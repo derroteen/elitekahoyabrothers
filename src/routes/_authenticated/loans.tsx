@@ -53,7 +53,7 @@ function LoansAdmin() {
   });
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status }: { id: string; status: any }) => {
       const { error } = await supabase.from("loans").update({ status }).eq("id", id);
       if (error) throw error;
     },
@@ -136,7 +136,7 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
       member_id: form.member_id,
       amount_borrowed: amount,
       interest_rate: Number(form.interest),
-      payment_frequency: form.freq,
+      payment_frequency: form.freq as any,
       insurance: Number(form.insurance || 0),
       balance,
       loan_date: form.date,
