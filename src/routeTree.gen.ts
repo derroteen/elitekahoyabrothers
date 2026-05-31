@@ -15,6 +15,17 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
+import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
+import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
+import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
+import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
+import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
+import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -45,6 +56,62 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSavingsRoute = AuthenticatedSavingsRouteImport.update({
+  id: '/savings',
+  path: '/savings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
+  id: '/passbook',
+  path: '/passbook',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMySavingsRoute = AuthenticatedMySavingsRouteImport.update({
+  id: '/my-savings',
+  path: '/my-savings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyPassbookRoute = AuthenticatedMyPassbookRouteImport.update({
+  id: '/my-passbook',
+  path: '/my-passbook',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyLoansRoute = AuthenticatedMyLoansRouteImport.update({
+  id: '/my-loans',
+  path: '/my-loans',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLoansRoute = AuthenticatedLoansRouteImport.update({
+  id: '/loans',
+  path: '/loans',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAnnouncementsRoute =
+  AuthenticatedAnnouncementsRouteImport.update({
+    id: '/announcements',
+    path: '/announcements',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -52,12 +119,34 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/audit': typeof AuthenticatedAuditRoute
+  '/loans': typeof AuthenticatedLoansRoute
+  '/members': typeof AuthenticatedMembersRoute
+  '/my-loans': typeof AuthenticatedMyLoansRoute
+  '/my-passbook': typeof AuthenticatedMyPassbookRoute
+  '/my-savings': typeof AuthenticatedMySavingsRoute
+  '/passbook': typeof AuthenticatedPassbookRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/savings': typeof AuthenticatedSavingsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/audit': typeof AuthenticatedAuditRoute
+  '/loans': typeof AuthenticatedLoansRoute
+  '/members': typeof AuthenticatedMembersRoute
+  '/my-loans': typeof AuthenticatedMyLoansRoute
+  '/my-passbook': typeof AuthenticatedMyPassbookRoute
+  '/my-savings': typeof AuthenticatedMySavingsRoute
+  '/passbook': typeof AuthenticatedPassbookRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/savings': typeof AuthenticatedSavingsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -67,6 +156,17 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/announcements': typeof AuthenticatedAnnouncementsRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/loans': typeof AuthenticatedLoansRoute
+  '/_authenticated/members': typeof AuthenticatedMembersRoute
+  '/_authenticated/my-loans': typeof AuthenticatedMyLoansRoute
+  '/_authenticated/my-passbook': typeof AuthenticatedMyPassbookRoute
+  '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
+  '/_authenticated/passbook': typeof AuthenticatedPassbookRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/savings': typeof AuthenticatedSavingsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -77,12 +177,34 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/announcements'
+    | '/audit'
+    | '/loans'
+    | '/members'
+    | '/my-loans'
+    | '/my-passbook'
+    | '/my-savings'
+    | '/passbook'
+    | '/reports'
+    | '/savings'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/change-password'
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/announcements'
+    | '/audit'
+    | '/loans'
+    | '/members'
+    | '/my-loans'
+    | '/my-passbook'
+    | '/my-savings'
+    | '/passbook'
+    | '/reports'
+    | '/savings'
+    | '/settings'
     | '/'
   id:
     | '__root__'
@@ -91,6 +213,17 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
+    | '/_authenticated/announcements'
+    | '/_authenticated/audit'
+    | '/_authenticated/loans'
+    | '/_authenticated/members'
+    | '/_authenticated/my-loans'
+    | '/_authenticated/my-passbook'
+    | '/_authenticated/my-savings'
+    | '/_authenticated/passbook'
+    | '/_authenticated/reports'
+    | '/_authenticated/savings'
+    | '/_authenticated/settings'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -146,14 +279,113 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/savings': {
+      id: '/_authenticated/savings'
+      path: '/savings'
+      fullPath: '/savings'
+      preLoaderRoute: typeof AuthenticatedSavingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/passbook': {
+      id: '/_authenticated/passbook'
+      path: '/passbook'
+      fullPath: '/passbook'
+      preLoaderRoute: typeof AuthenticatedPassbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-savings': {
+      id: '/_authenticated/my-savings'
+      path: '/my-savings'
+      fullPath: '/my-savings'
+      preLoaderRoute: typeof AuthenticatedMySavingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-passbook': {
+      id: '/_authenticated/my-passbook'
+      path: '/my-passbook'
+      fullPath: '/my-passbook'
+      preLoaderRoute: typeof AuthenticatedMyPassbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-loans': {
+      id: '/_authenticated/my-loans'
+      path: '/my-loans'
+      fullPath: '/my-loans'
+      preLoaderRoute: typeof AuthenticatedMyLoansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/members': {
+      id: '/_authenticated/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof AuthenticatedMembersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/loans': {
+      id: '/_authenticated/loans'
+      path: '/loans'
+      fullPath: '/loans'
+      preLoaderRoute: typeof AuthenticatedLoansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/announcements': {
+      id: '/_authenticated/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedLoansRoute: typeof AuthenticatedLoansRoute
+  AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
+  AuthenticatedMyLoansRoute: typeof AuthenticatedMyLoansRoute
+  AuthenticatedMyPassbookRoute: typeof AuthenticatedMyPassbookRoute
+  AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
+  AuthenticatedPassbookRoute: typeof AuthenticatedPassbookRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSavingsRoute: typeof AuthenticatedSavingsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAnnouncementsRoute: AuthenticatedAnnouncementsRoute,
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedLoansRoute: AuthenticatedLoansRoute,
+  AuthenticatedMembersRoute: AuthenticatedMembersRoute,
+  AuthenticatedMyLoansRoute: AuthenticatedMyLoansRoute,
+  AuthenticatedMyPassbookRoute: AuthenticatedMyPassbookRoute,
+  AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
+  AuthenticatedPassbookRoute: AuthenticatedPassbookRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSavingsRoute: AuthenticatedSavingsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
@@ -171,13 +403,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
