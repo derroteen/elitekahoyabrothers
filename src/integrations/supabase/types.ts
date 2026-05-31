@@ -14,16 +14,394 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          pinned: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pinned?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          record_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          record_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          record_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      loan_repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          loan_id: string
+          notes: string | null
+          payment_date: string
+          penalty: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loan_id: string
+          notes?: string | null
+          payment_date?: string
+          penalty?: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loan_id?: string
+          notes?: string | null
+          payment_date?: string
+          penalty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          amount_borrowed: number
+          amount_paid: number
+          balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          insurance: number
+          interest_rate: number
+          loan_date: string
+          member_id: string
+          notes: string | null
+          payment_frequency: Database["public"]["Enums"]["payment_frequency"]
+          status: Database["public"]["Enums"]["loan_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_borrowed: number
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          insurance?: number
+          interest_rate?: number
+          loan_date?: string
+          member_id: string
+          notes?: string | null
+          payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          status?: Database["public"]["Enums"]["loan_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_borrowed?: number
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          insurance?: number
+          interest_rate?: number
+          loan_date?: string
+          member_id?: string
+          notes?: string | null
+          payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          status?: Database["public"]["Enums"]["loan_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          channel: string
+          created_at: string
+          id: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      passbook_entries: {
+        Row: {
+          balance: number
+          bonus: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          loan_balance: number
+          loan_payment: number
+          member_id: string
+          remarks: string | null
+          savings: number
+          total: number
+          treasurer_sign: string | null
+          updated_at: string
+          withdrawal: number
+        }
+        Insert: {
+          balance?: number
+          bonus?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          id?: string
+          loan_balance?: number
+          loan_payment?: number
+          member_id: string
+          remarks?: string | null
+          savings?: number
+          total?: number
+          treasurer_sign?: string | null
+          updated_at?: string
+          withdrawal?: number
+        }
+        Update: {
+          balance?: number
+          bonus?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          loan_balance?: number
+          loan_payment?: number
+          member_id?: string
+          remarks?: string | null
+          savings?: number
+          total?: number
+          treasurer_sign?: string | null
+          updated_at?: string
+          withdrawal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passbook_entries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          date_joined: string
+          email: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          membership_no: string | null
+          must_change_password: boolean
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date_joined?: string
+          email?: string | null
+          full_name: string
+          id: string
+          is_active?: boolean
+          membership_no?: string | null
+          must_change_password?: boolean
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date_joined?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          membership_no?: string | null
+          must_change_password?: boolean
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      savings_entries: {
+        Row: {
+          amount: number
+          balance: number
+          bonus: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          member_id: string
+          notes: string | null
+          total: number
+          withdrawal: number
+        }
+        Insert: {
+          amount?: number
+          balance?: number
+          bonus?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          total?: number
+          withdrawal?: number
+        }
+        Update: {
+          amount?: number
+          balance?: number
+          bonus?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          total?: number
+          withdrawal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_entries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_view_all: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_staff: { Args: { _user_id: string }; Returns: boolean }
+      next_membership_no: { Args: never; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "admin" | "auditor" | "member"
+      loan_status: "pending" | "approved" | "active" | "closed" | "defaulted"
+      payment_frequency: "weekly" | "biweekly" | "monthly" | "quarterly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +528,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "admin", "auditor", "member"],
+      loan_status: ["pending", "approved", "active", "closed", "defaulted"],
+      payment_frequency: ["weekly", "biweekly", "monthly", "quarterly"],
+    },
   },
 } as const
