@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { fmtKES } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: Dashboard,
@@ -19,6 +22,46 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 
 function Dashboard() {
   const { profile, role } = useAuth();
+  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
+
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard-stats", role],
+    enabled: isStaff,
+    queryFn: async () => {
+      const [members, active, loans, pending, savings, announce] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
+        supabase.from("loans").select("balance, amount_paid, status"),
+        supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("passbook_entries").select("balance, entry_date, member_id"),
+        supabase.from("announcements").select("id", { count: "exact", head: true }),
+      ]);
+      const allLoans = loans.data ?? [];
+      const totalLoans = allLoans.reduce((s, l: any) => s + Number(l.balance ?? 0), 0);
+      const revenue = allLoans.reduce((s, l: any) => s + Number(l.amount_paid ?? 0), 0);
+      const activeLoans = allLoans.filter((l: any) => l.status === "active" || l.status === "approved").length;
+
+      // Sum latest balance per member from passbook
+      const latestByMember = new Map<string, { date: string; balance: number }>();
+      for (const e of savings.data ?? []) {
+        const prev = latestByMember.get(e.member_id);
+        if (!prev || e.entry_date > prev.date) latestByMember.set(e.member_id, { date: e.entry_date, balance: Number(e.balance) });
+      }
+      const totalSavings = Array.from(latestByMember.values()).reduce((s, x) => s + x.balance, 0);
+
+      return {
+        members: members.count ?? 0,
+        active: active.count ?? 0,
+        totalLoans,
+        activeLoans,
+        pending: pending.count ?? 0,
+        revenue,
+        totalSavings,
+        announcements: announce.count ?? 0,
+      };
+    },
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-7">
@@ -26,22 +69,26 @@ function Dashboard() {
           <h1 className="font-serif text-2xl font-bold">Welcome, {profile?.full_name?.split(" ")[0]}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Savings · Loans · Accountability · Growth</p>
         </div>
-        <div className="text-xs text-muted-foreground uppercase tracking-wider">{role?.replace("_"," ")}</div>
+        <div className="text-xs text-muted-foreground uppercase tracking-wider">{role?.replace("_", " ")}</div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-        <StatCard label="Total Members" value="—" icon="👥" />
-        <StatCard label="Total Savings" value="KES 0.00" icon="💰" />
-        <StatCard label="Active Loans" value="—" icon="🏦" />
-        <StatCard label="Overdue Loans" value="—" icon="⚠️" />
-      </div>
+      {isStaff && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+          <StatCard label="Total Members" value={String(stats?.members ?? "—")} icon="👥" />
+          <StatCard label="Active Members" value={String(stats?.active ?? "—")} icon="✅" />
+          <StatCard label="Total Savings" value={stats ? fmtKES(stats.totalSavings) : "—"} icon="💰" />
+          <StatCard label="Outstanding Loans" value={stats ? fmtKES(stats.totalLoans) : "—"} icon="🏦" />
+          <StatCard label="Active Loans" value={String(stats?.activeLoans ?? "—")} icon="📈" />
+          <StatCard label="Pending Loans" value={String(stats?.pending ?? "—")} icon="⏳" />
+          <StatCard label="Revenue (Paid)" value={stats ? fmtKES(stats.revenue) : "—"} icon="💵" />
+          <StatCard label="Announcements" value={String(stats?.announcements ?? "—")} icon="📣" />
+        </div>
+      )}
 
       <div className="bg-card border border-border rounded-xl p-6">
-        <h2 className="font-serif text-lg font-bold mb-3">Phase 1 ready</h2>
+        <h2 className="font-serif text-lg font-bold mb-3">Elite Kahoya Brothers</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Authentication, roles, database schema, and the navy/gold portal shell are live.
-          Phase 2 (Passbook, Loans, Savings, Members management, Announcements, Notifications)
-          and Phase 3 (Dashboards data, Audit log viewer, PDF/Excel exports) are next.
+          Use the sidebar to manage members, passbooks, loans, savings, and announcements.
         </p>
       </div>
     </div>

@@ -400,7 +400,14 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "admin" | "auditor" | "member"
-      loan_status: "pending" | "approved" | "active" | "closed" | "defaulted"
+      loan_status:
+        | "pending"
+        | "approved"
+        | "active"
+        | "closed"
+        | "defaulted"
+        | "rejected"
+        | "completed"
       payment_frequency: "weekly" | "biweekly" | "monthly" | "quarterly"
     }
     CompositeTypes: {
@@ -530,7 +537,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "auditor", "member"],
-      loan_status: ["pending", "approved", "active", "closed", "defaulted"],
+      loan_status: [
+        "pending",
+        "approved",
+        "active",
+        "closed",
+        "defaulted",
+        "rejected",
+        "completed",
+      ],
       payment_frequency: ["weekly", "biweekly", "monthly", "quarterly"],
     },
   },
