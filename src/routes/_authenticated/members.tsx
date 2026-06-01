@@ -120,24 +120,30 @@ function MembersPage() {
 function NewMemberDialog({ open, onOpenChange, onCreated, canSetRole }: { open: boolean; onOpenChange: (b: boolean) => void; onCreated: () => void; canSetRole: boolean }) {
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", password: "", role: "member" });
   const [submitting, setSubmitting] = useState(false);
+  const createMember = useServerFn(adminCreateMember);
 
   const submit = async () => {
     if (!form.full_name || !form.email || !form.password) { toast.error("Name, email, password required"); return; }
     setSubmitting(true);
-    const { error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: form.full_name, phone: form.phone, role: form.role, must_change_password: true },
-      },
-    });
-    setSubmitting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Member created. They must change password on first login.");
-    setForm({ full_name: "", email: "", phone: "", password: "", role: "member" });
-    onOpenChange(false);
-    onCreated();
+    try {
+      await createMember({
+        data: {
+          full_name: form.full_name,
+          email: form.email,
+          phone: form.phone || null,
+          password: form.password,
+          role: form.role as "member" | "auditor" | "admin",
+        },
+      });
+      toast.success("Member created. They must change password on first login.");
+      setForm({ full_name: "", email: "", phone: "", password: "", role: "member" });
+      onOpenChange(false);
+      onCreated();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to create member");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
