@@ -361,6 +361,27 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          development_mode: boolean
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          development_mode?: boolean
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          development_mode?: boolean
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -388,6 +409,10 @@ export type Database = {
     }
     Functions: {
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
+      email_for_membership_no: {
+        Args: { _membership_no: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -397,6 +422,7 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
+      reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "auditor" | "member"

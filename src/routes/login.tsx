@@ -9,10 +9,17 @@ export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Elite Kahoya Brothers" }] }),
 });
 
-// "superadmin" username maps to a synthetic email.
-function resolveEmail(credential: string): string {
+const EKB_PATTERN = /^EKB\d{3,}$/i;
+
+async function resolveEmail(credential: string): Promise<string | null> {
   const c = credential.trim();
+  if (!c) return null;
   if (c.includes("@")) return c.toLowerCase();
+  if (EKB_PATTERN.test(c)) {
+    const { data } = await supabase.rpc("email_for_membership_no", { _membership_no: c.toUpperCase() });
+    return (data as string | null) ?? null;
+  }
+  // Legacy: superadmin / other usernames
   return `${c.toLowerCase()}@ekb.local`;
 }
 
@@ -33,17 +40,19 @@ function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); setSubmitting(true);
-    const email = resolveEmail(credential);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setSubmitting(false);
-    if (err) { setError("Invalid credentials. Please try again."); return; }
-    toast.success("Welcome back");
+    try {
+      const email = await resolveEmail(credential);
+      if (!email) { setError("Membership number not found."); setSubmitting(false); return; }
+      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) { setError("Invalid credentials. Please try again."); return; }
+      toast.success("Welcome back");
+    } finally { setSubmitting(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-navy px-4"
+    <div className="min-h-screen flex items-center justify-center bg-navy px-4 py-8"
          style={{ backgroundImage: "radial-gradient(circle at 20% 50%, oklch(0.74 0.115 85 / 0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, oklch(0.55 0.16 245 / 0.12) 0%, transparent 50%)" }}>
-      <div className="w-[380px] bg-card rounded-2xl p-10 shadow-2xl">
+      <div className="w-full max-w-[400px] bg-card rounded-2xl p-7 sm:p-10 shadow-2xl">
         <div className="text-center mb-7">
           <div className="font-serif text-2xl font-black text-navy leading-tight">
             Elite Kahoya<br/>Brothers
@@ -56,21 +65,22 @@ function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Username / Email</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Membership # or Email</label>
             <input
-              className="w-full px-3.5 py-2.5 border-[1.5px] border-border rounded-md text-sm outline-none focus:border-blue"
+              className="w-full px-3.5 py-3 border-[1.5px] border-border rounded-md text-base outline-none focus:border-blue"
               value={credential} onChange={(e) => setCredential(e.target.value)}
-              placeholder="superadmin or you@example.com" autoFocus
+              placeholder="EKB001 or you@example.com" autoFocus
+              autoCapitalize="characters" autoComplete="username"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">Password</label>
-            <input type="password"
-              className="w-full px-3.5 py-2.5 border-[1.5px] border-border rounded-md text-sm outline-none focus:border-blue"
+            <input type="password" autoComplete="current-password"
+              className="w-full px-3.5 py-3 border-[1.5px] border-border rounded-md text-base outline-none focus:border-blue"
               value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <button type="submit" disabled={submitting}
-            className="w-full bg-gold text-navy font-semibold py-2.5 rounded-md hover:bg-gold-2 transition disabled:opacity-60">
+            className="w-full bg-gold text-navy font-semibold py-3 rounded-md hover:bg-gold-2 transition disabled:opacity-60 text-base">
             {submitting ? "Signing in…" : "Sign In →"}
           </button>
         </form>
