@@ -61,8 +61,7 @@ export const resetTestData = createServerFn({ method: "POST" })
     }
 
     // Reset membership counter so next member is EKB001
-    await supabaseAdmin.rpc("exec_sql" as any, {}); // no-op safeguard if absent
-    // Use raw SQL via from() not available — use rpc workaround: create a small definer fn? Simplest: just setval via a tiny rpc would need migration. Instead, use Postgres function via REST? Use service-role REST PostgREST? Sequence can be reset by a SECURITY DEFINER fn we already shipped? We don't have one. Workaround: insert dummy then drop. Cleanest: do it through SQL via supabase-js rpc using `pg_catalog.setval` — needs an RPC. We'll execute via a direct admin SQL using `setval` through PostgREST is not allowed; use `supabaseAdmin.rpc` against a function we create. Since no such function, fall back to: do not reset (sequence will continue). To make EKB001 again, we add a helper RPC in a follow-up migration. For now, log a hint.
+    await supabaseAdmin.rpc("reset_membership_seq" as any);
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
