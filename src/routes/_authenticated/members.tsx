@@ -120,15 +120,16 @@ function MembersPage() {
         </div>
       </Card>
       <Card>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="px-4 py-3">Member #</th>
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Joined</th>
+              <th className="px-4 py-3 hidden md:table-cell">Email</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Phone</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Role</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Joined</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -141,11 +142,14 @@ function MembersPage() {
               return (
                 <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-3 font-mono text-xs">{m.membership_no ?? "—"}</td>
-                  <td className="px-4 py-3 font-medium">{m.full_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{m.phone ?? "—"}</td>
-                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{r?.replace("_", " ") ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(m.date_joined)}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <div>{m.full_name}</div>
+                    <div className="md:hidden text-xs text-muted-foreground truncate max-w-[180px]">{m.email}</div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{m.email}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.phone ?? "—"}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider hidden lg:table-cell">{r?.replace("_", " ") ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{fmtDate(m.date_joined)}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${m.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                       {m.is_active ? "Active" : "Inactive"}
@@ -178,6 +182,7 @@ function MembersPage() {
             })}
           </tbody>
         </table>
+        </div>
       </Card>
       <NewMemberDialog open={open} onOpenChange={setOpen} onCreated={refresh} canSetRole={isSuper} />
       {editing && <EditDialog member={editing} onClose={() => setEditing(null)} onSaved={refresh} canSetRole={isSuper} />}
