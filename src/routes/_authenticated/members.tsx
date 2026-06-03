@@ -52,12 +52,17 @@ function MembersPage() {
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["members"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, phone, membership_no, is_active, date_joined, user_roles(role)")
-        .order("membership_no", { ascending: true, nullsFirst: false });
-      if (error) throw error;
-      return data ?? [];
+      const [pRes, rRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, full_name, email, phone, membership_no, is_active, date_joined")
+          .order("membership_no", { ascending: true, nullsFirst: false }),
+        supabase.from("user_roles").select("user_id, role"),
+      ]);
+      if (pRes.error) throw pRes.error;
+      if (rRes.error) throw rRes.error;
+      const roleMap = new Map((rRes.data ?? []).map((r: any) => [r.user_id, r.role]));
+      return (pRes.data ?? []).map((p: any) => ({ ...p, user_roles: [{ role: roleMap.get(p.id) ?? "member" }] }));
     },
   });
 
