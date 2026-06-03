@@ -118,6 +118,56 @@ export type Database = {
           },
         ]
       }
+      loan_schedule: {
+        Row: {
+          amount_paid: number
+          balance_remaining: number
+          created_at: string
+          due_date: string
+          expected_amount: number
+          id: string
+          loan_id: string
+          payment_date: string | null
+          period_number: number
+          remarks: string | null
+          status: string
+        }
+        Insert: {
+          amount_paid?: number
+          balance_remaining?: number
+          created_at?: string
+          due_date: string
+          expected_amount?: number
+          id?: string
+          loan_id: string
+          payment_date?: string | null
+          period_number: number
+          remarks?: string | null
+          status?: string
+        }
+        Update: {
+          amount_paid?: number
+          balance_remaining?: number
+          created_at?: string
+          due_date?: string
+          expected_amount?: number
+          id?: string
+          loan_id?: string
+          payment_date?: string | null
+          period_number?: number
+          remarks?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_schedule_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loans: {
         Row: {
           amount_borrowed: number
@@ -129,10 +179,13 @@ export type Database = {
           insurance: number
           interest_rate: number
           loan_date: string
+          loan_term_months: number
           member_id: string
           notes: string | null
           payment_frequency: Database["public"]["Enums"]["payment_frequency"]
+          period_payment: number
           status: Database["public"]["Enums"]["loan_status"]
+          total_repayable: number
           updated_at: string
         }
         Insert: {
@@ -145,10 +198,13 @@ export type Database = {
           insurance?: number
           interest_rate?: number
           loan_date?: string
+          loan_term_months?: number
           member_id: string
           notes?: string | null
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          total_repayable?: number
           updated_at?: string
         }
         Update: {
@@ -161,10 +217,13 @@ export type Database = {
           insurance?: number
           interest_rate?: number
           loan_date?: string
+          loan_term_months?: number
           member_id?: string
           notes?: string | null
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          total_repayable?: number
           updated_at?: string
         }
         Relationships: [
@@ -400,6 +459,104 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_collection_entries: {
+        Row: {
+          benevolent_fund: number
+          collection_id: string
+          created_at: string
+          fine: number
+          id: string
+          insurance: number
+          loan_refund: number
+          member_id: string
+          remarks: string | null
+          savings: number
+          total: number
+        }
+        Insert: {
+          benevolent_fund?: number
+          collection_id: string
+          created_at?: string
+          fine?: number
+          id?: string
+          insurance?: number
+          loan_refund?: number
+          member_id: string
+          remarks?: string | null
+          savings?: number
+          total?: number
+        }
+        Update: {
+          benevolent_fund?: number
+          collection_id?: string
+          created_at?: string
+          fine?: number
+          id?: string
+          insurance?: number
+          loan_refund?: number
+          member_id?: string
+          remarks?: string | null
+          savings?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_collection_entries_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_collections: {
+        Row: {
+          banked_by: string | null
+          banked_in_advance: number
+          cash_in_hand: number
+          collection_date: string
+          created_at: string
+          created_by: string | null
+          id: string
+          locked: boolean
+          notes: string | null
+          recorded_by: string | null
+          treasurer_name: string | null
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          banked_by?: string | null
+          banked_in_advance?: number
+          cash_in_hand?: number
+          collection_date?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          locked?: boolean
+          notes?: string | null
+          recorded_by?: string | null
+          treasurer_name?: string | null
+          updated_at?: string
+          week_number: number
+        }
+        Update: {
+          banked_by?: string | null
+          banked_in_advance?: number
+          cash_in_hand?: number
+          collection_date?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          locked?: boolean
+          notes?: string | null
+          recorded_by?: string | null
+          treasurer_name?: string | null
+          updated_at?: string
+          week_number?: number
         }
         Relationships: []
       }
