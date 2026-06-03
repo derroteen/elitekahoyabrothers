@@ -72,7 +72,7 @@ function CollectionsPage() {
         </div>
       </Card>
 
-      <NewSheetDialog open={openNew} onOpenChange={setOpenNew} onCreated={(id) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
+      <NewSheetDialog open={openNew} onOpenChange={setOpenNew} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
       {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} />}
     </div>
   );
