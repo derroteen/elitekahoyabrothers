@@ -88,9 +88,6 @@ function LoginPage() {
         <div className="mt-4 text-center text-xs text-muted-foreground">
           <Link to="/forgot-password" className="hover:text-foreground">Forgot password?</Link>
         </div>
-        <p className="text-center text-[11px] text-muted-foreground mt-3">
-          Super Admin: <span className="font-mono">superadmin</span> / <span className="font-mono">admin1234</span>
-        </p>
       </div>
     </div>
   );
