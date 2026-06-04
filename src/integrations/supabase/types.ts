@@ -77,6 +77,60 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_fines: {
+        Row: {
+          amount: number
+          amount_paid: number
+          created_at: string
+          fine_date: string
+          id: string
+          loan_id: string
+          reason: string
+          schedule_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          amount_paid?: number
+          created_at?: string
+          fine_date?: string
+          id?: string
+          loan_id: string
+          reason?: string
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          amount_paid?: number
+          created_at?: string
+          fine_date?: string
+          id?: string
+          loan_id?: string
+          reason?: string
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_fines_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_fines_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "loan_schedule"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_repayments: {
         Row: {
           amount: number
@@ -125,10 +179,13 @@ export type Database = {
           created_at: string
           due_date: string
           expected_amount: number
+          fine_amount: number
+          fine_paid: number
           id: string
           loan_id: string
           payment_date: string | null
           period_number: number
+          prepaid: boolean
           remarks: string | null
           status: string
         }
@@ -138,10 +195,13 @@ export type Database = {
           created_at?: string
           due_date: string
           expected_amount?: number
+          fine_amount?: number
+          fine_paid?: number
           id?: string
           loan_id: string
           payment_date?: string | null
           period_number: number
+          prepaid?: boolean
           remarks?: string | null
           status?: string
         }
@@ -151,10 +211,13 @@ export type Database = {
           created_at?: string
           due_date?: string
           expected_amount?: number
+          fine_amount?: number
+          fine_paid?: number
           id?: string
           loan_id?: string
           payment_date?: string | null
           period_number?: number
+          prepaid?: boolean
           remarks?: string | null
           status?: string
         }
@@ -178,13 +241,18 @@ export type Database = {
           id: string
           insurance: number
           interest_rate: number
+          last_interest_year: number | null
           loan_date: string
           loan_term_months: number
           member_id: string
           notes: string | null
+          outstanding_fines: number
           payment_frequency: Database["public"]["Enums"]["payment_frequency"]
           period_payment: number
           status: Database["public"]["Enums"]["loan_status"]
+          total_fines_charged: number
+          total_fines_paid: number
+          total_interest_added: number
           total_repayable: number
           updated_at: string
         }
@@ -197,13 +265,18 @@ export type Database = {
           id?: string
           insurance?: number
           interest_rate?: number
+          last_interest_year?: number | null
           loan_date?: string
           loan_term_months?: number
           member_id: string
           notes?: string | null
+          outstanding_fines?: number
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
           period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          total_fines_charged?: number
+          total_fines_paid?: number
+          total_interest_added?: number
           total_repayable?: number
           updated_at?: string
         }
@@ -216,13 +289,18 @@ export type Database = {
           id?: string
           insurance?: number
           interest_rate?: number
+          last_interest_year?: number | null
           loan_date?: string
           loan_term_months?: number
           member_id?: string
           notes?: string | null
+          outstanding_fines?: number
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
           period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
+          total_fines_charged?: number
+          total_fines_paid?: number
+          total_interest_added?: number
           total_repayable?: number
           updated_at?: string
         }
@@ -565,6 +643,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_annual_interest: { Args: { _loan_id?: string }; Returns: number }
+      apply_loan_fines: { Args: { _loan_id?: string }; Returns: number }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       email_for_membership_no: {
         Args: { _membership_no: string }
@@ -579,6 +659,15 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
+      record_loan_repayment: {
+        Args: {
+          _amount: number
+          _loan_id: string
+          _notes?: string
+          _payment_date?: string
+        }
+        Returns: Json
+      }
       reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -591,6 +680,8 @@ export type Database = {
         | "defaulted"
         | "rejected"
         | "completed"
+        | "completed_with_fine"
+        | "overdue"
       payment_frequency: "weekly" | "biweekly" | "monthly" | "quarterly"
     }
     CompositeTypes: {
@@ -728,6 +819,8 @@ export const Constants = {
         "defaulted",
         "rejected",
         "completed",
+        "completed_with_fine",
+        "overdue",
       ],
       payment_frequency: ["weekly", "biweekly", "monthly", "quarterly"],
     },
