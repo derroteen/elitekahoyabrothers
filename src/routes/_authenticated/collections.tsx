@@ -60,14 +60,17 @@ function CollectionsPage() {
               {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && sheets.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No collection sheets yet</td></tr>}
               {sheets.map((s: any) => (
-                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer" onClick={() => setActiveId(s.id)}>
-                  <td className="px-4 py-3 font-semibold">Week {s.week_number}</td>
-                  <td className="px-4 py-3">{fmtDate(s.collection_date)}</td>
+                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-4 py-3 font-semibold cursor-pointer" onClick={() => setActiveId(s.id)}>Week {s.week_number}</td>
+                  <td className="px-4 py-3 cursor-pointer" onClick={() => setActiveId(s.id)}>{fmtDate(s.collection_date)}</td>
                   <td className="px-4 py-3">{s.treasurer_name ?? "—"}</td>
                   <td className="px-4 py-3">{s.banked_by ?? "—"}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(s.banked_in_advance)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(s.cash_in_hand)}</td>
-                  <td className="px-4 py-3 text-right"><Button size="sm" variant="ghost">Open →</Button></td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => setActiveId(s.id)}>Open</Button>
+                    {canDelete && <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeleteId(s.id)}>Delete</Button>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -77,6 +80,7 @@ function CollectionsPage() {
 
       <NewSheetDialog open={openNew} onOpenChange={setOpenNew} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
       {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} />}
+      {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
   );
 }
