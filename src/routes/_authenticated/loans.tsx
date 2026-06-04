@@ -194,6 +194,7 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               <SelectTrigger><SelectValue placeholder="Choose…" /></SelectTrigger>
               <SelectContent>{members.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.membership_no} · {m.full_name}</SelectItem>)}</SelectContent>
             </Select>
+            {selectedMember && <div className="text-xs text-muted-foreground mt-1 font-mono">Membership No: {selectedMember.membership_no}</div>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
@@ -207,8 +208,12 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
                   <SelectItem value="6">6 Months</SelectItem>
                   <SelectItem value="12">12 Months</SelectItem>
                   <SelectItem value="24">24 Months</SelectItem>
+                  <SelectItem value="custom">Custom…</SelectItem>
                 </SelectContent>
               </Select>
+              {form.term === "custom" && (
+                <Input className="mt-2" type="number" min="1" placeholder="Months" value={form.customTerm} onChange={(e) => setForm({ ...form, customTerm: e.target.value })} />
+              )}
             </div>
             <div>
               <Label>Frequency</Label>
@@ -221,8 +226,10 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               </Select>
             </div>
             <div className="col-span-2"><Label>Loan Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Loan Purpose (optional)</Label><Input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="e.g. School fees, business capital" /></div>
             <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
+
 
           <div className="bg-muted/40 rounded-md p-4 text-sm grid grid-cols-2 gap-x-6 gap-y-1.5">
             <div className="text-muted-foreground">Principal + Compound Interest:</div>
