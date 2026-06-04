@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -22,30 +22,38 @@ function MyLoans() {
     <div>
       <PageHeader title="My Loans" subtitle="Loans you've taken with the SACCO" />
       <Card>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3 text-right">Borrowed</th>
-              <th className="px-4 py-3 text-right">Paid</th>
-              <th className="px-4 py-3 text-right">Balance</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-            {!isLoading && loans.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
-            {loans.map((l: any) => (
-              <tr key={l.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3">{fmtDate(l.loan_date)}</td>
-                <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
-                <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
-                <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
-                <td className="px-4 py-3 text-xs uppercase tracking-wider">{l.status}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[800px]">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3 text-right">Borrowed</th>
+                <th className="px-4 py-3 text-right">Paid</th>
+                <th className="px-4 py-3 text-right">Balance</th>
+                <th className="px-4 py-3 text-right">Outstanding Fines</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {!isLoading && loans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
+              {loans.map((l: any) => (
+                <tr key={l.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3">{fmtDate(l.loan_date)}</td>
+                  <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
+                  <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
+                  <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
+                  <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{(l.status ?? "").replace(/_/g, " ")}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );

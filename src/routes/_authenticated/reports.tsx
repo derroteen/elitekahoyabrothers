@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports — EKB" }] }),
 });
 
-type ReportKey = "summary" | "members" | "loans" | "savings" | "collections";
+type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines";
 
 function ReportsPage() {
   const { role, loading } = useAuth();
@@ -27,7 +27,7 @@ function ReportsPage() {
     queryKey: ["reports-bundle"],
     enabled: allowed,
     queryFn: async () => {
-      const [profs, roles, loans, sched, repay, savings, sheets, entries] = await Promise.all([
+      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, phone, membership_no, is_active, date_joined"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("loans").select("*"),
@@ -36,6 +36,7 @@ function ReportsPage() {
         supabase.from("passbook_entries").select("*"),
         (supabase.from("weekly_collections" as any) as any).select("*"),
         (supabase.from("weekly_collection_entries" as any) as any).select("*"),
+        (supabase.from("loan_fines" as any) as any).select("*"),
       ]);
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
@@ -47,6 +48,7 @@ function ReportsPage() {
         savings: (savings.data ?? []).map((s: any) => ({ ...s, member: memberMap.get(s.member_id) })),
         sheets: sheets.data ?? [],
         entries: (entries.data ?? []).map((e: any) => ({ ...e, member: memberMap.get(e.member_id) })),
+        fines: fines.data ?? [],
         memberMap,
       };
     },
@@ -104,6 +106,14 @@ function ReportsPage() {
           { header: "Penalty", key: "penalty", align: "right", width: 10 },
           { header: "Total", key: "total", align: "right", width: 12 },
         ];
+      case "fines":
+        return [
+          { header: "Member", key: "member_name", width: 24 },
+          { header: "Member ID", key: "member_no", width: 12 },
+          { header: "Total Charged", key: "total_charged", align: "right", width: 14 },
+          { header: "Total Paid", key: "total_paid", align: "right", width: 14 },
+          { header: "Outstanding", key: "outstanding", align: "right", width: 14 },
+        ];
       default:
         return [];
     }
@@ -155,6 +165,25 @@ function ReportsPage() {
           };
         });
       }
+      case "fines": {
+        // Aggregate by member from fines table
+        const byMember = new Map<string, { name: string; no: string; charged: number; paid: number }>();
+        for (const f of data.fines as any[]) {
+          const loan: any = (data.loans as any[]).find((l: any) => l.id === f.loan_id);
+          if (!loan) continue;
+          const m: any = loan.member;
+          const key = loan.member_id;
+          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", charged: 0, paid: 0 };
+          cur.charged += Number(f.amount || 0);
+          cur.paid += Number(f.amount_paid || 0);
+          byMember.set(key, cur);
+        }
+        return Array.from(byMember.values()).map(v => ({
+          member_name: v.name, member_no: v.no,
+          total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid),
+          outstanding: fmtKES(v.charged - v.paid),
+        }));
+      }
       default:
         return [];
     }
@@ -173,6 +202,9 @@ function ReportsPage() {
       }
     }
     const totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    const totalFinesCharged = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_charged || 0), 0);
+    const totalFinesPaid = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_paid || 0), 0);
+    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0);
     return {
       members: data.members.length,
       active: data.members.filter((m: any) => m.is_active).length,
@@ -180,6 +212,7 @@ function ReportsPage() {
       pending: data.loans.filter((l: any) => l.status === "pending").length,
       active_loans: data.loans.filter((l: any) => ["active", "approved", "overdue"].includes(l.status)).length,
       totalBorrowed, totalBal, totalPaid, totalSavings,
+      totalFinesCharged, totalFinesPaid, totalOutstandingFines,
       sheets: data.sheets.length,
     };
   })();
@@ -188,6 +221,7 @@ function ReportsPage() {
     { key: "summary", label: "Summary Report", description: "Overall financial snapshot", icon: BarChart3 },
     { key: "members", label: "Members Roster", description: "Complete member directory", icon: Users },
     { key: "loans", label: "Loan Register", description: "All loans with balances & status", icon: Banknote },
+    { key: "fines", label: "Fine Summary", description: "Fines per member: charged / paid / outstanding", icon: Banknote },
     { key: "savings", label: "Savings Ledger", description: "All savings transactions", icon: PiggyBank },
     { key: "collections", label: "Weekly Collections", description: "All collection sheet entries", icon: ClipboardList },
   ];
@@ -207,6 +241,9 @@ function ReportsPage() {
         { metric: "Total Borrowed", value: fmtKES(summary.totalBorrowed) },
         { metric: "Total Repaid", value: fmtKES(summary.totalPaid) },
         { metric: "Outstanding Balance", value: fmtKES(summary.totalBal) },
+        { metric: "Total Fines Charged", value: fmtKES(summary.totalFinesCharged) },
+        { metric: "Total Fines Paid", value: fmtKES(summary.totalFinesPaid) },
+        { metric: "Outstanding Fines", value: fmtKES(summary.totalOutstandingFines) },
         { metric: "Total Member Savings", value: fmtKES(summary.totalSavings) },
         { metric: "Collection Sheets", value: String(summary.sheets) },
       ];
@@ -233,6 +270,7 @@ function ReportsPage() {
       exportXLSX(`ekb-full-report-${stamp()}.xlsx`, [
         { name: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { name: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { name: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { name: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { name: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
       ]);
@@ -240,6 +278,7 @@ function ReportsPage() {
       exportPDF(`ekb-full-report-${stamp()}.pdf`, "Full Report", [
         { heading: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { heading: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { heading: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { heading: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { heading: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
       ], { subtitle: "All modules" });

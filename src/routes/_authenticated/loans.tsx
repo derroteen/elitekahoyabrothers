@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,26 @@ function LoansAdmin() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const applyFines = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("apply_loan_fines", { _loan_id: null });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => { toast.success(`${n} fine(s) charged`); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const applyInterest = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("apply_annual_interest", { _loan_id: null });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => { toast.success(`Annual interest applied to ${n} loan(s)`); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   useEffect(() => { if (!loading && role === "member") navigate({ to: "/" }); }, [loading, role, navigate]);
 
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
@@ -67,65 +87,71 @@ function LoansAdmin() {
   return (
     <div>
       <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
-        actions={canEdit ? <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button> : undefined} />
+        actions={canEdit ? (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => applyFines.mutate()} disabled={applyFines.isPending}>Apply Fines</Button>
+            <Button variant="outline" size="sm" onClick={() => applyInterest.mutate()} disabled={applyInterest.isPending}>Annual Interest</Button>
+            <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button>
+          </div>
+        ) : undefined} />
 
       {canEdit && (
-        <div className="mb-4 flex justify-end sm:hidden">
-          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 w-full">+ New Loan</Button>
+        <div className="mb-4 flex gap-2 sm:hidden">
+          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 flex-1">+ New Loan</Button>
         </div>
       )}
       <Card>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-3 py-3">Date</th>
                 <th className="px-3 py-3">Member</th>
                 <th className="px-3 py-3 text-right">Borrowed</th>
                 <th className="px-3 py-3 text-right">Rate</th>
-                <th className="px-3 py-3 text-right">Term</th>
                 <th className="px-3 py-3">Freq</th>
                 <th className="px-3 py-3 text-right">Per Period</th>
-                <th className="px-3 py-3 text-right">Insurance</th>
-                <th className="px-3 py-3 text-right">Total Repay</th>
                 <th className="px-3 py-3 text-right">Paid</th>
                 <th className="px-3 py-3 text-right">Balance</th>
+                <th className="px-3 py-3 text-right">Outstanding Fines</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={13} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-              {!isLoading && loans.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
+              {isLoading && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {!isLoading && loans.length === 0 && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                   <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(l.loan_date)}</td>
                   <td className="px-3 py-3">
-                    <div className="font-medium">{l.profile?.full_name ?? l.member_id.slice(0, 8)}</div>
+                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="font-medium text-navy hover:underline">
+                      {l.profile?.full_name ?? l.member_id.slice(0, 8)}
+                    </Link>
                     <div className="text-xs text-muted-foreground font-mono">{l.profile?.membership_no}</div>
                   </td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
                   <td className="px-3 py-3 text-right">{Number(l.interest_rate).toFixed(1)}%</td>
-                  <td className="px-3 py-3 text-right">{l.loan_term_months}m</td>
                   <td className="px-3 py-3 text-xs capitalize">{l.payment_frequency}</td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.period_payment)}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.insurance)}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.total_repayable)}</td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
                   <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
+                  <td className={`px-3 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                   <td className="px-3 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700"}`}>{l.status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700"}`}>{l.status.replace(/_/g, " ")}</span>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <Button size="sm" variant="ghost" onClick={() => setScheduleFor(l)}>Schedule</Button>
+                    <Link to="/loans/$loanId" params={{ loanId: l.id }}>
+                      <Button size="sm" variant="ghost">Ledger</Button>
+                    </Link>
                     {canEdit && l.status === "pending" && (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "approved" })}>Approve</Button>
                         <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "rejected" })}>Reject</Button>
                       </>
                     )}
-                    {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue") && (
+                    {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue" || l.status === "completed_with_fine") && (
                       <Button size="sm" variant="ghost" onClick={() => setRepayFor(l)}>Repayment</Button>
                     )}
                   </td>
@@ -135,6 +161,7 @@ function LoansAdmin() {
           </table>
         </div>
       </Card>
+
       <NewLoanDialog open={open} onOpenChange={setOpen} onCreated={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />
       {repayFor && <RepaymentDialog loan={repayFor} onClose={() => setRepayFor(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />}
       {scheduleFor && <ScheduleDialog loan={scheduleFor} onClose={() => setScheduleFor(null)} />}
@@ -258,26 +285,28 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
 }
 
 function RepaymentDialog({ loan, onClose, onSaved }: any) {
-  const [form, setForm] = useState({ amount: "", penalty: "0", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [form, setForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
   const [submitting, setSubmitting] = useState(false);
+
+  const required = Number(loan.period_payment || 0);
+  const amt = Number(form.amount || 0);
+  const outFines = Number(loan.outstanding_fines || 0);
+  const previewFinePaid = Math.min(amt, outFines);
+  const previewExcess = Math.max(0, amt - outFines - required);
 
   const submit = async () => {
     if (!form.amount) { toast.error("Amount required"); return; }
     setSubmitting(true);
-    const amount = Number(form.amount);
-    const penalty = Number(form.penalty || 0);
-    const { error: e1 } = await supabase.from("loan_repayments").insert({
-      loan_id: loan.id, amount, penalty,
-      payment_date: form.payment_date, notes: form.notes || null,
+    const { data, error } = await (supabase as any).rpc("record_loan_repayment", {
+      _loan_id: loan.id,
+      _amount: Number(form.amount),
+      _payment_date: form.payment_date,
+      _notes: form.notes || null,
     });
-    if (e1) { setSubmitting(false); toast.error(e1.message); return; }
-    const newPaid = Number(loan.amount_paid) + amount;
-    const newBal = Math.max(0, Number(loan.balance) - amount);
-    const newStatus = newBal === 0 ? "completed" : (loan.status === "approved" ? "active" : loan.status);
-    const { error: e2 } = await supabase.from("loans").update({ amount_paid: newPaid, balance: newBal, status: newStatus }).eq("id", loan.id);
     setSubmitting(false);
-    if (e2) { toast.error(e2.message); return; }
-    toast.success("Repayment recorded");
+    if (error) { toast.error(error.message); return; }
+    const r = data as any;
+    toast.success(`Repayment recorded · ${r.installments_covered ?? 0} installment(s) covered${r.fine_paid > 0 ? `, ${fmtKES(r.fine_paid)} fines paid` : ""}`);
     onClose(); onSaved();
   };
 
@@ -285,13 +314,23 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader><DialogTitle className="font-serif">Record Repayment</DialogTitle></DialogHeader>
-        <div className="text-xs text-muted-foreground mb-3 font-mono">Current balance: {fmtKES(loan.balance)}</div>
+        <div className="text-xs text-muted-foreground mb-3 font-mono space-y-0.5">
+          <div>Required per period: {fmtKES(required)}</div>
+          <div>Current balance: {fmtKES(loan.balance)}</div>
+          {outFines > 0 && <div className="text-red-600">Outstanding fines: {fmtKES(outFines)}</div>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
-          <div><Label>Penalty</Label><Input type="number" step="0.01" value={form.penalty} onChange={(e) => setForm({ ...form, penalty: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Amount Paid</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
           <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
+        {amt > 0 && (
+          <div className="bg-muted/40 rounded-md p-3 text-xs space-y-1">
+            {previewFinePaid > 0 && <div>Fines covered: <span className="font-mono">{fmtKES(previewFinePaid)}</span></div>}
+            {previewExcess > 0 && <div className="text-emerald-700">Excess (prepays future): <span className="font-mono">{fmtKES(previewExcess)}</span></div>}
+            <div className="text-muted-foreground">Allocation: fines first → current installments → future installments (prepaid)</div>
+          </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save"}</Button>
