@@ -157,7 +157,9 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
 
   const submit = async () => {
     if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
+    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
     setSubmitting(true);
+    const purposeNote = form.purpose ? `Purpose: ${form.purpose}${form.notes ? ` · ${form.notes}` : ""}` : (form.notes || null);
     const { data: loan, error } = await supabase.from("loans").insert({
       member_id: form.member_id,
       amount_borrowed: calc.principal,
@@ -169,10 +171,11 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
       period_payment: calc.periodPayment,
       balance: calc.totalRepayable,
       loan_date: form.date,
-      notes: form.notes || null,
+      notes: purposeNote,
       status: "pending",
     } as any).select("id").single();
     if (error) { setSubmitting(false); toast.error(error.message); return; }
+
 
     // Auto-generate repayment schedule
     const rows = buildSchedule(form.date, calc).map(r => ({ ...r, loan_id: loan!.id, status: "pending" }));
