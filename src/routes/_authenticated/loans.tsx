@@ -36,13 +36,9 @@ function LoansAdmin() {
   const [repayFor, setRepayFor] = useState<any>(null);
   const [scheduleFor, setScheduleFor] = useState<any>(null);
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading…</div>;
-  if (!role) return <div className="p-8 text-muted-foreground">Loading…</div>;
-  if (role === "member") { navigate({ to: "/" }); return null; }
-  const canEdit = role === "super_admin" || role === "admin";
-
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ["loans-all"],
+    enabled: !!role && role !== "member",
     queryFn: async () => {
       const [{ data: ls }, { data: profs }] = await Promise.all([
         supabase.from("loans").select("*").order("created_at", { ascending: false }),
@@ -62,10 +58,17 @@ function LoansAdmin() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  useEffect(() => { if (!loading && role === "member") navigate({ to: "/" }); }, [loading, role, navigate]);
+
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role === "member") return null;
+  const canEdit = role === "super_admin" || role === "admin";
+
   return (
     <div>
       <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
         actions={canEdit ? <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button> : undefined} />
+
       {canEdit && (
         <div className="mb-4 flex justify-end sm:hidden">
           <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 w-full">+ New Loan</Button>
