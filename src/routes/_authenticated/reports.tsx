@@ -106,6 +106,14 @@ function ReportsPage() {
           { header: "Penalty", key: "penalty", align: "right", width: 10 },
           { header: "Total", key: "total", align: "right", width: 12 },
         ];
+      case "fines":
+        return [
+          { header: "Member", key: "member_name", width: 24 },
+          { header: "Member ID", key: "member_no", width: 12 },
+          { header: "Total Charged", key: "total_charged", align: "right", width: 14 },
+          { header: "Total Paid", key: "total_paid", align: "right", width: 14 },
+          { header: "Outstanding", key: "outstanding", align: "right", width: 14 },
+        ];
       default:
         return [];
     }
