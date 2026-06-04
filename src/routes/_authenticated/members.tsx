@@ -32,7 +32,7 @@ type RoleFilter = "all" | "member" | "auditor" | "admin" | "super_admin";
 type StatusFilter = "all" | "active" | "inactive";
 
 function MembersPage() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -43,14 +43,11 @@ function MembersPage() {
   const [resetting, setResetting] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
 
-  if (role !== "super_admin" && role !== "admin") {
-    navigate({ to: "/" });
-    return null;
-  }
-  const isSuper = role === "super_admin";
+  const isStaff = role === "super_admin" || role === "admin";
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["members"],
+    enabled: isStaff,
     queryFn: async () => {
       const [pRes, rRes] = await Promise.all([
         supabase
@@ -67,10 +64,20 @@ function MembersPage() {
   });
 
   const setActive = useServerFn(adminSetActive);
+
+  useEffect(() => {
+    if (!loading && role && !isStaff) navigate({ to: "/" });
+  }, [loading, role, isStaff, navigate]);
+
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!isStaff) return null;
+  const isSuper = role === "super_admin";
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["members"] });
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
+
 
   const filtered = members.filter((m: any) => {
     const r = m.user_roles?.[0]?.role;
