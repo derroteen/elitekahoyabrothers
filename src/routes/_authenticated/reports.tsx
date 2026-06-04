@@ -217,6 +217,7 @@ function ReportsPage() {
     { key: "summary", label: "Summary Report", description: "Overall financial snapshot", icon: BarChart3 },
     { key: "members", label: "Members Roster", description: "Complete member directory", icon: Users },
     { key: "loans", label: "Loan Register", description: "All loans with balances & status", icon: Banknote },
+    { key: "fines", label: "Fine Summary", description: "Fines per member: charged / paid / outstanding", icon: Banknote },
     { key: "savings", label: "Savings Ledger", description: "All savings transactions", icon: PiggyBank },
     { key: "collections", label: "Weekly Collections", description: "All collection sheet entries", icon: ClipboardList },
   ];
