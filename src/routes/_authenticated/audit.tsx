@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -11,14 +12,20 @@ export const Route = createFileRoute("/_authenticated/audit")({
 });
 
 function AuditPage() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
-  if (role && role !== "super_admin" && role !== "admin" && role !== "auditor") { navigate({ to: "/" }); return null; }
+  const allowed = role === "super_admin" || role === "admin" || role === "auditor";
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["audit"],
+    enabled: allowed,
     queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
   });
+
+  useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/" }); }, [loading, role, allowed, navigate]);
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!allowed) return null;
+
 
   return (
     <div>
