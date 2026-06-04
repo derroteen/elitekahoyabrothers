@@ -65,8 +65,14 @@ function LoansAdmin() {
   return (
     <div>
       <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
-        actions={canEdit ? <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Loan</Button> : undefined} />
+        actions={canEdit ? <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button> : undefined} />
+      {canEdit && (
+        <div className="mb-4 flex justify-end sm:hidden">
+          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 w-full">+ New Loan</Button>
+        </div>
+      )}
       <Card>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[1000px]">
             <thead>
@@ -140,15 +146,20 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   });
   const [form, setForm] = useState({
     member_id: "", amount: "", interest: "10", freq: "monthly" as Frequency,
-    term: "12", date: new Date().toISOString().slice(0, 10), notes: "",
+    term: "12", customTerm: "", date: new Date().toISOString().slice(0, 10), notes: "", purpose: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), Number(form.term || 0), form.freq), [form.amount, form.interest, form.term, form.freq]);
+  const selectedMember = members.find((m: any) => m.id === form.member_id);
+  const effectiveTerm = form.term === "custom" ? Number(form.customTerm || 0) : Number(form.term || 0);
+  const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), effectiveTerm, form.freq), [form.amount, form.interest, effectiveTerm, form.freq]);
+
 
   const submit = async () => {
     if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
+    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
     setSubmitting(true);
+    const purposeNote = form.purpose ? `Purpose: ${form.purpose}${form.notes ? ` · ${form.notes}` : ""}` : (form.notes || null);
     const { data: loan, error } = await supabase.from("loans").insert({
       member_id: form.member_id,
       amount_borrowed: calc.principal,
@@ -160,10 +171,11 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
       period_payment: calc.periodPayment,
       balance: calc.totalRepayable,
       loan_date: form.date,
-      notes: form.notes || null,
+      notes: purposeNote,
       status: "pending",
     } as any).select("id").single();
     if (error) { setSubmitting(false); toast.error(error.message); return; }
+
 
     // Auto-generate repayment schedule
     const rows = buildSchedule(form.date, calc).map(r => ({ ...r, loan_id: loan!.id, status: "pending" }));
@@ -185,6 +197,7 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               <SelectTrigger><SelectValue placeholder="Choose…" /></SelectTrigger>
               <SelectContent>{members.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.membership_no} · {m.full_name}</SelectItem>)}</SelectContent>
             </Select>
+            {selectedMember && <div className="text-xs text-muted-foreground mt-1 font-mono">Membership No: {selectedMember.membership_no}</div>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
@@ -198,8 +211,12 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
                   <SelectItem value="6">6 Months</SelectItem>
                   <SelectItem value="12">12 Months</SelectItem>
                   <SelectItem value="24">24 Months</SelectItem>
+                  <SelectItem value="custom">Custom…</SelectItem>
                 </SelectContent>
               </Select>
+              {form.term === "custom" && (
+                <Input className="mt-2" type="number" min="1" placeholder="Months" value={form.customTerm} onChange={(e) => setForm({ ...form, customTerm: e.target.value })} />
+              )}
             </div>
             <div>
               <Label>Frequency</Label>
@@ -212,8 +229,10 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               </Select>
             </div>
             <div className="col-span-2"><Label>Loan Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Loan Purpose (optional)</Label><Input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="e.g. School fees, business capital" /></div>
             <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
+
 
           <div className="bg-muted/40 rounded-md p-4 text-sm grid grid-cols-2 gap-x-6 gap-y-1.5">
             <div className="text-muted-foreground">Principal + Compound Interest:</div>
