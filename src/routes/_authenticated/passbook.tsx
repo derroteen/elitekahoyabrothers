@@ -19,16 +19,17 @@ export const Route = createFileRoute("/_authenticated/passbook")({
 });
 
 function PassbookAdmin() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [memberId, setMemberId] = useState<string>("");
   const [open, setOpen] = useState(false);
 
-  if (!role || role === "member") { navigate({ to: "/" }); return null; }
+  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
 
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite"],
+    enabled: isStaff,
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("id, full_name, membership_no").order("membership_no");
       return data ?? [];
@@ -37,7 +38,7 @@ function PassbookAdmin() {
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["passbook", memberId],
-    enabled: !!memberId,
+    enabled: !!memberId && isStaff,
     queryFn: async () => {
       const { data, error } = await supabase.from("passbook_entries").select("*").eq("member_id", memberId).order("entry_date", { ascending: true });
       if (error) throw error;
@@ -45,8 +46,14 @@ function PassbookAdmin() {
     },
   });
 
+  useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/" }); }, [loading, role, isStaff, navigate]);
+
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!isStaff) return null;
+
   const selectedMember = members.find((m: any) => m.id === memberId);
   const canEdit = role === "super_admin" || role === "admin";
+
 
   return (
     <div>
