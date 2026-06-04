@@ -49,6 +49,18 @@ function LoansAdmin() {
     },
   });
 
+  const deleteLoan = useMutation({
+    mutationFn: async (id: string) => {
+      await (supabase.from("loan_fines" as any) as any).delete().eq("loan_id", id);
+      await (supabase.from("loan_schedule" as any) as any).delete().eq("loan_id", id);
+      await supabase.from("loan_repayments").delete().eq("loan_id", id);
+      const { error } = await supabase.from("loans").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Loan deleted"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const setStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: any }) => {
       const { error } = await supabase.from("loans").update({ status }).eq("id", id);
@@ -153,6 +165,11 @@ function LoansAdmin() {
                     )}
                     {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue" || l.status === "completed_with_fine") && (
                       <Button size="sm" variant="ghost" onClick={() => setRepayFor(l)}>Repayment</Button>
+                    )}
+                    {role === "super_admin" && (
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => {
+                        if (confirm(`Delete this loan for ${l.profile?.full_name ?? "member"}? This removes the loan, its schedule, fines, and repayments. This cannot be undone.`)) deleteLoan.mutate(l.id);
+                      }}>Delete</Button>
                     )}
                   </td>
                 </tr>
