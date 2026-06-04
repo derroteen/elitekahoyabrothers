@@ -29,14 +29,16 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function LoansAdmin() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [repayFor, setRepayFor] = useState<any>(null);
   const [scheduleFor, setScheduleFor] = useState<any>(null);
 
-  if (!role || role === "member") { navigate({ to: "/" }); return null; }
+  if (loading) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role === "member") { navigate({ to: "/" }); return null; }
   const canEdit = role === "super_admin" || role === "admin";
 
   const { data: loans = [], isLoading } = useQuery({

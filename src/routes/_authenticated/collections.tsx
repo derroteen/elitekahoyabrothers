@@ -17,14 +17,17 @@ export const Route = createFileRoute("/_authenticated/collections")({
 });
 
 function CollectionsPage() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [openNew, setOpenNew] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  if (!role || role === "member") { navigate({ to: "/" }); return null; }
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role === "member") { navigate({ to: "/" }); return null; }
   const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   const { data: sheets = [], isLoading } = useQuery({
     queryKey: ["collections-list"],
