@@ -165,6 +165,25 @@ function ReportsPage() {
           };
         });
       }
+      case "fines": {
+        // Aggregate by member from fines table
+        const byMember = new Map<string, { name: string; no: string; charged: number; paid: number }>();
+        for (const f of data.fines as any[]) {
+          const loan: any = (data.loans as any[]).find((l: any) => l.id === f.loan_id);
+          if (!loan) continue;
+          const m: any = loan.member;
+          const key = loan.member_id;
+          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", charged: 0, paid: 0 };
+          cur.charged += Number(f.amount || 0);
+          cur.paid += Number(f.amount_paid || 0);
+          byMember.set(key, cur);
+        }
+        return Array.from(byMember.values()).map(v => ({
+          member_name: v.name, member_no: v.no,
+          total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid),
+          outstanding: fmtKES(v.charged - v.paid),
+        }));
+      }
       default:
         return [];
     }
