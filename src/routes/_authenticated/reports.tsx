@@ -202,6 +202,9 @@ function ReportsPage() {
       }
     }
     const totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    const totalFinesCharged = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_charged || 0), 0);
+    const totalFinesPaid = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_paid || 0), 0);
+    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0);
     return {
       members: data.members.length,
       active: data.members.filter((m: any) => m.is_active).length,
@@ -209,6 +212,7 @@ function ReportsPage() {
       pending: data.loans.filter((l: any) => l.status === "pending").length,
       active_loans: data.loans.filter((l: any) => ["active", "approved", "overdue"].includes(l.status)).length,
       totalBorrowed, totalBal, totalPaid, totalSavings,
+      totalFinesCharged, totalFinesPaid, totalOutstandingFines,
       sheets: data.sheets.length,
     };
   })();
