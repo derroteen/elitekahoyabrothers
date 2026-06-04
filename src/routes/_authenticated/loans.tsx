@@ -49,6 +49,18 @@ function LoansAdmin() {
     },
   });
 
+  const deleteLoan = useMutation({
+    mutationFn: async (id: string) => {
+      await (supabase.from("loan_fines" as any) as any).delete().eq("loan_id", id);
+      await (supabase.from("loan_schedule" as any) as any).delete().eq("loan_id", id);
+      await supabase.from("loan_repayments").delete().eq("loan_id", id);
+      const { error } = await supabase.from("loans").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Loan deleted"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const setStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: any }) => {
       const { error } = await supabase.from("loans").update({ status }).eq("id", id);
