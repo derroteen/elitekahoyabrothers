@@ -87,65 +87,71 @@ function LoansAdmin() {
   return (
     <div>
       <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
-        actions={canEdit ? <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button> : undefined} />
+        actions={canEdit ? (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => applyFines.mutate()} disabled={applyFines.isPending}>Apply Fines</Button>
+            <Button variant="outline" size="sm" onClick={() => applyInterest.mutate()} disabled={applyInterest.isPending}>Annual Interest</Button>
+            <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button>
+          </div>
+        ) : undefined} />
 
       {canEdit && (
-        <div className="mb-4 flex justify-end sm:hidden">
-          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 w-full">+ New Loan</Button>
+        <div className="mb-4 flex gap-2 sm:hidden">
+          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 flex-1">+ New Loan</Button>
         </div>
       )}
       <Card>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-3 py-3">Date</th>
                 <th className="px-3 py-3">Member</th>
                 <th className="px-3 py-3 text-right">Borrowed</th>
                 <th className="px-3 py-3 text-right">Rate</th>
-                <th className="px-3 py-3 text-right">Term</th>
                 <th className="px-3 py-3">Freq</th>
                 <th className="px-3 py-3 text-right">Per Period</th>
-                <th className="px-3 py-3 text-right">Insurance</th>
-                <th className="px-3 py-3 text-right">Total Repay</th>
                 <th className="px-3 py-3 text-right">Paid</th>
                 <th className="px-3 py-3 text-right">Balance</th>
+                <th className="px-3 py-3 text-right">Outstanding Fines</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={13} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-              {!isLoading && loans.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
+              {isLoading && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {!isLoading && loans.length === 0 && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                   <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(l.loan_date)}</td>
                   <td className="px-3 py-3">
-                    <div className="font-medium">{l.profile?.full_name ?? l.member_id.slice(0, 8)}</div>
+                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="font-medium text-navy hover:underline">
+                      {l.profile?.full_name ?? l.member_id.slice(0, 8)}
+                    </Link>
                     <div className="text-xs text-muted-foreground font-mono">{l.profile?.membership_no}</div>
                   </td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
                   <td className="px-3 py-3 text-right">{Number(l.interest_rate).toFixed(1)}%</td>
-                  <td className="px-3 py-3 text-right">{l.loan_term_months}m</td>
                   <td className="px-3 py-3 text-xs capitalize">{l.payment_frequency}</td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.period_payment)}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.insurance)}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.total_repayable)}</td>
                   <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
                   <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
+                  <td className={`px-3 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                   <td className="px-3 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700"}`}>{l.status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700"}`}>{l.status.replace(/_/g, " ")}</span>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <Button size="sm" variant="ghost" onClick={() => setScheduleFor(l)}>Schedule</Button>
+                    <Link to="/loans/$loanId" params={{ loanId: l.id }}>
+                      <Button size="sm" variant="ghost">Ledger</Button>
+                    </Link>
                     {canEdit && l.status === "pending" && (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "approved" })}>Approve</Button>
                         <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "rejected" })}>Reject</Button>
                       </>
                     )}
-                    {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue") && (
+                    {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue" || l.status === "completed_with_fine") && (
                       <Button size="sm" variant="ghost" onClick={() => setRepayFor(l)}>Repayment</Button>
                     )}
                   </td>
@@ -155,6 +161,7 @@ function LoansAdmin() {
           </table>
         </div>
       </Card>
+
       <NewLoanDialog open={open} onOpenChange={setOpen} onCreated={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />
       {repayFor && <RepaymentDialog loan={repayFor} onClose={() => setRepayFor(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />}
       {scheduleFor && <ScheduleDialog loan={scheduleFor} onClose={() => setScheduleFor(null)} />}
