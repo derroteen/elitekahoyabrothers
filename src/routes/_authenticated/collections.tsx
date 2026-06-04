@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -24,13 +24,9 @@ function CollectionsPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
-  if (role === "member") { navigate({ to: "/" }); return null; }
-  const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin" || role === "admin";
-
   const { data: sheets = [], isLoading } = useQuery({
     queryKey: ["collections-list"],
+    enabled: !!role && role !== "member",
     queryFn: async () => {
       const { data } = await (supabase.from("weekly_collections" as any) as any)
         .select("*").order("collection_date", { ascending: false }).order("week_number", { ascending: false });
@@ -38,10 +34,18 @@ function CollectionsPage() {
     },
   });
 
+  useEffect(() => { if (!loading && role === "member") navigate({ to: "/" }); }, [loading, role, navigate]);
+
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role === "member") return null;
+  const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin" || role === "admin";
+
   return (
     <div>
       <PageHeader title="Weekly Collection Sheet" subtitle={`${sheets.length} sheets on file`}
         actions={canEdit ? <Button onClick={() => setOpenNew(true)} className="bg-navy text-white hover:bg-navy-2">+ New Week</Button> : undefined} />
+
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[700px]">

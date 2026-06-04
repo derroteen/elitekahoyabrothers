@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/system-reset")({
 });
 
 function SystemResetPage() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [password, setPassword] = useState("");
@@ -28,17 +28,21 @@ function SystemResetPage() {
   const reset = useServerFn(resetTestData);
   const setMode = useServerFn(setSystemMode);
 
-  if (role !== "super_admin") { navigate({ to: "/" }); return null; }
-
   const { data: settings, refetch } = useQuery({
     queryKey: ["system-settings"],
+    enabled: role === "super_admin",
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("*").eq("id", true).maybeSingle();
       return data;
     },
   });
 
+  useEffect(() => { if (!loading && role && role !== "super_admin") navigate({ to: "/" }); }, [loading, role, navigate]);
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role !== "super_admin") return null;
+
   const devMode = settings?.development_mode ?? true;
+
 
   const onToggle = async (val: boolean) => {
     try { await setMode({ data: { development_mode: val } }); toast.success(val ? "Development mode ON" : "Production mode ON"); refetch(); qc.invalidateQueries({ queryKey: ["system-settings"] }); }

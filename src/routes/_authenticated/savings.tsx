@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -18,26 +18,33 @@ export const Route = createFileRoute("/_authenticated/savings")({
 });
 
 function SavingsAdmin() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [memberId, setMemberId] = useState("");
   const [open, setOpen] = useState(false);
 
-  if (!role || role === "member") { navigate({ to: "/" }); return null; }
-  const canEdit = role === "super_admin" || role === "admin";
+  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
 
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite"],
+    enabled: isStaff,
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, membership_no").order("membership_no")).data ?? [],
   });
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["savings", memberId],
-    enabled: !!memberId,
+    enabled: !!memberId && isStaff,
     queryFn: async () => (await supabase.from("savings_entries").select("*").eq("member_id", memberId).order("entry_date", { ascending: true })).data ?? [],
   });
 
+  useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/" }); }, [loading, role, isStaff, navigate]);
+
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!isStaff) return null;
+  const canEdit = role === "super_admin" || role === "admin";
+
   const latestBal = entries.at(-1)?.balance ?? 0;
+
 
   return (
     <div>
