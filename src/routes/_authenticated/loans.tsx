@@ -285,26 +285,28 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
 }
 
 function RepaymentDialog({ loan, onClose, onSaved }: any) {
-  const [form, setForm] = useState({ amount: "", penalty: "0", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [form, setForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
   const [submitting, setSubmitting] = useState(false);
+
+  const required = Number(loan.period_payment || 0);
+  const amt = Number(form.amount || 0);
+  const outFines = Number(loan.outstanding_fines || 0);
+  const previewFinePaid = Math.min(amt, outFines);
+  const previewExcess = Math.max(0, amt - outFines - required);
 
   const submit = async () => {
     if (!form.amount) { toast.error("Amount required"); return; }
     setSubmitting(true);
-    const amount = Number(form.amount);
-    const penalty = Number(form.penalty || 0);
-    const { error: e1 } = await supabase.from("loan_repayments").insert({
-      loan_id: loan.id, amount, penalty,
-      payment_date: form.payment_date, notes: form.notes || null,
+    const { data, error } = await (supabase as any).rpc("record_loan_repayment", {
+      _loan_id: loan.id,
+      _amount: Number(form.amount),
+      _payment_date: form.payment_date,
+      _notes: form.notes || null,
     });
-    if (e1) { setSubmitting(false); toast.error(e1.message); return; }
-    const newPaid = Number(loan.amount_paid) + amount;
-    const newBal = Math.max(0, Number(loan.balance) - amount);
-    const newStatus = newBal === 0 ? "completed" : (loan.status === "approved" ? "active" : loan.status);
-    const { error: e2 } = await supabase.from("loans").update({ amount_paid: newPaid, balance: newBal, status: newStatus }).eq("id", loan.id);
     setSubmitting(false);
-    if (e2) { toast.error(e2.message); return; }
-    toast.success("Repayment recorded");
+    if (error) { toast.error(error.message); return; }
+    const r = data as any;
+    toast.success(`Repayment recorded · ${r.installments_covered ?? 0} installment(s) covered${r.fine_paid > 0 ? `, ${fmtKES(r.fine_paid)} fines paid` : ""}`);
     onClose(); onSaved();
   };
 
@@ -312,13 +314,23 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader><DialogTitle className="font-serif">Record Repayment</DialogTitle></DialogHeader>
-        <div className="text-xs text-muted-foreground mb-3 font-mono">Current balance: {fmtKES(loan.balance)}</div>
+        <div className="text-xs text-muted-foreground mb-3 font-mono space-y-0.5">
+          <div>Required per period: {fmtKES(required)}</div>
+          <div>Current balance: {fmtKES(loan.balance)}</div>
+          {outFines > 0 && <div className="text-red-600">Outstanding fines: {fmtKES(outFines)}</div>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
-          <div><Label>Penalty</Label><Input type="number" step="0.01" value={form.penalty} onChange={(e) => setForm({ ...form, penalty: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Amount Paid</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
           <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
+        {amt > 0 && (
+          <div className="bg-muted/40 rounded-md p-3 text-xs space-y-1">
+            {previewFinePaid > 0 && <div>Fines covered: <span className="font-mono">{fmtKES(previewFinePaid)}</span></div>}
+            {previewExcess > 0 && <div className="text-emerald-700">Excess (prepays future): <span className="font-mono">{fmtKES(previewExcess)}</span></div>}
+            <div className="text-muted-foreground">Allocation: fines first → current installments → future installments (prepaid)</div>
+          </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save"}</Button>
