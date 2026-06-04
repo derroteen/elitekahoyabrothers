@@ -17,14 +17,17 @@ export const Route = createFileRoute("/_authenticated/collections")({
 });
 
 function CollectionsPage() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [openNew, setOpenNew] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  if (!role || role === "member") { navigate({ to: "/" }); return null; }
+  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (role === "member") { navigate({ to: "/" }); return null; }
   const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   const { data: sheets = [], isLoading } = useQuery({
     queryKey: ["collections-list"],
@@ -57,14 +60,17 @@ function CollectionsPage() {
               {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && sheets.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No collection sheets yet</td></tr>}
               {sheets.map((s: any) => (
-                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer" onClick={() => setActiveId(s.id)}>
-                  <td className="px-4 py-3 font-semibold">Week {s.week_number}</td>
-                  <td className="px-4 py-3">{fmtDate(s.collection_date)}</td>
+                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-4 py-3 font-semibold cursor-pointer" onClick={() => setActiveId(s.id)}>Week {s.week_number}</td>
+                  <td className="px-4 py-3 cursor-pointer" onClick={() => setActiveId(s.id)}>{fmtDate(s.collection_date)}</td>
                   <td className="px-4 py-3">{s.treasurer_name ?? "—"}</td>
                   <td className="px-4 py-3">{s.banked_by ?? "—"}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(s.banked_in_advance)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(s.cash_in_hand)}</td>
-                  <td className="px-4 py-3 text-right"><Button size="sm" variant="ghost">Open →</Button></td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => setActiveId(s.id)}>Open</Button>
+                    {canDelete && <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeleteId(s.id)}>Delete</Button>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -74,6 +80,7 @@ function CollectionsPage() {
 
       <NewSheetDialog open={openNew} onOpenChange={setOpenNew} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
       {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} />}
+      {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
   );
 }
@@ -298,6 +305,32 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={onClose}>Close</Button>
           {canEdit && <Button onClick={() => saveAll.mutate()} disabled={saveAll.isPending} className="bg-navy text-white hover:bg-navy-2">{saveAll.isPending ? "Saving…" : "Save Sheet"}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteSheetDialog({ id, onClose, onDeleted }: { id: string; onClose: () => void; onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    const { error: e1 } = await (supabase.from("weekly_collection_entries" as any) as any).delete().eq("collection_id", id);
+    if (e1) { setBusy(false); toast.error(e1.message); return; }
+    const { error: e2 } = await (supabase.from("weekly_collections" as any) as any).delete().eq("id", id);
+    setBusy(false);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success("Week sheet deleted");
+    onDeleted();
+  };
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Delete Week Sheet?</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">This permanently removes the week sheet and all of its entries. This action cannot be undone.</p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={confirm} disabled={busy} className="bg-red-600 text-white hover:bg-red-700">{busy ? "Deleting…" : "Delete Permanently"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
