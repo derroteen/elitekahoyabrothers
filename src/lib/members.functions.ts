@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -27,7 +28,7 @@ async function audit(actorId: string, action: string, recordId: string, oldValue
 
 const CreateInput = z.object({
   full_name: z.string().min(1).max(200),
-  email: z.string().email(),
+  email: z.string().email().optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   password: z.string().min(6).max(200),
   role: z.enum(["member", "auditor", "admin"]).default("member"),
@@ -41,8 +42,9 @@ export const adminCreateMember = createServerFn({ method: "POST" })
     if (data.role !== "member" && callerRole !== "super_admin") {
       throw new Error("Only super admins can assign elevated roles");
     }
+    const resolvedEmail = data.email?.trim() || `member-${randomUUID().slice(0, 8)}@ekb.local`;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
+      email: resolvedEmail,
       password: data.password,
       email_confirm: true,
       user_metadata: {
@@ -53,7 +55,7 @@ export const adminCreateMember = createServerFn({ method: "POST" })
       },
     });
     if (error || !created.user) throw new Error(error?.message ?? "Failed to create user");
-    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: data.email, role: data.role });
+    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: resolvedEmail, role: data.role });
     return { id: created.user.id, email: created.user.email };
   });
 
