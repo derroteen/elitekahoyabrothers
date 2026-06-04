@@ -28,7 +28,7 @@ async function audit(actorId: string, action: string, recordId: string, oldValue
 
 const CreateInput = z.object({
   full_name: z.string().min(1).max(200),
-  email: z.string().email(),
+  email: z.string().email().optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   password: z.string().min(6).max(200),
   role: z.enum(["member", "auditor", "admin"]).default("member"),
