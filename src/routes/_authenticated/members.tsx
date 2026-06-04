@@ -210,7 +210,7 @@ function NewMemberDialog({ open, onOpenChange, onCreated, canSetRole }: { open: 
   const createMember = useServerFn(adminCreateMember);
 
   const submit = async () => {
-    if (!form.full_name || !form.email || !form.password) { toast.error("Name, email, password required"); return; }
+    if (!form.full_name || !form.password) { toast.error("Name and password are required"); return; }
     setSubmitting(true);
     try {
       await createMember({ data: { ...form, phone: form.phone || null, role: form.role as any } });
