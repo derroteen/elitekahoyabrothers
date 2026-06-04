@@ -65,8 +65,14 @@ function LoansAdmin() {
   return (
     <div>
       <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
-        actions={canEdit ? <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Loan</Button> : undefined} />
+        actions={canEdit ? <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button> : undefined} />
+      {canEdit && (
+        <div className="mb-4 flex justify-end sm:hidden">
+          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 w-full">+ New Loan</Button>
+        </div>
+      )}
       <Card>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[1000px]">
             <thead>
