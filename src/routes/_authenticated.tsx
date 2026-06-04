@@ -155,7 +155,7 @@ function AuthLayout() {
         </div>
       )}
 
-      <main className="flex-1 min-h-screen w-full md:ml-[240px] pt-14 md:pt-0 p-4 sm:p-6 md:p-7">
+      <main className="flex-1 min-w-0 min-h-screen w-full md:ml-[240px] pt-14 md:pt-0 p-4 sm:p-6 md:p-7">
         <Outlet />
       </main>
     </div>
