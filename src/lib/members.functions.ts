@@ -55,7 +55,7 @@ export const adminCreateMember = createServerFn({ method: "POST" })
       },
     });
     if (error || !created.user) throw new Error(error?.message ?? "Failed to create user");
-    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: data.email, role: data.role });
+    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: resolvedEmail, role: data.role });
     return { id: created.user.id, email: created.user.email };
   });
 
