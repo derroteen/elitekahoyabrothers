@@ -166,6 +166,11 @@ function LoansAdmin() {
                     {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue" || l.status === "completed_with_fine") && (
                       <Button size="sm" variant="ghost" onClick={() => setRepayFor(l)}>Repayment</Button>
                     )}
+                    {role === "super_admin" && (
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => {
+                        if (confirm(`Delete this loan for ${l.profile?.full_name ?? "member"}? This removes the loan, its schedule, fines, and repayments. This cannot be undone.`)) deleteLoan.mutate(l.id);
+                      }}>Delete</Button>
+                    )}
                   </td>
                 </tr>
               ))}
