@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports — EKB" }] }),
 });
 
-type ReportKey = "summary" | "members" | "loans" | "savings" | "collections";
+type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines";
 
 function ReportsPage() {
   const { role, loading } = useAuth();
@@ -27,7 +27,7 @@ function ReportsPage() {
     queryKey: ["reports-bundle"],
     enabled: allowed,
     queryFn: async () => {
-      const [profs, roles, loans, sched, repay, savings, sheets, entries] = await Promise.all([
+      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, phone, membership_no, is_active, date_joined"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("loans").select("*"),
@@ -36,6 +36,7 @@ function ReportsPage() {
         supabase.from("passbook_entries").select("*"),
         (supabase.from("weekly_collections" as any) as any).select("*"),
         (supabase.from("weekly_collection_entries" as any) as any).select("*"),
+        (supabase.from("loan_fines" as any) as any).select("*"),
       ]);
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
@@ -47,6 +48,7 @@ function ReportsPage() {
         savings: (savings.data ?? []).map((s: any) => ({ ...s, member: memberMap.get(s.member_id) })),
         sheets: sheets.data ?? [],
         entries: (entries.data ?? []).map((e: any) => ({ ...e, member: memberMap.get(e.member_id) })),
+        fines: fines.data ?? [],
         memberMap,
       };
     },
