@@ -241,6 +241,9 @@ function ReportsPage() {
         { metric: "Total Borrowed", value: fmtKES(summary.totalBorrowed) },
         { metric: "Total Repaid", value: fmtKES(summary.totalPaid) },
         { metric: "Outstanding Balance", value: fmtKES(summary.totalBal) },
+        { metric: "Total Fines Charged", value: fmtKES(summary.totalFinesCharged) },
+        { metric: "Total Fines Paid", value: fmtKES(summary.totalFinesPaid) },
+        { metric: "Outstanding Fines", value: fmtKES(summary.totalOutstandingFines) },
         { metric: "Total Member Savings", value: fmtKES(summary.totalSavings) },
         { metric: "Collection Sheets", value: String(summary.sheets) },
       ];
