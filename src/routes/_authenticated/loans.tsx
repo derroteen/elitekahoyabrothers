@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +55,26 @@ function LoansAdmin() {
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Loan updated"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const applyFines = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("apply_loan_fines", { _loan_id: null });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => { toast.success(`${n} fine(s) charged`); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const applyInterest = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as any).rpc("apply_annual_interest", { _loan_id: null });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => { toast.success(`Annual interest applied to ${n} loan(s)`); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
