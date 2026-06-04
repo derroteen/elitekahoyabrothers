@@ -310,3 +310,29 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
     </Dialog>
   );
 }
+
+function DeleteSheetDialog({ id, onClose, onDeleted }: { id: string; onClose: () => void; onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    const { error: e1 } = await (supabase.from("weekly_collection_entries" as any) as any).delete().eq("collection_id", id);
+    if (e1) { setBusy(false); toast.error(e1.message); return; }
+    const { error: e2 } = await (supabase.from("weekly_collections" as any) as any).delete().eq("id", id);
+    setBusy(false);
+    if (e2) { toast.error(e2.message); return; }
+    toast.success("Week sheet deleted");
+    onDeleted();
+  };
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Delete Week Sheet?</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">This permanently removes the week sheet and all of its entries. This action cannot be undone.</p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={confirm} disabled={busy} className="bg-red-600 text-white hover:bg-red-700">{busy ? "Deleting…" : "Delete Permanently"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
