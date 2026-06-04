@@ -270,6 +270,7 @@ function ReportsPage() {
       exportXLSX(`ekb-full-report-${stamp()}.xlsx`, [
         { name: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { name: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { name: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { name: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { name: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
       ]);
@@ -277,6 +278,7 @@ function ReportsPage() {
       exportPDF(`ekb-full-report-${stamp()}.pdf`, "Full Report", [
         { heading: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { heading: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { heading: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { heading: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { heading: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
       ], { subtitle: "All modules" });
