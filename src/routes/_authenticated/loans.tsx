@@ -146,11 +146,14 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   });
   const [form, setForm] = useState({
     member_id: "", amount: "", interest: "10", freq: "monthly" as Frequency,
-    term: "12", date: new Date().toISOString().slice(0, 10), notes: "",
+    term: "12", customTerm: "", date: new Date().toISOString().slice(0, 10), notes: "", purpose: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), Number(form.term || 0), form.freq), [form.amount, form.interest, form.term, form.freq]);
+  const selectedMember = members.find((m: any) => m.id === form.member_id);
+  const effectiveTerm = form.term === "custom" ? Number(form.customTerm || 0) : Number(form.term || 0);
+  const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), effectiveTerm, form.freq), [form.amount, form.interest, effectiveTerm, form.freq]);
+
 
   const submit = async () => {
     if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
