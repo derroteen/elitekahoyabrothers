@@ -42,8 +42,9 @@ export const adminCreateMember = createServerFn({ method: "POST" })
     if (data.role !== "member" && callerRole !== "super_admin") {
       throw new Error("Only super admins can assign elevated roles");
     }
+    const resolvedEmail = data.email?.trim() || `member-${randomUUID().slice(0, 8)}@ekb.local`;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
+      email: resolvedEmail,
       password: data.password,
       email_confirm: true,
       user_metadata: {
