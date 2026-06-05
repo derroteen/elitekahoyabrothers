@@ -108,6 +108,28 @@ function Dashboard() {
         </div>
       )}
 
+      {isMember && myOpening && (
+        <div className="mb-7">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="font-serif text-lg font-bold">Brought Forward Balances</h2>
+            <span className="text-xs text-muted-foreground">
+              As of {fmtDate(myOpening.effective_date)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatCard label="Savings B/F" value={fmtKES(myOpening.opening_savings)} icon="💰" />
+            <StatCard label="Loan B/F" value={fmtKES(myOpening.opening_loan)} icon="🏦" />
+            <StatCard label="Fine B/F" value={fmtKES(myOpening.opening_fine)} icon="⚠️" />
+            <StatCard label="Insurance B/F" value={fmtKES(myOpening.opening_insurance)} icon="🛡️" />
+            <StatCard label="Benevolent B/F" value={fmtKES(myOpening.opening_benevolent)} icon="🤝" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            These balances were carried over from before the website was launched and are
+            the starting point for all your future calculations.
+          </p>
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-xl p-6">
         <h2 className="font-serif text-lg font-bold mb-3">Elite Kahoya Brothers</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
