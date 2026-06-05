@@ -78,7 +78,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
                 <td className="px-3 py-2 text-right">{fmtKES(totalSavings)}</td>
                 <td className="px-3 py-2 text-right text-red-700">{fmtKES(totalWithdrawn)}</td>
                 <td className="px-3 py-2 text-right text-navy">{fmtKES(currentBal)}</td>
-                <td colSpan={4}></td>
+                <td colSpan={canEdit ? 5 : 4}></td>
               </tr>
             </tfoot>
           )}
