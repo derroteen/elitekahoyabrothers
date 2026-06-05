@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+// Install the session-storage shim BEFORE the supabase client is touched.
+import "@/integrations/supabase/session-storage-shim";
 import { supabase } from "@/integrations/supabase/client";
 
 export type AppRole = "super_admin" | "admin" | "auditor" | "member";
