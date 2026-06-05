@@ -33,19 +33,21 @@ function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from("announcements")
-      .select("id, title, body, pinned, created_at")
-      .order("pinned", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(3)
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("announcements")
+          .select("id, title, body, pinned, created_at")
+          .order("pinned", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(3);
         if (!cancelled) setAnnouncements((data as Announcement[]) ?? []);
-      })
-      .catch(() => {})
-      .finally(() => {
+      } catch {
+        /* ignore */
+      } finally {
         if (!cancelled) setLoadingAnnouncements(false);
-      });
+      }
+    })();
     return () => { cancelled = true; };
   }, []);
 
