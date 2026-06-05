@@ -51,16 +51,19 @@ function Dashboard() {
         if (excludeFilter) q = q.not("id", "in", excludeFilter);
         return q;
       };
-      const [members, active, loans, pending, savings, announce] = await Promise.all([
+      const [members, active, loans, pending, savings, announce, openings] = await Promise.all([
         buildProfiles(),
         buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
         supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
         supabase.from("announcements").select("id", { count: "exact", head: true }),
+        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan"),
       ]);
       const allLoans = loans.data ?? [];
-      const totalLoans = allLoans.reduce((s, l: any) => s + Number(l.balance ?? 0), 0);
+      const allOpenings = openings.data ?? [];
+      const openingLoanTotal = allOpenings.reduce((s: number, o: any) => s + Number(o.opening_loan ?? 0), 0);
+      const totalLoans = allLoans.reduce((s, l: any) => s + Number(l.balance ?? 0), 0) + openingLoanTotal;
       const revenue = allLoans.reduce((s, l: any) => s + Number(l.amount_paid ?? 0), 0);
       const activeLoans = allLoans.filter((l: any) => l.status === "active" || l.status === "approved").length;
 
@@ -70,7 +73,11 @@ function Dashboard() {
         const prev = latestByMember.get(e.member_id);
         if (!prev || e.entry_date > prev.date) latestByMember.set(e.member_id, { date: e.entry_date, balance: Number(e.balance) });
       }
-      const totalSavings = Array.from(latestByMember.values()).reduce((s, x) => s + x.balance, 0);
+      let totalSavings = Array.from(latestByMember.values()).reduce((s, x) => s + x.balance, 0);
+      // Add opening savings for members with no passbook entries yet
+      for (const o of allOpenings as any[]) {
+        if (!latestByMember.has(o.member_id)) totalSavings += Number(o.opening_savings ?? 0);
+      }
 
       return {
         members: members.count ?? 0,
