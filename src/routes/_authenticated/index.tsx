@@ -28,9 +28,24 @@ function Dashboard() {
     queryKey: ["dashboard-stats", role],
     enabled: isStaff,
     queryFn: async () => {
+      const { fetchNonMemberIds } = await import("@/lib/member-queries");
+      const nonMembers = await fetchNonMemberIds();
+      const excludeFilter = nonMembers.size
+        ? `(${Array.from(nonMembers).join(",")})`
+        : null;
+      const buildProfiles = () => {
+        let q = supabase.from("profiles").select("id", { count: "exact", head: true });
+        if (excludeFilter) q = q.not("id", "in", excludeFilter);
+        return q;
+      };
+      const buildActive = () => {
+        let q = supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true);
+        if (excludeFilter) q = q.not("id", "in", excludeFilter);
+        return q;
+      };
       const [members, active, loans, pending, savings, announce] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
+        buildProfiles(),
+        buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
         supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
