@@ -153,6 +153,7 @@ function MembersPage() {
               const r = m.user_roles?.[0]?.role;
               const isStaffTarget = r === "admin" || r === "super_admin";
               const canToggleActive = !isStaffTarget || isSuper;
+              const canResetPw = !isStaffTarget || isSuper;
               return (
                 <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-3 font-mono text-xs">{m.membership_no ?? "—"}</td>
