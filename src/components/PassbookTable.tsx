@@ -57,6 +57,15 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
                     {bf ? <span className="text-gold-3 font-semibold uppercase tracking-wider text-[10px]">Brought Forward Balance</span> : (e.remarks ?? "")}
                   </td>
                   <td className="px-3 py-2 text-left text-xs">{e.treasurer_sign ?? ""}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-left">
+                      {!bf && (
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onEdit?.(e)}>
+                          <Pencil className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
