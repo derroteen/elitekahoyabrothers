@@ -91,7 +91,13 @@ export const adminResetPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ResetPwInput.parse(i))
   .handler(async ({ data, context }) => {
-    await assertCaller(context.userId);
+    const callerRole = await assertCaller(context.userId);
+    const { data: targetRoleRow } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", data.id).maybeSingle();
+    const targetRole = targetRoleRow?.role;
+    // Only super admins may reset passwords for admin or super-admin accounts
+    if ((targetRole === "admin" || targetRole === "super_admin") && callerRole !== "super_admin") {
+      throw new Error("Only super admins can reset passwords for admin accounts");
+    }
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.id, {
       password: data.password,
       user_metadata: { must_change_password: true },
