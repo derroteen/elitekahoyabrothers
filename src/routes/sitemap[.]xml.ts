@@ -13,7 +13,8 @@ interface SitemapEntry {
 // (dashboard, savings, loans, passbook, collections, reports, audit, settings,
 // admin) are intentionally excluded — they require sign-in.
 const entries: SitemapEntry[] = [
-  { path: "/login", changefreq: "monthly", priority: "1.0" },
+  { path: "/", changefreq: "weekly", priority: "1.0" },
+  { path: "/login", changefreq: "monthly", priority: "0.8" },
   { path: "/forgot-password", changefreq: "yearly", priority: "0.3" },
 ];
 

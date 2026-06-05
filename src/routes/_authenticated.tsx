@@ -13,7 +13,7 @@ type NavItem = { to: string; label: string; icon: any };
 
 const NAV: Record<AppRole, NavItem[]> = {
   super_admin: [
-    { to: "/", label: "Dashboard", icon: Home },
+    { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/members", label: "Members", icon: Users },
     { to: "/opening-balances", label: "Opening Balances", icon: Wallet },
     { to: "/passbook", label: "Passbook", icon: BookOpen },
@@ -26,7 +26,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/settings", label: "Settings", icon: Settings },
   ],
   admin: [
-    { to: "/", label: "Dashboard", icon: Home },
+    { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/members", label: "Members", icon: Users },
     { to: "/opening-balances", label: "Opening Balances", icon: Wallet },
     { to: "/passbook", label: "Passbook", icon: BookOpen },
@@ -38,14 +38,14 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/settings", label: "Settings", icon: Settings },
   ],
   auditor: [
-    { to: "/", label: "Dashboard", icon: Home },
+    { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/passbook", label: "Passbooks", icon: BookOpen },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/audit", label: "Audit Log", icon: ShieldCheck },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
   member: [
-    { to: "/", label: "Dashboard", icon: Home },
+    { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/my-passbook", label: "My Passbook", icon: BookOpen },
     { to: "/my-loans", label: "My Loans", icon: Banknote },
     { to: "/my-savings", label: "My Savings", icon: PiggyBank },

@@ -22,7 +22,7 @@ function AuditPage() {
     queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
   });
 
-  useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/" }); }, [loading, role, allowed, navigate]);
+  useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/dashboard" }); }, [loading, role, allowed, navigate]);
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!allowed) return null;
 

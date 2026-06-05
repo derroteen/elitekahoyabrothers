@@ -32,7 +32,7 @@ function ResetPage() {
     const { error: err } = await supabase.auth.updateUser({ password: pw });
     if (err) return setError(err.message);
     toast.success("Password updated");
-    navigate({ to: "/" });
+    navigate({ to: "/dashboard" });
   };
 
   return (

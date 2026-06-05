@@ -60,7 +60,7 @@ function OpeningBalancesPage() {
   const canEdit = role === "super_admin" || role === "admin";
 
   useEffect(() => {
-    if (!loading && role && !canEdit) navigate({ to: "/" });
+    if (!loading && role && !canEdit) navigate({ to: "/dashboard" });
   }, [loading, role, canEdit, navigate]);
 
   const [search, setSearch] = useState("");

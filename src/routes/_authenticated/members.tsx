@@ -66,7 +66,7 @@ function MembersPage() {
   const setActive = useServerFn(adminSetActive);
 
   useEffect(() => {
-    if (!loading && role && !isStaff) navigate({ to: "/" });
+    if (!loading && role && !isStaff) navigate({ to: "/dashboard" });
   }, [loading, role, isStaff, navigate]);
 
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
