@@ -70,7 +70,12 @@ export const adminUpdateMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => UpdateInput.parse(i))
   .handler(async ({ data, context }) => {
-    await assertCaller(context.userId);
+    const callerRole = await assertCaller(context.userId);
+    const { data: targetRoleRow } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", data.id).maybeSingle();
+    const targetRole = targetRoleRow?.role;
+    if (targetRole === "super_admin" && callerRole !== "super_admin") {
+      throw new Error("Only super admins can edit super admin details");
+    }
     const { data: prev } = await supabaseAdmin.from("profiles").select("*").eq("id", data.id).maybeSingle();
     const { error } = await supabaseAdmin.from("profiles").update({
       full_name: data.full_name,

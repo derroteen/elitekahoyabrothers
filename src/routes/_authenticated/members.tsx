@@ -154,6 +154,7 @@ function MembersPage() {
               const isStaffTarget = r === "admin" || r === "super_admin";
               const canToggleActive = !isStaffTarget || isSuper;
               const canResetPw = !isStaffTarget || isSuper;
+              const canEdit = r !== "super_admin" || isSuper;
               return (
                 <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-3 font-mono text-xs">{m.membership_no ?? "—"}</td>
@@ -176,7 +177,9 @@ function MembersPage() {
                         <Button variant="ghost" size="sm" aria-label="Member actions"><MoreHorizontal className="w-4 h-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditing(m)}>Edit details</DropdownMenuItem>
+                        {canEdit && (
+                          <DropdownMenuItem onClick={() => setEditing(m)}>Edit details</DropdownMenuItem>
+                        )}
                         {canResetPw && (
                           <DropdownMenuItem onClick={() => setResetting(m)}>Reset password</DropdownMenuItem>
                         )}
