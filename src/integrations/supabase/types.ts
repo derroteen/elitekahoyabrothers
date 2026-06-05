@@ -559,6 +559,7 @@ export type Database = {
           id: string
           member_id: string
           notes: string | null
+          passbook_entry_id: string | null
           total: number
           withdrawal: number
         }
@@ -572,6 +573,7 @@ export type Database = {
           id?: string
           member_id: string
           notes?: string | null
+          passbook_entry_id?: string | null
           total?: number
           withdrawal?: number
         }
@@ -585,6 +587,7 @@ export type Database = {
           id?: string
           member_id?: string
           notes?: string | null
+          passbook_entry_id?: string | null
           total?: number
           withdrawal?: number
         }
@@ -594,6 +597,13 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "savings_entries_passbook_entry_id_fkey"
+            columns: ["passbook_entry_id"]
+            isOneToOne: true
+            referencedRelation: "passbook_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -760,6 +770,10 @@ export type Database = {
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
       recompute_passbook_balances: {
+        Args: { _member: string }
+        Returns: undefined
+      }
+      recompute_savings_balances: {
         Args: { _member: string }
         Returns: undefined
       }
