@@ -29,7 +29,14 @@ function SavingsAdmin() {
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite"],
     enabled: isStaff,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, membership_no").order("membership_no")).data ?? [],
+    queryFn: async () => {
+      const { fetchNonMemberIds, filterMembersOnly } = await import("@/lib/member-queries");
+      const [profilesRes, nonMembers] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, membership_no").order("membership_no"),
+        fetchNonMemberIds(),
+      ]);
+      return filterMembersOnly(profilesRes.data ?? [], nonMembers);
+    },
   });
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["savings", memberId],
