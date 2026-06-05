@@ -37,7 +37,7 @@ function SystemResetPage() {
     },
   });
 
-  useEffect(() => { if (!loading && role && role !== "super_admin") navigate({ to: "/" }); }, [loading, role, navigate]);
+  useEffect(() => { if (!loading && role && role !== "super_admin") navigate({ to: "/dashboard" }); }, [loading, role, navigate]);
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (role !== "super_admin") return null;
 

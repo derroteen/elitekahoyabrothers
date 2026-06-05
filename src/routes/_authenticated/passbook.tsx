@@ -54,7 +54,7 @@ function PassbookAdmin() {
     },
   });
 
-  useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/" }); }, [loading, role, isStaff, navigate]);
+  useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/dashboard" }); }, [loading, role, isStaff, navigate]);
 
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!isStaff) return null;

@@ -56,7 +56,7 @@ function ReportsPage() {
     },
   });
 
-  useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/" }); }, [loading, role, allowed, navigate]);
+  useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/dashboard" }); }, [loading, role, allowed, navigate]);
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!allowed) return null;
 

@@ -40,7 +40,7 @@ function ChangePasswordPage() {
     await supabase.from("profiles").update({ must_change_password: false }).eq("id", user!.id);
     await refresh();
     toast.success("Password updated");
-    navigate({ to: "/" });
+    navigate({ to: "/dashboard" });
   };
 
   return (
