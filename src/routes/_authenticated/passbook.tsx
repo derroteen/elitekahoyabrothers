@@ -84,7 +84,7 @@ function PassbookAdmin() {
         <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} />
       )}
 
-      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestBalance={entries.at(-1)?.balance ?? 0} latestLoanBal={entries.at(-1)?.loan_balance ?? 0} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestBalance={entries.at(-1)?.balance ?? 0} latestLoanBal={entries.at(-1)?.loan_balance ?? 0} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
     </div>
   );
 }
