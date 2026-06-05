@@ -170,7 +170,7 @@ function MembersPage() {
                   <td className="px-4 py-3 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm"><MoreHorizontal className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" aria-label="Member actions"><MoreHorizontal className="w-4 h-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditing(m)}>Edit details</DropdownMenuItem>

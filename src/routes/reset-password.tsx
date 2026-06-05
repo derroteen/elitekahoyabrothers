@@ -5,7 +5,17 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPage,
-  head: () => ({ meta: [{ title: "Reset password — EKB" }] }),
+  head: () => ({
+    meta: [
+      { title: "Set new password — Elite Kahoya Brothers" },
+      { name: "description", content: "Set a new password to finish recovering your EKB members portal account." },
+      { property: "og:title", content: "Set new password — Elite Kahoya Brothers" },
+      { property: "og:description", content: "Choose a new password for your EKB account." },
+      { property: "og:url", content: "https://www.elitekahoyabrothers.com/reset-password" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+    links: [{ rel: "canonical", href: "https://www.elitekahoyabrothers.com/reset-password" }],
+  }),
 });
 
 function ResetPage() {
@@ -28,10 +38,10 @@ function ResetPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy px-4">
       <div className="w-[380px] bg-card rounded-2xl p-10 shadow-2xl">
-        <div className="text-center mb-6">
-          <div className="font-serif text-xl font-black text-navy">Set new password</div>
+        <header className="text-center mb-6">
+          <h1 className="font-serif text-xl font-black text-navy">Set new password</h1>
           <div className="w-10 h-[3px] bg-gold mx-auto my-3" />
-        </div>
+        </header>
         {error && <div className="bg-red-100 text-red-800 px-3.5 py-2.5 rounded-md text-sm mb-4">{error}</div>}
         <form onSubmit={submit} className="space-y-4">
           <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="New password"
