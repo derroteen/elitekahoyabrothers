@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { fetchOpeningBalance } from "@/lib/opening-balances";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
   head: () => ({ meta: [{ title: "Dashboard — EKB" }] }),
 });
