@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { fmtKES } from "@/lib/format";
+import { fmtKES, fmtDate } from "@/lib/format";
+import { fetchOpeningBalance } from "@/lib/opening-balances";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: Dashboard,
@@ -21,8 +22,15 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 }
 
 function Dashboard() {
-  const { profile, role } = useAuth();
+  const { user, profile, role } = useAuth();
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
+  const isMember = role === "member";
+
+  const { data: myOpening } = useQuery({
+    queryKey: ["my-opening-balance", user?.id],
+    enabled: !!user && isMember,
+    queryFn: () => fetchOpeningBalance(user!.id),
+  });
 
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", role],
@@ -43,16 +51,19 @@ function Dashboard() {
         if (excludeFilter) q = q.not("id", "in", excludeFilter);
         return q;
       };
-      const [members, active, loans, pending, savings, announce] = await Promise.all([
+      const [members, active, loans, pending, savings, announce, openings] = await Promise.all([
         buildProfiles(),
         buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
         supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
         supabase.from("announcements").select("id", { count: "exact", head: true }),
+        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan"),
       ]);
       const allLoans = loans.data ?? [];
-      const totalLoans = allLoans.reduce((s, l: any) => s + Number(l.balance ?? 0), 0);
+      const allOpenings = openings.data ?? [];
+      const openingLoanTotal = allOpenings.reduce((s: number, o: any) => s + Number(o.opening_loan ?? 0), 0);
+      const totalLoans = allLoans.reduce((s, l: any) => s + Number(l.balance ?? 0), 0) + openingLoanTotal;
       const revenue = allLoans.reduce((s, l: any) => s + Number(l.amount_paid ?? 0), 0);
       const activeLoans = allLoans.filter((l: any) => l.status === "active" || l.status === "approved").length;
 
@@ -62,7 +73,11 @@ function Dashboard() {
         const prev = latestByMember.get(e.member_id);
         if (!prev || e.entry_date > prev.date) latestByMember.set(e.member_id, { date: e.entry_date, balance: Number(e.balance) });
       }
-      const totalSavings = Array.from(latestByMember.values()).reduce((s, x) => s + x.balance, 0);
+      let totalSavings = Array.from(latestByMember.values()).reduce((s, x) => s + x.balance, 0);
+      // Add opening savings for members with no passbook entries yet
+      for (const o of allOpenings as any[]) {
+        if (!latestByMember.has(o.member_id)) totalSavings += Number(o.opening_savings ?? 0);
+      }
 
       return {
         members: members.count ?? 0,
@@ -97,6 +112,28 @@ function Dashboard() {
           <StatCard label="Pending Loans" value={String(stats?.pending ?? "—")} icon="⏳" />
           <StatCard label="Revenue (Paid)" value={stats ? fmtKES(stats.revenue) : "—"} icon="💵" />
           <StatCard label="Announcements" value={String(stats?.announcements ?? "—")} icon="📣" />
+        </div>
+      )}
+
+      {isMember && myOpening && (
+        <div className="mb-7">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="font-serif text-lg font-bold">Brought Forward Balances</h2>
+            <span className="text-xs text-muted-foreground">
+              As of {fmtDate(myOpening.effective_date)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatCard label="Savings B/F" value={fmtKES(myOpening.opening_savings)} icon="💰" />
+            <StatCard label="Loan B/F" value={fmtKES(myOpening.opening_loan)} icon="🏦" />
+            <StatCard label="Fine B/F" value={fmtKES(myOpening.opening_fine)} icon="⚠️" />
+            <StatCard label="Insurance B/F" value={fmtKES(myOpening.opening_insurance)} icon="🛡️" />
+            <StatCard label="Benevolent B/F" value={fmtKES(myOpening.opening_benevolent)} icon="🤝" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            These balances were carried over from before the website was launched and are
+            the starting point for all your future calculations.
+          </p>
         </div>
       )}
 

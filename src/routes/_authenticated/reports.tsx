@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports — EKB" }] }),
 });
 
-type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines";
+type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines" | "opening";
 
 function ReportsPage() {
   const { role, loading } = useAuth();
@@ -27,7 +27,7 @@ function ReportsPage() {
     queryKey: ["reports-bundle"],
     enabled: allowed,
     queryFn: async () => {
-      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines] = await Promise.all([
+      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines, openings] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, phone, membership_no, is_active, date_joined"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("loans").select("*"),
@@ -37,6 +37,7 @@ function ReportsPage() {
         (supabase.from("weekly_collections" as any) as any).select("*"),
         (supabase.from("weekly_collection_entries" as any) as any).select("*"),
         (supabase.from("loan_fines" as any) as any).select("*"),
+        (supabase.from("member_opening_balances" as any) as any).select("*"),
       ]);
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
@@ -49,6 +50,7 @@ function ReportsPage() {
         sheets: sheets.data ?? [],
         entries: (entries.data ?? []).map((e: any) => ({ ...e, member: memberMap.get(e.member_id) })),
         fines: fines.data ?? [],
+        openings: (openings.data ?? []).map((o: any) => ({ ...o, member: memberMap.get(o.member_id) })),
         memberMap,
       };
     },
@@ -113,6 +115,18 @@ function ReportsPage() {
           { header: "Total Charged", key: "total_charged", align: "right", width: 14 },
           { header: "Total Paid", key: "total_paid", align: "right", width: 14 },
           { header: "Outstanding", key: "outstanding", align: "right", width: 14 },
+        ];
+      case "opening":
+        return [
+          { header: "Member ID", key: "member_no", width: 12 },
+          { header: "Member", key: "member_name", width: 24 },
+          { header: "Effective Date", key: "effective_date", width: 14 },
+          { header: "Savings B/F", key: "opening_savings", align: "right", width: 14 },
+          { header: "Loan B/F", key: "opening_loan", align: "right", width: 14 },
+          { header: "Fine B/F", key: "opening_fine", align: "right", width: 12 },
+          { header: "Insurance B/F", key: "opening_insurance", align: "right", width: 14 },
+          { header: "Benevolent B/F", key: "opening_benevolent", align: "right", width: 14 },
+          { header: "Notes", key: "notes", width: 28 },
         ];
       default:
         return [];
@@ -184,6 +198,18 @@ function ReportsPage() {
           outstanding: fmtKES(v.charged - v.paid),
         }));
       }
+      case "opening":
+        return (data.openings as any[]).map((o: any) => ({
+          member_name: o.member?.full_name ?? "—",
+          member_no: o.member?.membership_no ?? "—",
+          effective_date: fmtDate(o.effective_date),
+          opening_savings: fmtKES(o.opening_savings),
+          opening_loan: fmtKES(o.opening_loan),
+          opening_fine: fmtKES(o.opening_fine),
+          opening_insurance: fmtKES(o.opening_insurance),
+          opening_benevolent: fmtKES(o.opening_benevolent),
+          notes: o.notes ?? "",
+        }));
       default:
         return [];
     }
@@ -192,19 +218,29 @@ function ReportsPage() {
   const summary = (() => {
     if (!data) return null;
     const totalBorrowed = data.loans.reduce((s: number, l: any) => s + Number(l.amount_borrowed || 0), 0);
-    const totalBal = data.loans.reduce((s: number, l: any) => s + Number(l.balance || 0), 0);
+    const openingLoanTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_loan || 0), 0);
+    const openingSavingsTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_savings || 0), 0);
+    const openingFineTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_fine || 0), 0);
+    const openingInsuranceTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_insurance || 0), 0);
+    const openingBenevolentTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_benevolent || 0), 0);
+    const totalBal = data.loans.reduce((s: number, l: any) => s + Number(l.balance || 0), 0) + openingLoanTotal;
     const totalPaid = data.loans.reduce((s: number, l: any) => s + Number(l.amount_paid || 0), 0);
     const latestByMember = new Map<string, number>();
+    const latestDate = new Map<string, string>();
     for (const e of data.savings) {
-      const cur = latestByMember.get(e.member_id);
-      if (cur == null || e.entry_date > (latestByMember as any).__d?.[e.member_id]) {
+      const prev = latestDate.get(e.member_id);
+      if (!prev || e.entry_date > prev) {
         latestByMember.set(e.member_id, Number(e.balance));
+        latestDate.set(e.member_id, e.entry_date);
       }
     }
-    const totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    let totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    for (const o of data.openings as any[]) {
+      if (!latestByMember.has(o.member_id)) totalSavings += Number(o.opening_savings || 0);
+    }
     const totalFinesCharged = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_charged || 0), 0);
     const totalFinesPaid = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_paid || 0), 0);
-    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0);
+    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0) + openingFineTotal;
     return {
       members: data.members.length,
       active: data.members.filter((m: any) => m.is_active).length,
@@ -213,6 +249,7 @@ function ReportsPage() {
       active_loans: data.loans.filter((l: any) => ["active", "approved", "overdue"].includes(l.status)).length,
       totalBorrowed, totalBal, totalPaid, totalSavings,
       totalFinesCharged, totalFinesPaid, totalOutstandingFines,
+      openingLoanTotal, openingSavingsTotal, openingFineTotal, openingInsuranceTotal, openingBenevolentTotal,
       sheets: data.sheets.length,
     };
   })();
@@ -220,6 +257,7 @@ function ReportsPage() {
   const reports: { key: ReportKey; label: string; description: string; icon: any }[] = [
     { key: "summary", label: "Summary Report", description: "Overall financial snapshot", icon: BarChart3 },
     { key: "members", label: "Members Roster", description: "Complete member directory", icon: Users },
+    { key: "opening", label: "Opening Balances", description: "Brought-forward balances per member (savings, loan, fine, insurance, benevolent)", icon: BarChart3 },
     { key: "loans", label: "Loan Register", description: "All loans with balances & status", icon: Banknote },
     { key: "fines", label: "Fine Summary", description: "Fines per member: charged / paid / outstanding", icon: Banknote },
     { key: "savings", label: "Savings Ledger", description: "All savings transactions", icon: PiggyBank },
@@ -235,16 +273,23 @@ function ReportsPage() {
       const rows = [
         { metric: "Total Members", value: String(summary.members) },
         { metric: "Active Members", value: String(summary.active) },
+        { metric: "— Brought Forward Totals —", value: "" },
+        { metric: "Opening Savings (B/F)", value: fmtKES(summary.openingSavingsTotal) },
+        { metric: "Opening Loans (B/F)", value: fmtKES(summary.openingLoanTotal) },
+        { metric: "Opening Fines (B/F)", value: fmtKES(summary.openingFineTotal) },
+        { metric: "Opening Insurance (B/F)", value: fmtKES(summary.openingInsuranceTotal) },
+        { metric: "Opening Benevolent Fund (B/F)", value: fmtKES(summary.openingBenevolentTotal) },
+        { metric: "— Current Period —", value: "" },
         { metric: "Total Loans on File", value: String(summary.loansCount) },
         { metric: "Pending Approval", value: String(summary.pending) },
         { metric: "Active/Approved Loans", value: String(summary.active_loans) },
         { metric: "Total Borrowed", value: fmtKES(summary.totalBorrowed) },
         { metric: "Total Repaid", value: fmtKES(summary.totalPaid) },
-        { metric: "Outstanding Balance", value: fmtKES(summary.totalBal) },
+        { metric: "Outstanding Balance (incl. B/F)", value: fmtKES(summary.totalBal) },
         { metric: "Total Fines Charged", value: fmtKES(summary.totalFinesCharged) },
         { metric: "Total Fines Paid", value: fmtKES(summary.totalFinesPaid) },
-        { metric: "Outstanding Fines", value: fmtKES(summary.totalOutstandingFines) },
-        { metric: "Total Member Savings", value: fmtKES(summary.totalSavings) },
+        { metric: "Outstanding Fines (incl. B/F)", value: fmtKES(summary.totalOutstandingFines) },
+        { metric: "Total Member Savings (incl. B/F)", value: fmtKES(summary.totalSavings) },
         { metric: "Collection Sheets", value: String(summary.sheets) },
       ];
       const cols: Column[] = [{ header: "Metric", key: "metric", width: 28 }, { header: "Value", key: "value", width: 20, align: "right" }];
@@ -269,6 +314,7 @@ function ReportsPage() {
     if (kind === "xlsx") {
       exportXLSX(`ekb-full-report-${stamp()}.xlsx`, [
         { name: "Members", columns: buildColumns("members"), rows: buildRows("members") },
+        { name: "Opening Balances", columns: buildColumns("opening"), rows: buildRows("opening") },
         { name: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
         { name: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { name: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
@@ -277,6 +323,7 @@ function ReportsPage() {
     } else {
       exportPDF(`ekb-full-report-${stamp()}.pdf`, "Full Report", [
         { heading: "Members", columns: buildColumns("members"), rows: buildRows("members") },
+        { heading: "Opening Balances (Brought Forward)", columns: buildColumns("opening"), rows: buildRows("opening") },
         { heading: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
         { heading: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { heading: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },

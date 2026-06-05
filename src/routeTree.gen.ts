@@ -21,6 +21,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
+import { Route as AuthenticatedOpeningBalancesRouteImport } from './routes/_authenticated/opening-balances'
 import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
 import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
 import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
@@ -91,6 +92,12 @@ const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
   path: '/passbook',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOpeningBalancesRoute =
+  AuthenticatedOpeningBalancesRouteImport.update({
+    id: '/opening-balances',
+    path: '/opening-balances',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMySavingsRoute = AuthenticatedMySavingsRouteImport.update({
   id: '/my-savings',
   path: '/my-savings',
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
+  '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
   '/passbook': typeof AuthenticatedPassbookRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/savings': typeof AuthenticatedSavingsRoute
@@ -176,6 +184,7 @@ export interface FileRoutesByTo {
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
+  '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
   '/passbook': typeof AuthenticatedPassbookRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/savings': typeof AuthenticatedSavingsRoute
@@ -200,6 +209,7 @@ export interface FileRoutesById {
   '/_authenticated/my-loans': typeof AuthenticatedMyLoansRoute
   '/_authenticated/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
+  '/_authenticated/opening-balances': typeof AuthenticatedOpeningBalancesRoute
   '/_authenticated/passbook': typeof AuthenticatedPassbookRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/savings': typeof AuthenticatedSavingsRoute
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
+    | '/opening-balances'
     | '/passbook'
     | '/reports'
     | '/savings'
@@ -246,6 +257,7 @@ export interface FileRouteTypes {
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
+    | '/opening-balances'
     | '/passbook'
     | '/reports'
     | '/savings'
@@ -269,6 +281,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-loans'
     | '/_authenticated/my-passbook'
     | '/_authenticated/my-savings'
+    | '/_authenticated/opening-balances'
     | '/_authenticated/passbook'
     | '/_authenticated/reports'
     | '/_authenticated/savings'
@@ -373,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPassbookRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/opening-balances': {
+      id: '/_authenticated/opening-balances'
+      path: '/opening-balances'
+      fullPath: '/opening-balances'
+      preLoaderRoute: typeof AuthenticatedOpeningBalancesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/my-savings': {
       id: '/_authenticated/my-savings'
       path: '/my-savings'
@@ -459,6 +479,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMyLoansRoute: typeof AuthenticatedMyLoansRoute
   AuthenticatedMyPassbookRoute: typeof AuthenticatedMyPassbookRoute
   AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
+  AuthenticatedOpeningBalancesRoute: typeof AuthenticatedOpeningBalancesRoute
   AuthenticatedPassbookRoute: typeof AuthenticatedPassbookRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSavingsRoute: typeof AuthenticatedSavingsRoute
@@ -476,6 +497,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMyLoansRoute: AuthenticatedMyLoansRoute,
   AuthenticatedMyPassbookRoute: AuthenticatedMyPassbookRoute,
   AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
+  AuthenticatedOpeningBalancesRoute: AuthenticatedOpeningBalancesRoute,
   AuthenticatedPassbookRoute: AuthenticatedPassbookRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSavingsRoute: AuthenticatedSavingsRoute,

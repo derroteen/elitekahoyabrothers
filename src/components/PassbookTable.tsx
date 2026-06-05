@@ -38,20 +38,25 @@ export function PassbookTable({ entries, loading, memberName, membershipNo }: { 
           <tbody>
             {loading && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
             {!loading && entries.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
-            {entries.map((e) => (
-              <tr key={e.id} className="border-t border-border hover:bg-muted/30">
-                <td className="px-3 py-2 text-left">{fmtDate(e.entry_date)}</td>
-                <td className="px-3 py-2 text-right">{Number(e.savings).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right">{Number(e.bonus).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right font-medium">{Number(e.total).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right text-red-700">{Number(e.withdrawal).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right">{Number(e.loan_payment).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right">{Number(e.loan_balance).toFixed(2)}</td>
-                <td className="px-3 py-2 text-left text-xs text-muted-foreground">{e.remarks ?? ""}</td>
-                <td className="px-3 py-2 text-left text-xs">{e.treasurer_sign ?? ""}</td>
-              </tr>
-            ))}
+            {entries.map((e) => {
+              const bf = (e as any).__brought_forward;
+              return (
+                <tr key={e.id} className={`border-t border-border ${bf ? "bg-gold/10 font-semibold" : "hover:bg-muted/30"}`}>
+                  <td className="px-3 py-2 text-left">{fmtDate(e.entry_date)}</td>
+                  <td className="px-3 py-2 text-right">{Number(e.savings).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right">{Number(e.bonus).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{Number(e.total).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right text-red-700">{Number(e.withdrawal).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right">{Number(e.loan_payment).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right">{Number(e.loan_balance).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-left text-xs text-muted-foreground">
+                    {bf ? <span className="text-gold-3 font-semibold uppercase tracking-wider text-[10px]">Brought Forward Balance</span> : (e.remarks ?? "")}
+                  </td>
+                  <td className="px-3 py-2 text-left text-xs">{e.treasurer_sign ?? ""}</td>
+                </tr>
+              );
+            })}
           </tbody>
           {entries.length > 0 && (
             <tfoot>

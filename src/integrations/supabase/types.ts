@@ -314,6 +314,59 @@ export type Database = {
           },
         ]
       }
+      member_opening_balances: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          member_id: string
+          notes: string | null
+          opening_benevolent: number
+          opening_fine: number
+          opening_insurance: number
+          opening_loan: number
+          opening_savings: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          member_id: string
+          notes?: string | null
+          opening_benevolent?: number
+          opening_fine?: number
+          opening_insurance?: number
+          opening_loan?: number
+          opening_savings?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          member_id?: string
+          notes?: string | null
+          opening_benevolent?: number
+          opening_fine?: number
+          opening_insurance?: number
+          opening_loan?: number
+          opening_savings?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_opening_balances_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null

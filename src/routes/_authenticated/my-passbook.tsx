@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/PageHeader";
 import { PassbookTable } from "@/components/PassbookTable";
+import { fetchOpeningBalance, withBroughtForward } from "@/lib/opening-balances";
 
 export const Route = createFileRoute("/_authenticated/my-passbook")({
   component: MyPassbook,
@@ -16,14 +17,17 @@ function MyPassbook() {
     queryKey: ["my-passbook", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("passbook_entries").select("*").eq("member_id", user!.id).order("entry_date", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
+      const [entriesRes, opening] = await Promise.all([
+        supabase.from("passbook_entries").select("*").eq("member_id", user!.id).order("entry_date", { ascending: true }),
+        fetchOpeningBalance(user!.id),
+      ]);
+      if (entriesRes.error) throw entriesRes.error;
+      return withBroughtForward(entriesRes.data ?? [], opening);
     },
   });
   return (
     <div>
-      <PageHeader title="My Passbook" subtitle="Your savings ledger" />
+      <PageHeader title="My Passbook" subtitle="Your savings ledger — starts from your Brought Forward balance" />
       <PassbookTable entries={entries} loading={isLoading} memberName={profile?.full_name} membershipNo={profile?.membership_no ?? undefined} />
     </div>
   );
