@@ -125,6 +125,9 @@ function HomePage() {
               contribution, loan disbursement, and repayment — ensuring every member has full visibility
               into their financial journey.
             </p>
+            <p className="text-foreground/80 leading-relaxed text-base sm:text-lg mt-4 font-semibold text-navy">
+              Location: Eldoret City
+            </p>
           </div>
         </div>
       </section>
