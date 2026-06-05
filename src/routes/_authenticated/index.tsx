@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { fmtKES } from "@/lib/format";
+import { fmtKES, fmtDate } from "@/lib/format";
+import { fetchOpeningBalance } from "@/lib/opening-balances";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: Dashboard,
@@ -21,8 +22,15 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 }
 
 function Dashboard() {
-  const { profile, role } = useAuth();
+  const { user, profile, role } = useAuth();
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
+  const isMember = role === "member";
+
+  const { data: myOpening } = useQuery({
+    queryKey: ["my-opening-balance", user?.id],
+    enabled: !!user && isMember,
+    queryFn: () => fetchOpeningBalance(user!.id),
+  });
 
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", role],
