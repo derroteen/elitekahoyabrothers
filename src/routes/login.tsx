@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { setRememberMe } from "@/integrations/supabase/session-storage-shim";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ function LoginPage() {
   const { user, profile, loading } = useAuth();
   const [credential, setCredential] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false); // OFF by default
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +45,9 @@ function LoginPage() {
     try {
       const email = await resolveEmail(credential);
       if (!email) { setError("Membership number not found."); setSubmitting(false); return; }
+      // Set persistence preference BEFORE sign-in so the shim routes the
+      // token to the right storage on the very first write.
+      setRememberMe(remember);
       const { error: err } = await supabase.auth.signInWithPassword({ email, password });
       if (err) { setError("Invalid credentials. Please try again."); return; }
       toast.success("Welcome back");
@@ -79,6 +84,15 @@ function LoginPage() {
               className="w-full px-3.5 py-3 border-[1.5px] border-border rounded-md text-base outline-none focus:border-blue"
               value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground select-none cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border accent-gold cursor-pointer"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            <span>Remember me on this device</span>
+          </label>
           <button type="submit" disabled={submitting}
             className="w-full bg-gold text-navy font-semibold py-3 rounded-md hover:bg-gold-2 transition disabled:opacity-60 text-base">
             {submitting ? "Signing in…" : "Sign In →"}
