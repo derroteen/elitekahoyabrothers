@@ -177,7 +177,9 @@ function MembersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditing(m)}>Edit details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setResetting(m)}>Reset password</DropdownMenuItem>
+                        {canResetPw && (
+                          <DropdownMenuItem onClick={() => setResetting(m)}>Reset password</DropdownMenuItem>
+                        )}
                         {canToggleActive && (
                           <DropdownMenuItem
                             onClick={async () => {
