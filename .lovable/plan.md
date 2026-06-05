@@ -1,69 +1,84 @@
+# Opening Balances ("Brought Forward")
 
-# Elite Kahoya Brothers (EKB) Management System — Build Plan
+## 1. Database
 
-I'll convert your HTML prototype into a production React + Lovable Cloud (Supabase) app, **preserving the navy/gold design language, Playfair/DM Sans/IBM Plex Mono typography, sidebar layout, passbook table styling, and color tokens** from your prototype.
+New table `public.member_opening_balances` (one row per member):
 
-This is a large scope — I'll deliver it in 3 phases so you can review between each phase.
+- `member_id` (uuid, PK, FK → profiles.id)
+- `effective_date` (date, default today)
+- `opening_savings`, `opening_loan`, `opening_fine`, `opening_insurance`, `opening_benevolent` (numeric(14,2), default 0)
+- `notes` (text)
+- `created_by`, `updated_by`, `created_at`, `updated_at`
 
----
+Standard four-step migration (CREATE → GRANT → RLS → POLICY). Policies:
+- `authenticated` SELECT where `member_id = auth.uid()` OR `is_staff(auth.uid())` OR `has_role(auth.uid(), 'auditor')`
+- INSERT/UPDATE/DELETE only when `is_staff(auth.uid())` (Super Admin + Admin)
+- Attach existing `audit_trigger()` so every change is recorded in `audit_logs`
+- `touch_updated_at` trigger
 
-## Phase 1 — Foundation (this turn)
+(Benevolent fund has no existing transactions table — we only track its opening balance for now; future contributions can extend later.)
 
-**Design system & layout**
-- Port the prototype's tokens (navy `#0A1628`, gold `#C9A84C`, blue accents, blue-light passbook rows) into `src/styles.css` as semantic tokens.
-- Load Playfair Display, DM Sans, IBM Plex Mono.
-- Build the sidebar shell, topbar, cards, stat-cards, buttons, badges, passbook table styles as reusable React components.
+## 2. Server functions (`src/lib/opening-balances.functions.ts`)
 
-**Backend (Lovable Cloud / Supabase)**
-- Enable Lovable Cloud.
-- Database schema:
-  - `profiles` (id → auth.users, full_name, email, phone, membership_no like `EKB001`, must_change_password, date_joined)
-  - `user_roles` (separate table, enum: `super_admin | admin | auditor | member`) + `has_role()` security-definer function
-  - `passbook_entries` (date, savings, bonus, total, withdrawal, balance, loan_payment, loan_balance, treasurer_sign, remarks, member_id)
-  - `loans` (date, amount_borrowed, interest_rate, payment_frequency, amount_paid, balance, insurance, status)
-  - `loan_repayments`
-  - `savings_entries` (amount, bonus, total, withdrawal, balance)
-  - `announcements` (title, body, pinned, created_by)
-  - `notifications` (user_id, type, payload, read)
-  - `audit_logs` (actor, action, table, record_id, old_value, new_value, timestamp)
-- RLS policies on every table — members see only their own data; admins/super_admins write; auditors read all.
-- Auto-grant `member` role on signup via trigger; sequential `EKB001` numbering via trigger.
-- Seed the **Super Admin** (`superadmin` / `admin1234`, `must_change_password=true`).
+All protected by `requireSupabaseAuth` + staff check:
 
-**Auth**
-- Email/password sign-in (username `superadmin` mapped to a synthetic email like `superadmin@ekb.local`).
-- Force password change on first login → `/change-password` route.
-- Password reset flow + `/reset-password` page.
-- `_authenticated` route guard + role-based child guards (`_admin`, `_auditor`).
+- `listOpeningBalances()` — joins profiles, returns members with their B/F row (or zeros) — staff/auditor only
+- `getMyOpeningBalance()` — current user's row — any authenticated user
+- `upsertOpeningBalance({ member_id, effective_date, opening_*, notes })` — staff only
+- `bulkImportOpeningBalances({ rows })` — staff only; validates each row (membership_no exists, numbers ≥ 0, valid date), returns `{ inserted, updated, errors[] }`
 
----
+## 3. UI
 
-## Phase 2 — Core modules
+New page `src/routes/_authenticated/opening-balances.tsx` (Super Admin + Admin only, gated by `role` check + redirect):
 
-- **Passbook**: list view (matching your prototype's navy header + blue-light striped rows), member-scoped read, admin add/edit/delete with auto-calculated `total`, `balance`, `loan_balance`.
-- **Loans module**: applications, approvals, repayments, interest & penalty calc, status tracking.
-- **Savings module**: deposits, bonuses, withdrawals, running balance.
-- **Members**: admin CRUD, auto-issue membership numbers, email temp password.
-- **Announcements**: CRUD + pin, displayed on dashboards.
-- **Notifications**: in-app + email (via Lovable Emails) for new account, password reset, new announcement, loan approval, repayment reminder.
+- Table of all members with their current B/F values (editable inline via dialog)
+- "Edit" dialog: all opening fields + effective date + notes
+- "Bulk import" dialog: paste-from-Excel textarea (TSV) or upload `.csv`/`.xlsx`. Preview validated rows, then commit. Uses `xlsx` (already widely supported) — install if missing.
+- Add nav item "Opening Balances" in `src/routes/_authenticated.tsx` for `super_admin` and `admin` only.
 
----
+## 4. Passbook integration
 
-## Phase 3 — Dashboards, exports, audit
+Modify `src/components/PassbookTable.tsx` (and `passbook.tsx` / `my-passbook.tsx` loaders):
 
-- **Dashboards** for Member / Admin / Auditor (matching prototype stat-grid).
-- **Audit logs** via DB triggers on financial tables.
-- **Exports**: PDF (passbook, reports) via `jspdf` + `jspdf-autotable`; Excel via `xlsx` with formulas.
-- **Settings**: change password, profile.
-- Sample data seed for 15 members.
+- Prepend a synthetic first row when an opening balance row exists for the member:
+  - Date: `effective_date`
+  - Description: **"Brought Forward Balance"**
+  - Savings / Loan / Fine / Insurance columns populated from opening row
+  - Visually distinct (bold + gold accent)
+- Running balances downstream start from those opening numbers.
 
----
+## 5. Member dashboard (`src/routes/_authenticated/index.tsx`)
+
+For the `member` view, add a "Brought Forward Balances" card with five rows (Savings, Loan, Fine, Insurance, Benevolent), shown above current-period totals. Hidden when all zeros.
+
+## 6. Reports (`src/routes/_authenticated/reports.tsx` + `src/lib/exports.ts`)
+
+- Member Statement, Passbook, Loan Report, Savings Report, Auditor Report each load opening balances and:
+  - Show a "Brought Forward" row/section at the top
+  - Include opening values in totals and running balances
+- PDF and Excel exports include the same B/F row as the first line.
+
+## 7. Audit trail
+
+`audit_trigger()` on `member_opening_balances` records actor, op, old/new JSON in existing `audit_logs` table — already surfaced on `/audit` page, no UI work needed.
+
+## 8. Calculations
+
+Wherever current balances are computed, replace `sum(entries)` with `opening + sum(entries)`:
+- Savings: `opening_savings + Σ savings_entries.amount`
+- Loan: `opening_loan + Σ new principal + interest + fines − repayments` (additive to existing `loans` rollups; treat opening as a virtual loan-balance baseline shown on dashboard/passbook only — do NOT mutate `loans.balance` to avoid corrupting per-loan accounting)
+- Fines: `opening_fine + Σ unpaid fines − fine payments`
+- Insurance: `opening_insurance + Σ insurance entries` (insurance currently tracked via savings/passbook entry types — handled in passbook running totals)
 
 ## Technical notes
 
-- Stack: TanStack Start (existing template) + React + Tailwind + Lovable Cloud.
-- All financial mutations write an `audit_logs` row via DB trigger so auditors get a complete history without app-layer coupling.
-- Email via Lovable Emails (will prompt for domain setup when we wire notifications in Phase 2).
-- No SMS now; notifications table has a `channel` column so SMS can be added later without migration.
+- Table: `public.member_opening_balances` with grants to `authenticated` (SELECT/INSERT/UPDATE/DELETE) and `service_role` (ALL).
+- Audit via existing `public.audit_trigger()`.
+- Bulk import: add `xlsx` package for parsing `.xlsx`; CSV path uses native parsing.
+- Member dropdowns continue to use existing `filterMembersOnly` helper so admins/auditors/super-admins are excluded from member-only views.
+- No changes to `loans.balance` schema — opening loan balance is a display-layer baseline, surfaced in passbook/dashboard/reports.
 
-Reply **"go"** to start Phase 1, or tell me what to adjust (scope, order, naming) first.
+## Out of scope
+
+- Editing historical (pre-website) loan repayment schedules row-by-row — only the aggregate opening loan balance is captured.
+- Benevolent fund transaction tracking beyond the opening balance (can be added in a follow-up).
