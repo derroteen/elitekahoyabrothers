@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,14 +11,25 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fmtKES, fmtDate } from "@/lib/format";
+import { fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
-import { updatePassbookEntry } from "@/lib/passbook.functions";
+import { createManualPassbookEntry, updatePassbookEntry } from "@/lib/passbook.functions";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
   component: PassbookAdmin,
   head: () => ({ meta: [{ title: "Passbook — EKB" }] }),
 });
+
+const MANUAL_CATEGORIES: { value: string; label: string; defaultDesc: string; field: "savings" | "bonus" | "withdrawal" | "loan_payment" | null }[] = [
+  { value: "bonus", label: "Bonus Allocation", defaultDesc: "Bonus Allocation", field: "bonus" },
+  { value: "dividend", label: "Dividend Payment", defaultDesc: "Dividend Payment", field: "bonus" },
+  { value: "special_contribution", label: "Special Contribution", defaultDesc: "Special Contribution", field: "savings" },
+  { value: "savings", label: "Savings (Ad-hoc)", defaultDesc: "Savings", field: "savings" },
+  { value: "refund", label: "Refund", defaultDesc: "Refund", field: "bonus" },
+  { value: "withdrawal", label: "Withdrawal", defaultDesc: "Withdrawal", field: "withdrawal" },
+  { value: "adjustment", label: "Adjustment / Correction", defaultDesc: "Adjustment Entry", field: null },
+  { value: "other", label: "Other", defaultDesc: "Other Entry", field: null },
+];
 
 function PassbookAdmin() {
   const { role, loading } = useAuth();
@@ -65,11 +76,10 @@ function PassbookAdmin() {
   const selectedMember = members.find((m: any) => m.id === memberId);
   const canEdit = role === "super_admin" || role === "admin";
 
-
   return (
     <div>
-      <PageHeader title="Passbook" subtitle="Member savings ledger" actions={
-        canEdit && memberId ? <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Entry</Button> : undefined
+      <PageHeader title="Passbook" subtitle="Member savings ledger — weekly entries sync automatically; use Manual Entry for bonuses, withdrawals, adjustments." actions={
+        canEdit && memberId ? <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ Manual Entry</Button> : undefined
       } />
       <Card className="p-4 mb-4">
         <Label className="text-xs uppercase tracking-wider">Select Member</Label>
@@ -87,68 +97,129 @@ function PassbookAdmin() {
         <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} onEdit={setEditEntry} />
       )}
 
-      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestBalance={entries.at(-1)?.balance ?? 0} latestLoanBal={entries.at(-1)?.loan_balance ?? 0} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
-
-      <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} entries={entries} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
     </div>
   );
 }
 
-function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoanBal, latestDate, onCreated }: any) {
+function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }: any) {
+  const doCreate = useServerFn(createManualPassbookEntry);
   const nextDate = (base?: string) => {
     const d = base ? new Date(base) : new Date();
     if (base) d.setDate(d.getDate() + 7);
     return d.toISOString().slice(0, 10);
   };
+  const [category, setCategory] = useState<string>("bonus");
   const [form, setForm] = useState({
     entry_date: nextDate(latestDate),
-    savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "",
+    description: "Bonus Allocation",
+    amount: "",
+    savings: "", bonus: "", withdrawal: "", loan_payment: "",
+    remarks: "", treasurer_sign: "",
+    reason: "",
   });
   useEffect(() => {
-    if (open) setForm((f) => ({ ...f, entry_date: nextDate(latestDate) }));
+    if (open) {
+      const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
+      setForm((f) => ({ ...f, entry_date: nextDate(latestDate), description: cat?.defaultDesc ?? "" }));
+    }
   }, [open, latestDate]);
+
+  const onCategoryChange = (v: string) => {
+    setCategory(v);
+    const cat = MANUAL_CATEGORIES.find((c) => c.value === v);
+    setForm((f) => ({ ...f, description: cat?.defaultDesc ?? "" }));
+  };
+
   const [submitting, setSubmitting] = useState(false);
 
-  const total = Number(form.savings || 0) + Number(form.bonus || 0);
-  const balance = Number(latestBalance) + total - Number(form.withdrawal || 0);
-  const loanBalance = Math.max(0, Number(latestLoanBal) - Number(form.loan_payment || 0));
+  const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
+  const singleField = cat?.field;
 
   const submit = async () => {
+    if (!form.description.trim()) { toast.error("Description is required"); return; }
     setSubmitting(true);
-    const { error } = await supabase.from("passbook_entries").insert({
-      member_id: memberId,
-      entry_date: form.entry_date,
-      savings: Number(form.savings || 0),
-      bonus: Number(form.bonus || 0),
-      total, withdrawal: Number(form.withdrawal || 0), balance,
-      loan_payment: Number(form.loan_payment || 0), loan_balance: loanBalance,
-      remarks: form.remarks || null,
-      treasurer_sign: form.treasurer_sign || null,
-    });
-    setSubmitting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Entry recorded");
-    setForm({ entry_date: nextDate(form.entry_date), savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "" });
-    onOpenChange(false); onCreated();
+    try {
+      let savings = Number(form.savings || 0);
+      let bonus = Number(form.bonus || 0);
+      let withdrawal = Number(form.withdrawal || 0);
+      let loan_payment = Number(form.loan_payment || 0);
+
+      if (singleField) {
+        const amt = Number(form.amount || 0);
+        savings = singleField === "savings" ? amt : 0;
+        bonus = singleField === "bonus" ? amt : 0;
+        withdrawal = singleField === "withdrawal" ? amt : 0;
+        loan_payment = singleField === "loan_payment" ? amt : 0;
+      }
+
+      await doCreate({
+        data: {
+          member_id: memberId,
+          entry_date: form.entry_date,
+          category: category as any,
+          description: form.description.trim(),
+          savings, bonus, withdrawal, loan_payment,
+          remarks: form.remarks || form.description,
+          treasurer_sign: form.treasurer_sign || null,
+          reason: (category === "adjustment" || category === "withdrawal") ? (form.reason || null) : null,
+        },
+      });
+      toast.success("Entry recorded");
+      setForm({ entry_date: nextDate(form.entry_date), description: cat?.defaultDesc ?? "", amount: "", savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "", reason: "" });
+      onOpenChange(false); onCreated();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to create entry");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const requiresReason = category === "adjustment" || category === "withdrawal";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle className="font-serif">New Passbook Entry</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+        <DialogHeader><DialogTitle className="font-serif">New Manual Passbook Entry</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} /></div>
-          <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
-          <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
-          <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
-          <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Remarks</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
-          <div className="col-span-2 bg-muted/50 rounded-md p-3 text-xs space-y-1 font-mono">
-            <div>Total = savings + bonus: <strong>{fmtKES(total)}</strong></div>
-            <div>New Balance: <strong>{fmtKES(balance)}</strong></div>
-            <div>Loan Balance: <strong>{fmtKES(loanBalance)}</strong></div>
+          <div className="col-span-2">
+            <Label>Category</Label>
+            <Select value={category} onValueChange={onCategoryChange}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MANUAL_CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} /></div>
+
+          {singleField ? (
+            <div className="col-span-2">
+              <Label>Amount ({singleField.replace("_", " ")})</Label>
+              <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+          ) : (
+            <>
+              <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
+              <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
+              <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
+              <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
+            </>
+          )}
+
+          <div className="col-span-2"><Label>Remarks (optional)</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
+
+          {requiresReason && (
+            <div className="col-span-2">
+              <Label>Reason {category === "adjustment" ? "(required)" : "(recommended)"}</Label>
+              <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Why is this entry being recorded?" />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -159,63 +230,60 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoa
   );
 }
 
-function EditEntryDialog({ entry, onClose, entries, onSaved }: any) {
+function EditEntryDialog({ entry, onClose, onSaved }: any) {
   const doUpdate = useServerFn(updatePassbookEntry);
   const open = !!entry;
 
   const [form, setForm] = useState({
     entry_date: "",
+    description: "",
     savings: "",
     bonus: "",
     withdrawal: "",
     loan_payment: "",
     remarks: "",
     treasurer_sign: "",
+    reason: "",
   });
 
   useEffect(() => {
     if (entry) {
       setForm({
         entry_date: entry.entry_date ?? "",
+        description: entry.description ?? entry.remarks ?? "",
         savings: String(entry.savings ?? ""),
         bonus: String(entry.bonus ?? ""),
         withdrawal: String(entry.withdrawal ?? ""),
         loan_payment: String(entry.loan_payment ?? ""),
         remarks: entry.remarks ?? "",
         treasurer_sign: entry.treasurer_sign ?? "",
+        reason: "",
       });
     }
   }, [entry?.id]);
-
-  const entryIndex = useMemo(() => {
-    if (!entry) return -1;
-    return entries.findIndex((e: any) => e.id === entry.id);
-  }, [entry, entries]);
-
-  const prevEntry = entryIndex > 0 ? entries[entryIndex - 1] : null;
-  const prevBalance = prevEntry ? Number(prevEntry.balance) : 0;
-  const prevLoanBal = prevEntry ? Number(prevEntry.loan_balance) : 0;
-
-  const total = Number(form.savings || 0) + Number(form.bonus || 0);
-  const balance = prevBalance + total - Number(form.withdrawal || 0);
-  const loanBalance = Math.max(0, prevLoanBal - Number(form.loan_payment || 0));
 
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
     if (!entry) return;
+    if (form.reason.trim().length < 3) {
+      toast.error("Reason for change is required (min 3 chars)");
+      return;
+    }
     setSubmitting(true);
     try {
       await doUpdate({
         data: {
           id: entry.id,
           entry_date: form.entry_date,
+          description: form.description || undefined,
           savings: Number(form.savings || 0),
           bonus: Number(form.bonus || 0),
           withdrawal: Number(form.withdrawal || 0),
           loan_payment: Number(form.loan_payment || 0),
           remarks: form.remarks || null,
           treasurer_sign: form.treasurer_sign || null,
+          reason: form.reason.trim(),
         },
       });
       toast.success("Entry updated and balances recalculated");
@@ -228,11 +296,19 @@ function EditEntryDialog({ entry, onClose, entries, onSaved }: any) {
     }
   };
 
+  const isWeekly = entry?.source === "weekly";
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-serif">Edit Passbook Entry</DialogTitle></DialogHeader>
+        {isWeekly && (
+          <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2 mb-2">
+            This entry is auto-synced from a Weekly Collection Sheet. Edits here will be overwritten next time that sheet is saved — change the sheet itself for permanent edits.
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} /></div>
           <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
           <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
@@ -240,11 +316,10 @@ function EditEntryDialog({ entry, onClose, entries, onSaved }: any) {
           <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
           <div className="col-span-2"><Label>Remarks</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
           <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
-          <div className="col-span-2 bg-muted/50 rounded-md p-3 text-xs space-y-1 font-mono">
-            <div>Total = savings + bonus: <strong>{fmtKES(total)}</strong></div>
-            <div>New Balance: <strong>{fmtKES(balance)}</strong></div>
-            <div>Loan Balance: <strong>{fmtKES(loanBalance)}</strong></div>
-            <div className="text-muted-foreground italic">All subsequent entries will be recalculated automatically.</div>
+          <div className="col-span-2">
+            <Label>Reason for change <span className="text-red-600">*</span></Label>
+            <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Corrected savings amount per member receipt" />
+            <div className="text-[11px] text-muted-foreground mt-1">Required — this is recorded in the Audit Log.</div>
           </div>
         </div>
         <DialogFooter>
