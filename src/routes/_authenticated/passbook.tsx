@@ -31,8 +31,12 @@ function PassbookAdmin() {
     queryKey: ["members-lite"],
     enabled: isStaff,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, membership_no").order("membership_no");
-      return data ?? [];
+      const { fetchNonMemberIds, filterMembersOnly } = await import("@/lib/member-queries");
+      const [profilesRes, nonMembers] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, membership_no").order("membership_no"),
+        fetchNonMemberIds(),
+      ]);
+      return filterMembersOnly(profilesRes.data ?? [], nonMembers);
     },
   });
 

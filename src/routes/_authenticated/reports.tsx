@@ -41,7 +41,7 @@ function ReportsPage() {
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
       return {
-        members: (profs.data ?? []).map((p: any) => ({ ...p, role: roleMap.get(p.id) ?? "member" })),
+        members: (profs.data ?? []).filter((p: any) => (roleMap.get(p.id) ?? "member") === "member").map((p: any) => ({ ...p, role: "member" })),
         loans: (loans.data ?? []).map((l: any) => ({ ...l, member: memberMap.get(l.member_id) })),
         schedule: sched.data ?? [],
         repayments: repay.data ?? [],

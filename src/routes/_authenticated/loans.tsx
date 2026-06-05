@@ -189,7 +189,14 @@ function LoansAdmin() {
 function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, membership_no").order("membership_no")).data ?? [],
+    queryFn: async () => {
+      const { fetchNonMemberIds, filterMembersOnly } = await import("@/lib/member-queries");
+      const [profilesRes, nonMembers] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, membership_no").order("membership_no"),
+        fetchNonMemberIds(),
+      ]);
+      return filterMembersOnly(profilesRes.data ?? [], nonMembers);
+    },
   });
   const [form, setForm] = useState({
     member_id: "", amount: "", interest: "10", freq: "monthly" as Frequency,
