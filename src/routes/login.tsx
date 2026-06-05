@@ -7,7 +7,17 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — Elite Kahoya Brothers" }] }),
+  head: () => ({
+    meta: [
+      { title: "Sign in — Elite Kahoya Brothers Members Portal" },
+      { name: "description", content: "Sign in to the Elite Kahoya Brothers members portal to manage your savings, loans, passbook, and group activity." },
+      { property: "og:title", content: "Sign in — Elite Kahoya Brothers" },
+      { property: "og:description", content: "Members sign-in for the Elite Kahoya Brothers savings & loans portal." },
+      { property: "og:url", content: "https://www.elitekahoyabrothers.com/login" },
+      { property: "og:type", content: "website" },
+    ],
+    links: [{ rel: "canonical", href: "https://www.elitekahoyabrothers.com/login" }],
+  }),
 });
 
 const EKB_PATTERN = /^EKB\d{3,}$/i;
@@ -58,13 +68,13 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-navy px-4 py-8"
          style={{ backgroundImage: "radial-gradient(circle at 20% 50%, oklch(0.74 0.115 85 / 0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, oklch(0.55 0.16 245 / 0.12) 0%, transparent 50%)" }}>
       <div className="w-full max-w-[400px] bg-card rounded-2xl p-7 sm:p-10 shadow-2xl">
-        <div className="text-center mb-7">
-          <div className="font-serif text-2xl font-black text-navy leading-tight">
-            Elite Kahoya<br/>Brothers
-          </div>
+        <header className="text-center mb-7">
+          <h1 className="font-serif text-2xl font-black text-navy leading-tight">
+            Elite Kahoya Brothers
+          </h1>
           <div className="w-10 h-[3px] bg-gold mx-auto my-3" />
-          <div className="text-xs text-muted-foreground tracking-[2px] uppercase">Members Portal</div>
-        </div>
+          <p className="text-xs text-muted-foreground tracking-[2px] uppercase">Members Portal</p>
+        </header>
 
         {error && <div className="bg-red-100 text-red-800 px-3.5 py-2.5 rounded-md text-sm mb-4">{error}</div>}
 

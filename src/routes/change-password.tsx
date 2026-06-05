@@ -6,7 +6,17 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/change-password")({
   component: ChangePasswordPage,
-  head: () => ({ meta: [{ title: "Change password — EKB" }] }),
+  head: () => ({
+    meta: [
+      { title: "Change password — Elite Kahoya Brothers" },
+      { name: "description", content: "Update the password on your Elite Kahoya Brothers members portal account." },
+      { property: "og:title", content: "Change password — Elite Kahoya Brothers" },
+      { property: "og:description", content: "Change the password on your EKB members portal account." },
+      { property: "og:url", content: "https://www.elitekahoyabrothers.com/change-password" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+    links: [{ rel: "canonical", href: "https://www.elitekahoyabrothers.com/change-password" }],
+  }),
 });
 
 function ChangePasswordPage() {
@@ -36,11 +46,11 @@ function ChangePasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy px-4">
       <div className="w-[380px] bg-card rounded-2xl p-10 shadow-2xl">
-        <div className="text-center mb-6">
-          <div className="font-serif text-xl font-black text-navy">Set a new password</div>
+        <header className="text-center mb-6">
+          <h1 className="font-serif text-xl font-black text-navy">Set a new password</h1>
           <div className="w-10 h-[3px] bg-gold mx-auto my-3" />
           <p className="text-xs text-muted-foreground">For security, please change your password to continue.</p>
-        </div>
+        </header>
         {error && <div className="bg-red-100 text-red-800 px-3.5 py-2.5 rounded-md text-sm mb-4">{error}</div>}
         <form onSubmit={onSubmit} className="space-y-4">
           <div>

@@ -4,7 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/forgot-password")({
   component: ForgotPage,
-  head: () => ({ meta: [{ title: "Forgot password — EKB" }] }),
+  head: () => ({
+    meta: [
+      { title: "Forgot password — Elite Kahoya Brothers" },
+      { name: "description", content: "Request a password reset link for your Elite Kahoya Brothers members portal account." },
+      { property: "og:title", content: "Forgot password — Elite Kahoya Brothers" },
+      { property: "og:description", content: "Recover access to your EKB members portal account." },
+      { property: "og:url", content: "https://www.elitekahoyabrothers.com/forgot-password" },
+    ],
+    links: [{ rel: "canonical", href: "https://www.elitekahoyabrothers.com/forgot-password" }],
+  }),
 });
 
 function ForgotPage() {
@@ -25,10 +34,10 @@ function ForgotPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy px-4">
       <div className="w-[380px] bg-card rounded-2xl p-10 shadow-2xl">
-        <div className="text-center mb-6">
-          <div className="font-serif text-xl font-black text-navy">Reset password</div>
+        <header className="text-center mb-6">
+          <h1 className="font-serif text-xl font-black text-navy">Reset password</h1>
           <div className="w-10 h-[3px] bg-gold mx-auto my-3" />
-        </div>
+        </header>
         {sent ? (
           <p className="text-sm text-muted-foreground">If an account exists for {email}, a reset link has been sent.</p>
         ) : (
