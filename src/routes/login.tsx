@@ -7,7 +7,17 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — Elite Kahoya Brothers" }] }),
+  head: () => ({
+    meta: [
+      { title: "Sign in — Elite Kahoya Brothers Members Portal" },
+      { name: "description", content: "Sign in to the Elite Kahoya Brothers members portal to manage your savings, loans, passbook, and group activity." },
+      { property: "og:title", content: "Sign in — Elite Kahoya Brothers" },
+      { property: "og:description", content: "Members sign-in for the Elite Kahoya Brothers savings & loans portal." },
+      { property: "og:url", content: "https://www.elitekahoyabrothers.com/login" },
+      { property: "og:type", content: "website" },
+    ],
+    links: [{ rel: "canonical", href: "https://www.elitekahoyabrothers.com/login" }],
+  }),
 });
 
 const EKB_PATTERN = /^EKB\d{3,}$/i;
