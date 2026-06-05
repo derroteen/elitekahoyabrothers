@@ -89,11 +89,19 @@ function PassbookAdmin() {
   );
 }
 
-function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoanBal, onCreated }: any) {
+function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoanBal, latestDate, onCreated }: any) {
+  const nextDate = (base?: string) => {
+    const d = base ? new Date(base) : new Date();
+    if (base) d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  };
   const [form, setForm] = useState({
-    entry_date: new Date().toISOString().slice(0, 10),
+    entry_date: nextDate(latestDate),
     savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "",
   });
+  useEffect(() => {
+    if (open) setForm((f) => ({ ...f, entry_date: nextDate(latestDate) }));
+  }, [open, latestDate]);
   const [submitting, setSubmitting] = useState(false);
 
   const total = Number(form.savings || 0) + Number(form.bonus || 0);
@@ -115,7 +123,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoa
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Entry recorded");
-    setForm({ entry_date: new Date().toISOString().slice(0, 10), savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "" });
+    setForm({ entry_date: nextDate(form.entry_date), savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "" });
     onOpenChange(false); onCreated();
   };
 
