@@ -82,15 +82,24 @@ function CollectionsPage() {
         </div>
       </Card>
 
-      <NewSheetDialog open={openNew} onOpenChange={setOpenNew} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
+      <NewSheetDialog open={openNew} onOpenChange={setOpenNew} lastSheet={sheets[0]} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
       {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} />}
       {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
   );
 }
 
-function NewSheetDialog({ open, onOpenChange, onCreated }: any) {
-  const [form, setForm] = useState({ week_number: "", collection_date: new Date().toISOString().slice(0, 10), treasurer_name: "" });
+function NewSheetDialog({ open, onOpenChange, lastSheet, onCreated }: any) {
+  const computeDefaults = () => {
+    if (lastSheet) {
+      const d = new Date(lastSheet.collection_date);
+      d.setDate(d.getDate() + 7);
+      return { week_number: String(Number(lastSheet.week_number) + 1), collection_date: d.toISOString().slice(0, 10), treasurer_name: "" };
+    }
+    return { week_number: "", collection_date: new Date().toISOString().slice(0, 10), treasurer_name: "" };
+  };
+  const [form, setForm] = useState(computeDefaults);
+  useEffect(() => { if (open) setForm(computeDefaults()); }, [open, lastSheet?.id]);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     if (!form.week_number) { toast.error("Week number required"); return; }
