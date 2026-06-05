@@ -139,31 +139,46 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string | null
+          fine_paid: number
           id: string
           loan_id: string
           notes: string | null
           payment_date: string
+          payment_method: string | null
           penalty: number
+          principal_paid: number
+          source: string
+          weekly_entry_id: string | null
         }
         Insert: {
           amount: number
           created_at?: string
           created_by?: string | null
+          fine_paid?: number
           id?: string
           loan_id: string
           notes?: string | null
           payment_date?: string
+          payment_method?: string | null
           penalty?: number
+          principal_paid?: number
+          source?: string
+          weekly_entry_id?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
           created_by?: string | null
+          fine_paid?: number
           id?: string
           loan_id?: string
           notes?: string | null
           payment_date?: string
+          payment_method?: string | null
           penalty?: number
+          principal_paid?: number
+          source?: string
+          weekly_entry_id?: string | null
         }
         Relationships: [
           {
@@ -171,6 +186,13 @@ export type Database = {
             columns: ["loan_id"]
             isOneToOne: false
             referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_weekly_entry_id_fkey"
+            columns: ["weekly_entry_id"]
+            isOneToOne: true
+            referencedRelation: "weekly_collection_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -741,15 +763,28 @@ export type Database = {
         Args: { _member: string }
         Returns: undefined
       }
-      record_loan_repayment: {
-        Args: {
-          _amount: number
-          _loan_id: string
-          _notes?: string
-          _payment_date?: string
-        }
-        Returns: Json
-      }
+      record_loan_repayment:
+        | {
+            Args: {
+              _amount: number
+              _loan_id: string
+              _notes?: string
+              _payment_date?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _amount: number
+              _loan_id: string
+              _notes?: string
+              _payment_date?: string
+              _payment_method?: string
+              _source?: string
+              _weekly_entry_id?: string
+            }
+            Returns: Json
+          }
       reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {

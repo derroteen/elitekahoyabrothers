@@ -309,7 +309,12 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
 }
 
 function RepaymentDialog({ loan, onClose, onSaved }: any) {
-  const [form, setForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [form, setForm] = useState({
+    amount: "",
+    payment_date: new Date().toISOString().slice(0, 10),
+    payment_method: "cash",
+    notes: "",
+  });
   const [submitting, setSubmitting] = useState(false);
 
   const required = Number(loan.period_payment || 0);
@@ -326,6 +331,9 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
       _amount: Number(form.amount),
       _payment_date: form.payment_date,
       _notes: form.notes || null,
+      _payment_method: form.payment_method,
+      _source: "manual",
+      _weekly_entry_id: null,
     });
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
@@ -337,27 +345,41 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
-        <DialogHeader><DialogTitle className="font-serif">Record Repayment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-serif">Manual Loan Repayment</DialogTitle></DialogHeader>
         <div className="text-xs text-muted-foreground mb-3 font-mono space-y-0.5">
+          <div>Member: <span className="text-foreground">{loan.profile?.full_name} · {loan.profile?.membership_no}</span></div>
           <div>Required per period: {fmtKES(required)}</div>
           <div>Current balance: {fmtKES(loan.balance)}</div>
           {outFines > 0 && <div className="text-red-600">Outstanding fines: {fmtKES(outFines)}</div>}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Label>Amount Paid</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          <div><Label>Amount Paid</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div className="col-span-2">
+            <Label>Payment Method</Label>
+            <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="mpesa">M-Pesa</SelectItem>
+                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                <SelectItem value="cheque">Cheque</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. outside-meeting payment, correction, bulk payment" /></div>
         </div>
         {amt > 0 && (
           <div className="bg-muted/40 rounded-md p-3 text-xs space-y-1">
             {previewFinePaid > 0 && <div>Fines covered: <span className="font-mono">{fmtKES(previewFinePaid)}</span></div>}
             {previewExcess > 0 && <div className="text-emerald-700">Excess (prepays future): <span className="font-mono">{fmtKES(previewExcess)}</span></div>}
-            <div className="text-muted-foreground">Allocation: fines first → current installments → future installments (prepaid)</div>
+            <div className="text-muted-foreground">Allocation order: outstanding fines → current installments → future installments (prepaid)</div>
           </div>
         )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save"}</Button>
+          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Record Payment"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
