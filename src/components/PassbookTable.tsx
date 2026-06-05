@@ -35,11 +35,12 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
               <th className="px-3 py-2 text-right">Loan Bal</th>
               <th className="px-3 py-2 text-left">Remarks</th>
               <th className="px-3 py-2 text-left">Sign</th>
+              {canEdit && <th className="px-3 py-2 text-left">Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-            {!loading && entries.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
+            {loading && <tr><td colSpan={canEdit ? 11 : 10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {!loading && entries.length === 0 && <tr><td colSpan={canEdit ? 11 : 10} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
             {entries.map((e) => {
               const bf = (e as any).__brought_forward;
               return (
