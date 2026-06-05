@@ -151,6 +151,8 @@ function MembersPage() {
             {!isLoading && filtered.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No members</td></tr>}
             {filtered.map((m: any) => {
               const r = m.user_roles?.[0]?.role;
+              const isStaffTarget = r === "admin" || r === "super_admin";
+              const canToggleActive = !isStaffTarget || isSuper;
               return (
                 <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-3 font-mono text-xs">{m.membership_no ?? "—"}</td>
@@ -175,13 +177,15 @@ function MembersPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditing(m)}>Edit details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setResetting(m)}>Reset password</DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={async () => {
-                            try { await setActive({ data: { id: m.id, is_active: !m.is_active } }); toast.success(m.is_active ? "Deactivated" : "Reactivated"); refresh(); }
-                            catch (e: any) { toast.error(e.message); }
-                          }}>
-                          {m.is_active ? "Deactivate" : "Reactivate"}
-                        </DropdownMenuItem>
+                        {canToggleActive && (
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              try { await setActive({ data: { id: m.id, is_active: !m.is_active } }); toast.success(m.is_active ? "Deactivated" : "Reactivated"); refresh(); }
+                              catch (e: any) { toast.error(e.message); }
+                            }}>
+                            {m.is_active ? "Deactivate" : "Reactivate"}
+                          </DropdownMenuItem>
+                        )}
                         {isSuper && <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-red-600" onClick={() => setDeleting(m)}>Delete user</DropdownMenuItem>
