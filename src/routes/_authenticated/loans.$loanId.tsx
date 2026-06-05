@@ -158,23 +158,39 @@ function LoanLedger() {
 
       <Card>
         <div className="p-4 border-b border-border font-serif text-lg">Payment History</div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-              <th className="px-3 py-2">Date</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {repayments.length === 0 && <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
-            {repayments.map((r: any) => (
-              <tr key={r.id} className="border-b last:border-0">
-                <td className="px-3 py-2">{fmtDate(r.payment_date)}</td>
-                <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Method</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-right">Fine Paid</th>
+                <th className="px-3 py-2 text-right">Principal Paid</th>
+                <th className="px-3 py-2">Notes</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {repayments.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
+              {repayments.map((r: any) => (
+                <tr key={r.id} className="border-b last:border-0">
+                  <td className="px-3 py-2">{fmtDate(r.payment_date)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.source === "weekly" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
+                      {r.source === "weekly" ? "Weekly Sheet" : "Manual"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs capitalize">{(r.payment_method ?? "").replace(/_/g, " ") || "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.fine_paid ?? 0)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.principal_paid ?? 0)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );
