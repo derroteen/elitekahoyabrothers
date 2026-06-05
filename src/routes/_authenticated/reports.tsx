@@ -198,6 +198,18 @@ function ReportsPage() {
           outstanding: fmtKES(v.charged - v.paid),
         }));
       }
+      case "opening":
+        return (data.openings as any[]).map((o: any) => ({
+          member_name: o.member?.full_name ?? "—",
+          member_no: o.member?.membership_no ?? "—",
+          effective_date: fmtDate(o.effective_date),
+          opening_savings: fmtKES(o.opening_savings),
+          opening_loan: fmtKES(o.opening_loan),
+          opening_fine: fmtKES(o.opening_fine),
+          opening_insurance: fmtKES(o.opening_insurance),
+          opening_benevolent: fmtKES(o.opening_benevolent),
+          notes: o.notes ?? "",
+        }));
       default:
         return [];
     }
@@ -206,19 +218,29 @@ function ReportsPage() {
   const summary = (() => {
     if (!data) return null;
     const totalBorrowed = data.loans.reduce((s: number, l: any) => s + Number(l.amount_borrowed || 0), 0);
-    const totalBal = data.loans.reduce((s: number, l: any) => s + Number(l.balance || 0), 0);
+    const openingLoanTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_loan || 0), 0);
+    const openingSavingsTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_savings || 0), 0);
+    const openingFineTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_fine || 0), 0);
+    const openingInsuranceTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_insurance || 0), 0);
+    const openingBenevolentTotal = (data.openings as any[]).reduce((s: number, o: any) => s + Number(o.opening_benevolent || 0), 0);
+    const totalBal = data.loans.reduce((s: number, l: any) => s + Number(l.balance || 0), 0) + openingLoanTotal;
     const totalPaid = data.loans.reduce((s: number, l: any) => s + Number(l.amount_paid || 0), 0);
     const latestByMember = new Map<string, number>();
+    const latestDate = new Map<string, string>();
     for (const e of data.savings) {
-      const cur = latestByMember.get(e.member_id);
-      if (cur == null || e.entry_date > (latestByMember as any).__d?.[e.member_id]) {
+      const prev = latestDate.get(e.member_id);
+      if (!prev || e.entry_date > prev) {
         latestByMember.set(e.member_id, Number(e.balance));
+        latestDate.set(e.member_id, e.entry_date);
       }
     }
-    const totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    let totalSavings = Array.from(latestByMember.values()).reduce((a, b) => a + b, 0);
+    for (const o of data.openings as any[]) {
+      if (!latestByMember.has(o.member_id)) totalSavings += Number(o.opening_savings || 0);
+    }
     const totalFinesCharged = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_charged || 0), 0);
     const totalFinesPaid = data.loans.reduce((s: number, l: any) => s + Number(l.total_fines_paid || 0), 0);
-    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0);
+    const totalOutstandingFines = data.loans.reduce((s: number, l: any) => s + Number(l.outstanding_fines || 0), 0) + openingFineTotal;
     return {
       members: data.members.length,
       active: data.members.filter((m: any) => m.is_active).length,
@@ -227,6 +249,7 @@ function ReportsPage() {
       active_loans: data.loans.filter((l: any) => ["active", "approved", "overdue"].includes(l.status)).length,
       totalBorrowed, totalBal, totalPaid, totalSavings,
       totalFinesCharged, totalFinesPaid, totalOutstandingFines,
+      openingLoanTotal, openingSavingsTotal, openingFineTotal, openingInsuranceTotal, openingBenevolentTotal,
       sheets: data.sheets.length,
     };
   })();
@@ -234,6 +257,7 @@ function ReportsPage() {
   const reports: { key: ReportKey; label: string; description: string; icon: any }[] = [
     { key: "summary", label: "Summary Report", description: "Overall financial snapshot", icon: BarChart3 },
     { key: "members", label: "Members Roster", description: "Complete member directory", icon: Users },
+    { key: "opening", label: "Opening Balances", description: "Brought-forward balances per member (savings, loan, fine, insurance, benevolent)", icon: BarChart3 },
     { key: "loans", label: "Loan Register", description: "All loans with balances & status", icon: Banknote },
     { key: "fines", label: "Fine Summary", description: "Fines per member: charged / paid / outstanding", icon: Banknote },
     { key: "savings", label: "Savings Ledger", description: "All savings transactions", icon: PiggyBank },
