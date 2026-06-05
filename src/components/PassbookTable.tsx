@@ -1,7 +1,8 @@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, FileSpreadsheet, FileText } from "lucide-react";
+import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
 
 const CATEGORY_LABELS: Record<string, string> = {
   weekly_collection: "Weekly Collection",
@@ -30,16 +31,30 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
   const currentBal = entries.at(-1)?.balance ?? 0;
   const loanBal = entries.at(-1)?.loan_balance ?? 0;
 
+  const hasEntries = entries.length > 0;
+  const doExcel = () => exportPassbookExcel(entries, { memberName, membershipNo });
+  const doPdf = () => exportPassbookPdf(entries, { memberName, membershipNo });
+
   return (
     <Card className="overflow-hidden">
-      <div className="bg-navy text-white px-5 py-4 flex items-center justify-between">
+      <div className="bg-navy text-white px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="font-serif text-lg text-gold">{memberName ?? "Member"}</div>
           <div className="text-xs text-white/60 font-mono uppercase tracking-wider">{membershipNo}</div>
         </div>
-        <div className="text-right text-xs text-white/60">
-          <div>Balance: <span className="text-gold font-mono">{fmtKES(currentBal)}</span></div>
-          <div>Loan: <span className="text-gold font-mono">{fmtKES(loanBal)}</span></div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="text-right text-xs text-white/60">
+            <div>Balance: <span className="text-gold font-mono">{fmtKES(currentBal)}</span></div>
+            <div>Loan: <span className="text-gold font-mono">{fmtKES(loanBal)}</span></div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={doExcel} disabled={!hasEntries} className="h-8">
+              <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
+            </Button>
+            <Button size="sm" variant="secondary" onClick={doPdf} disabled={!hasEntries} className="h-8">
+              <FileText className="h-3.5 w-3.5 mr-1" /> PDF
+            </Button>
+          </div>
         </div>
       </div>
       <div className="overflow-x-auto">
