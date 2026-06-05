@@ -52,6 +52,7 @@ export type Database = {
           id: string
           new_value: Json | null
           old_value: Json | null
+          reason: string | null
           record_id: string | null
           table_name: string
         }
@@ -62,6 +63,7 @@ export type Database = {
           id?: string
           new_value?: Json | null
           old_value?: Json | null
+          reason?: string | null
           record_id?: string | null
           table_name: string
         }
@@ -72,6 +74,7 @@ export type Database = {
           id?: string
           new_value?: Json | null
           old_value?: Json | null
+          reason?: string | null
           record_id?: string | null
           table_name?: string
         }
@@ -404,52 +407,67 @@ export type Database = {
         Row: {
           balance: number
           bonus: number
+          category: string
           created_at: string
           created_by: string | null
+          description: string | null
           entry_date: string
           id: string
           loan_balance: number
           loan_payment: number
           member_id: string
+          reason: string | null
           remarks: string | null
           savings: number
+          source: string
           total: number
           treasurer_sign: string | null
           updated_at: string
+          weekly_entry_id: string | null
           withdrawal: number
         }
         Insert: {
           balance?: number
           bonus?: number
+          category?: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           entry_date: string
           id?: string
           loan_balance?: number
           loan_payment?: number
           member_id: string
+          reason?: string | null
           remarks?: string | null
           savings?: number
+          source?: string
           total?: number
           treasurer_sign?: string | null
           updated_at?: string
+          weekly_entry_id?: string | null
           withdrawal?: number
         }
         Update: {
           balance?: number
           bonus?: number
+          category?: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           entry_date?: string
           id?: string
           loan_balance?: number
           loan_payment?: number
           member_id?: string
+          reason?: string | null
           remarks?: string | null
           savings?: number
+          source?: string
           total?: number
           treasurer_sign?: string | null
           updated_at?: string
+          weekly_entry_id?: string | null
           withdrawal?: number
         }
         Relationships: [
@@ -458,6 +476,13 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passbook_entries_weekly_entry_id_fkey"
+            columns: ["weekly_entry_id"]
+            isOneToOne: true
+            referencedRelation: "weekly_collection_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -712,6 +737,10 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
+      recompute_passbook_balances: {
+        Args: { _member: string }
+        Returns: undefined
+      }
       record_loan_repayment: {
         Args: {
           _amount: number

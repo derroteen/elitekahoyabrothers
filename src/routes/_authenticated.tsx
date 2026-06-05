@@ -47,6 +47,7 @@ const NAV: Record<AppRole, NavItem[]> = {
   member: [
     { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/my-passbook", label: "My Passbook", icon: BookOpen },
+    { to: "/my-weekly", label: "My Weekly Contributions", icon: ClipboardList },
     { to: "/my-loans", label: "My Loans", icon: Banknote },
     { to: "/my-savings", label: "My Savings", icon: PiggyBank },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
