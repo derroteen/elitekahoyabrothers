@@ -44,9 +44,13 @@ function PassbookAdmin() {
     queryKey: ["passbook", memberId],
     enabled: !!memberId && isStaff,
     queryFn: async () => {
-      const { data, error } = await supabase.from("passbook_entries").select("*").eq("member_id", memberId).order("entry_date", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
+      const { fetchOpeningBalance, withBroughtForward } = await import("@/lib/opening-balances");
+      const [entriesRes, opening] = await Promise.all([
+        supabase.from("passbook_entries").select("*").eq("member_id", memberId).order("entry_date", { ascending: true }),
+        fetchOpeningBalance(memberId),
+      ]);
+      if (entriesRes.error) throw entriesRes.error;
+      return withBroughtForward(entriesRes.data ?? [], opening);
     },
   });
 
