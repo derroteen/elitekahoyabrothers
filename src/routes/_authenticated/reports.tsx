@@ -314,6 +314,7 @@ function ReportsPage() {
     if (kind === "xlsx") {
       exportXLSX(`ekb-full-report-${stamp()}.xlsx`, [
         { name: "Members", columns: buildColumns("members"), rows: buildRows("members") },
+        { name: "Opening Balances", columns: buildColumns("opening"), rows: buildRows("opening") },
         { name: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
         { name: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { name: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
@@ -322,6 +323,7 @@ function ReportsPage() {
     } else {
       exportPDF(`ekb-full-report-${stamp()}.pdf`, "Full Report", [
         { heading: "Members", columns: buildColumns("members"), rows: buildRows("members") },
+        { heading: "Opening Balances (Brought Forward)", columns: buildColumns("opening"), rows: buildRows("opening") },
         { heading: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
         { heading: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { heading: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
