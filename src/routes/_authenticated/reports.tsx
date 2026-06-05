@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports — EKB" }] }),
 });
 
-type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines";
+type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines" | "opening";
 
 function ReportsPage() {
   const { role, loading } = useAuth();
@@ -27,7 +27,7 @@ function ReportsPage() {
     queryKey: ["reports-bundle"],
     enabled: allowed,
     queryFn: async () => {
-      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines] = await Promise.all([
+      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines, openings] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, phone, membership_no, is_active, date_joined"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("loans").select("*"),
@@ -37,6 +37,7 @@ function ReportsPage() {
         (supabase.from("weekly_collections" as any) as any).select("*"),
         (supabase.from("weekly_collection_entries" as any) as any).select("*"),
         (supabase.from("loan_fines" as any) as any).select("*"),
+        (supabase.from("member_opening_balances" as any) as any).select("*"),
       ]);
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
@@ -49,6 +50,7 @@ function ReportsPage() {
         sheets: sheets.data ?? [],
         entries: (entries.data ?? []).map((e: any) => ({ ...e, member: memberMap.get(e.member_id) })),
         fines: fines.data ?? [],
+        openings: (openings.data ?? []).map((o: any) => ({ ...o, member: memberMap.get(o.member_id) })),
         memberMap,
       };
     },
@@ -113,6 +115,18 @@ function ReportsPage() {
           { header: "Total Charged", key: "total_charged", align: "right", width: 14 },
           { header: "Total Paid", key: "total_paid", align: "right", width: 14 },
           { header: "Outstanding", key: "outstanding", align: "right", width: 14 },
+        ];
+      case "opening":
+        return [
+          { header: "Member ID", key: "member_no", width: 12 },
+          { header: "Member", key: "member_name", width: 24 },
+          { header: "Effective Date", key: "effective_date", width: 14 },
+          { header: "Savings B/F", key: "opening_savings", align: "right", width: 14 },
+          { header: "Loan B/F", key: "opening_loan", align: "right", width: 14 },
+          { header: "Fine B/F", key: "opening_fine", align: "right", width: 12 },
+          { header: "Insurance B/F", key: "opening_insurance", align: "right", width: 14 },
+          { header: "Benevolent B/F", key: "opening_benevolent", align: "right", width: 14 },
+          { header: "Notes", key: "notes", width: 28 },
         ];
       default:
         return [];
