@@ -1,7 +1,9 @@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 
-export function PassbookTable({ entries, loading, memberName, membershipNo }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, onEdit }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; onEdit?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
@@ -33,11 +35,12 @@ export function PassbookTable({ entries, loading, memberName, membershipNo }: { 
               <th className="px-3 py-2 text-right">Loan Bal</th>
               <th className="px-3 py-2 text-left">Remarks</th>
               <th className="px-3 py-2 text-left">Sign</th>
+              {canEdit && <th className="px-3 py-2 text-left">Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-            {!loading && entries.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
+            {loading && <tr><td colSpan={canEdit ? 11 : 10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {!loading && entries.length === 0 && <tr><td colSpan={canEdit ? 11 : 10} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
             {entries.map((e) => {
               const bf = (e as any).__brought_forward;
               return (
@@ -54,6 +57,15 @@ export function PassbookTable({ entries, loading, memberName, membershipNo }: { 
                     {bf ? <span className="text-gold-3 font-semibold uppercase tracking-wider text-[10px]">Brought Forward Balance</span> : (e.remarks ?? "")}
                   </td>
                   <td className="px-3 py-2 text-left text-xs">{e.treasurer_sign ?? ""}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-left">
+                      {!bf && (
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onEdit?.(e)}>
+                          <Pencil className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -66,7 +78,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo }: { 
                 <td className="px-3 py-2 text-right">{fmtKES(totalSavings)}</td>
                 <td className="px-3 py-2 text-right text-red-700">{fmtKES(totalWithdrawn)}</td>
                 <td className="px-3 py-2 text-right text-navy">{fmtKES(currentBal)}</td>
-                <td colSpan={4}></td>
+                <td colSpan={canEdit ? 5 : 4}></td>
               </tr>
             </tfoot>
           )}

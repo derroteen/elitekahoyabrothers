@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
+import { updatePassbookEntry } from "@/lib/passbook.functions";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
   component: PassbookAdmin,
@@ -24,6 +26,7 @@ function PassbookAdmin() {
   const qc = useQueryClient();
   const [memberId, setMemberId] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<any>(null);
 
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
 
@@ -81,10 +84,12 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} onEdit={setEditEntry} />
       )}
 
       <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestBalance={entries.at(-1)?.balance ?? 0} latestLoanBal={entries.at(-1)?.loan_balance ?? 0} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+
+      <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} entries={entries} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
     </div>
   );
 }
@@ -148,6 +153,103 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestBalance, latestLoa
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Entry"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditEntryDialog({ entry, onClose, entries, onSaved }: any) {
+  const doUpdate = useServerFn(updatePassbookEntry);
+  const open = !!entry;
+
+  const [form, setForm] = useState({
+    entry_date: "",
+    savings: "",
+    bonus: "",
+    withdrawal: "",
+    loan_payment: "",
+    remarks: "",
+    treasurer_sign: "",
+  });
+
+  useEffect(() => {
+    if (entry) {
+      setForm({
+        entry_date: entry.entry_date ?? "",
+        savings: String(entry.savings ?? ""),
+        bonus: String(entry.bonus ?? ""),
+        withdrawal: String(entry.withdrawal ?? ""),
+        loan_payment: String(entry.loan_payment ?? ""),
+        remarks: entry.remarks ?? "",
+        treasurer_sign: entry.treasurer_sign ?? "",
+      });
+    }
+  }, [entry?.id]);
+
+  const entryIndex = useMemo(() => {
+    if (!entry) return -1;
+    return entries.findIndex((e: any) => e.id === entry.id);
+  }, [entry, entries]);
+
+  const prevEntry = entryIndex > 0 ? entries[entryIndex - 1] : null;
+  const prevBalance = prevEntry ? Number(prevEntry.balance) : 0;
+  const prevLoanBal = prevEntry ? Number(prevEntry.loan_balance) : 0;
+
+  const total = Number(form.savings || 0) + Number(form.bonus || 0);
+  const balance = prevBalance + total - Number(form.withdrawal || 0);
+  const loanBalance = Math.max(0, prevLoanBal - Number(form.loan_payment || 0));
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!entry) return;
+    setSubmitting(true);
+    try {
+      await doUpdate({
+        data: {
+          id: entry.id,
+          entry_date: form.entry_date,
+          savings: Number(form.savings || 0),
+          bonus: Number(form.bonus || 0),
+          withdrawal: Number(form.withdrawal || 0),
+          loan_payment: Number(form.loan_payment || 0),
+          remarks: form.remarks || null,
+          treasurer_sign: form.treasurer_sign || null,
+        },
+      });
+      toast.success("Entry updated and balances recalculated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Update failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle className="font-serif">Edit Passbook Entry</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><Label>Date</Label><Input type="date" value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} /></div>
+          <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
+          <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
+          <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
+          <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Remarks</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
+          <div className="col-span-2 bg-muted/50 rounded-md p-3 text-xs space-y-1 font-mono">
+            <div>Total = savings + bonus: <strong>{fmtKES(total)}</strong></div>
+            <div>New Balance: <strong>{fmtKES(balance)}</strong></div>
+            <div>Loan Balance: <strong>{fmtKES(loanBalance)}</strong></div>
+            <div className="text-muted-foreground italic">All subsequent entries will be recalculated automatically.</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Update Entry"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
