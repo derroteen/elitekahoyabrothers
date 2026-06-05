@@ -1,7 +1,9 @@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 
-export function PassbookTable({ entries, loading, memberName, membershipNo }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, onEdit }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; onEdit?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
