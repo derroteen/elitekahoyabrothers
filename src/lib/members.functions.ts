@@ -107,7 +107,14 @@ export const adminSetActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => SetActiveInput.parse(i))
   .handler(async ({ data, context }) => {
-    await assertCaller(context.userId);
+    const callerRole = await assertCaller(context.userId);
+    if (data.id === context.userId) throw new Error("You cannot change your own active status");
+    const { data: targetRoleRow } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", data.id).maybeSingle();
+    const targetRole = targetRoleRow?.role;
+    // Only super admins may deactivate/reactivate admins or other super admins
+    if ((targetRole === "admin" || targetRole === "super_admin") && callerRole !== "super_admin") {
+      throw new Error("Only super admins can deactivate or reactivate admin accounts");
+    }
     const { error } = await supabaseAdmin.from("profiles").update({ is_active: data.is_active }).eq("id", data.id);
     if (error) throw new Error(error.message);
     // Ban/unban auth user — Supabase admin: set ban_duration
