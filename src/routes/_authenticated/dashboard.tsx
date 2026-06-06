@@ -132,6 +132,8 @@ function Dashboard() {
           <StatCard label="Pending Loans" value={String(stats?.pending ?? "—")} icon="⏳" />
           <StatCard label="Revenue (Paid)" value={stats ? fmtKES(stats.revenue) : "—"} icon="💵" />
           <StatCard label="Announcements" value={String(stats?.announcements ?? "—")} icon="📣" />
+          <StatCard label="Weekly Expenditure" value={stats ? fmtKES(stats.weeklyExpenditure) : "—"} icon="🧾" />
+          <StatCard label="Monthly Expenditure" value={stats ? fmtKES(stats.monthlyExpenditure) : "—"} icon="📅" />
         </div>
       )}
 
