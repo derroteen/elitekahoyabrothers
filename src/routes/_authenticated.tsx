@@ -20,6 +20,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/collections", label: "Weekly Collections", icon: ClipboardList },
     { to: "/loans", label: "Loans", icon: Banknote },
     { to: "/savings", label: "Savings", icon: PiggyBank },
+    { to: "/benevolent", label: "Benevolent Fund", icon: HeartHandshake },
     { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
