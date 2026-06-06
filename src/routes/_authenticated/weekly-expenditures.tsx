@@ -362,8 +362,9 @@ function ExpenditureDialog({
   const [submitting, setSubmitting] = useState(false);
 
   // Reset form when dialog opens with different record
-  useMemo(() => {
+  useEffect(() => {
     if (open) setForm(initForm(editing));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
   function initForm(e: Expenditure | null) {
