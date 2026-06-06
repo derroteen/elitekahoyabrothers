@@ -748,6 +748,48 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_expenditures: {
+        Row: {
+          amount: number
+          created_at: string
+          expenditure_date: string
+          id: string
+          notes: string | null
+          particulars: string
+          quantity: number | null
+          recorded_by: string | null
+          updated_at: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          expenditure_date: string
+          id?: string
+          notes?: string | null
+          particulars: string
+          quantity?: number | null
+          recorded_by?: string | null
+          updated_at?: string
+          week_number?: number
+          year?: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          expenditure_date?: string
+          id?: string
+          notes?: string | null
+          particulars?: string
+          quantity?: number | null
+          recorded_by?: string | null
+          updated_at?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
