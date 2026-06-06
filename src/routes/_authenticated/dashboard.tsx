@@ -51,14 +51,14 @@ function Dashboard() {
         if (excludeFilter) q = q.not("id", "in", excludeFilter);
         return q;
       };
-      const [members, active, loans, pending, savings, announce, openings, weekExp, monthExp] = await Promise.all([
+      const [members, active, loans, pending, savings, announce, openings, weekExp, monthExp, benev] = await Promise.all([
         buildProfiles(),
         buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
         supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
         supabase.from("announcements").select("id", { count: "exact", head: true }),
-        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan"),
+        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan, opening_benevolent"),
         (() => {
           const now = new Date();
           const day = now.getDay() || 7; // ISO: Mon=1..Sun=7
@@ -74,6 +74,7 @@ function Dashboard() {
           const iso = (d: Date) => d.toISOString().slice(0, 10);
           return supabase.from("weekly_expenditures").select("amount").gte("expenditure_date", iso(first)).lte("expenditure_date", iso(last));
         })(),
+        supabase.from("benevolent_entries").select("member_id, entry_date, balance, contribution, withdrawal"),
       ]);
       const allLoans = loans.data ?? [];
       const allOpenings = openings.data ?? [];
@@ -97,6 +98,20 @@ function Dashboard() {
       const weeklyExpenditure = (weekExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const monthlyExpenditure = (monthExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
 
+      // Benevolent fund: contributions, withdrawals, current balance (latest per member + openings for members with no entries)
+      const benevRows = (benev.data ?? []) as any[];
+      const benevContrib = benevRows.reduce((s, e) => s + Number(e.contribution ?? 0), 0);
+      const benevWithdraw = benevRows.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
+      const latestBenev = new Map<string, { date: string; balance: number }>();
+      for (const e of benevRows) {
+        const prev = latestBenev.get(e.member_id);
+        if (!prev || e.entry_date > prev.date) latestBenev.set(e.member_id, { date: e.entry_date, balance: Number(e.balance) });
+      }
+      let benevBalance = Array.from(latestBenev.values()).reduce((s, x) => s + x.balance, 0);
+      for (const o of allOpenings as any[]) {
+        if (!latestBenev.has(o.member_id)) benevBalance += Number(o.opening_benevolent ?? 0);
+      }
+
       return {
         members: members.count ?? 0,
         active: active.count ?? 0,
@@ -108,6 +123,9 @@ function Dashboard() {
         announcements: announce.count ?? 0,
         weeklyExpenditure,
         monthlyExpenditure,
+        benevContrib,
+        benevWithdraw,
+        benevBalance,
       };
     },
   });
@@ -134,6 +152,9 @@ function Dashboard() {
           <StatCard label="Announcements" value={String(stats?.announcements ?? "—")} icon="📣" />
           <StatCard label="Weekly Expenditure" value={stats ? fmtKES(stats.weeklyExpenditure) : "—"} icon="🧾" />
           <StatCard label="Monthly Expenditure" value={stats ? fmtKES(stats.monthlyExpenditure) : "—"} icon="📅" />
+          <StatCard label="Benevolent Contributions" value={stats ? fmtKES(stats.benevContrib) : "—"} icon="🤝" />
+          <StatCard label="Benevolent Withdrawals" value={stats ? fmtKES(stats.benevWithdraw) : "—"} icon="💔" />
+          <StatCard label="Benevolent Balance" value={stats ? fmtKES(stats.benevBalance) : "—"} icon="❤️" />
         </div>
       )}
 

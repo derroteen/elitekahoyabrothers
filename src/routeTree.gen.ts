@@ -27,10 +27,12 @@ import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
 import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
 import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
+import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
 import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
+import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
 import { Route as AuthenticatedLoansLoanIdRouteImport } from './routes/_authenticated/loans.$loanId'
@@ -127,6 +129,12 @@ const AuthenticatedMyLoansRoute = AuthenticatedMyLoansRouteImport.update({
   path: '/my-loans',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMyBenevolentRoute =
+  AuthenticatedMyBenevolentRouteImport.update({
+    id: '/my-benevolent',
+    path: '/my-benevolent',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -148,6 +156,11 @@ const AuthenticatedCollectionsRoute =
     path: '/collections',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedBenevolentRoute = AuthenticatedBenevolentRouteImport.update({
+  id: '/benevolent',
+  path: '/benevolent',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -175,10 +188,12 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
@@ -201,10 +216,12 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
@@ -229,10 +246,12 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/announcements': typeof AuthenticatedAnnouncementsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/benevolent': typeof AuthenticatedBenevolentRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
   '/_authenticated/members': typeof AuthenticatedMembersRoute
+  '/_authenticated/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/_authenticated/my-loans': typeof AuthenticatedMyLoansRoute
   '/_authenticated/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
@@ -257,10 +276,12 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/announcements'
     | '/audit'
+    | '/benevolent'
     | '/collections'
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
@@ -283,10 +304,12 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/announcements'
     | '/audit'
+    | '/benevolent'
     | '/collections'
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
@@ -310,10 +333,12 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/announcements'
     | '/_authenticated/audit'
+    | '/_authenticated/benevolent'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
     | '/_authenticated/loans'
     | '/_authenticated/members'
+    | '/_authenticated/my-benevolent'
     | '/_authenticated/my-loans'
     | '/_authenticated/my-passbook'
     | '/_authenticated/my-savings'
@@ -466,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyLoansRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/my-benevolent': {
+      id: '/_authenticated/my-benevolent'
+      path: '/my-benevolent'
+      fullPath: '/my-benevolent'
+      preLoaderRoute: typeof AuthenticatedMyBenevolentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/members': {
       id: '/_authenticated/members'
       path: '/members'
@@ -492,6 +524,13 @@ declare module '@tanstack/react-router' {
       path: '/collections'
       fullPath: '/collections'
       preLoaderRoute: typeof AuthenticatedCollectionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/benevolent': {
+      id: '/_authenticated/benevolent'
+      path: '/benevolent'
+      fullPath: '/benevolent'
+      preLoaderRoute: typeof AuthenticatedBenevolentRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/audit': {
@@ -532,10 +571,12 @@ const AuthenticatedLoansRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedBenevolentRoute: typeof AuthenticatedBenevolentRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
+  AuthenticatedMyBenevolentRoute: typeof AuthenticatedMyBenevolentRoute
   AuthenticatedMyLoansRoute: typeof AuthenticatedMyLoansRoute
   AuthenticatedMyPassbookRoute: typeof AuthenticatedMyPassbookRoute
   AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
@@ -552,10 +593,12 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnnouncementsRoute: AuthenticatedAnnouncementsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedBenevolentRoute: AuthenticatedBenevolentRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
+  AuthenticatedMyBenevolentRoute: AuthenticatedMyBenevolentRoute,
   AuthenticatedMyLoansRoute: AuthenticatedMyLoansRoute,
   AuthenticatedMyPassbookRoute: AuthenticatedMyPassbookRoute,
   AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
