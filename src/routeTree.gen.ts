@@ -16,6 +16,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedWeeklyExpendituresRouteImport } from './routes/_authenticated/weekly-expenditures'
 import { Route as AuthenticatedSystemResetRouteImport } from './routes/_authenticated/system-reset'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
@@ -68,6 +69,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWeeklyExpendituresRoute =
+  AuthenticatedWeeklyExpendituresRouteImport.update({
+    id: '/weekly-expenditures',
+    path: '/weekly-expenditures',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSystemResetRoute =
   AuthenticatedSystemResetRouteImport.update({
     id: '/system-reset',
@@ -182,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/savings': typeof AuthenticatedSavingsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/system-reset': typeof AuthenticatedSystemResetRoute
+  '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
 }
 export interface FileRoutesByTo {
@@ -207,6 +215,7 @@ export interface FileRoutesByTo {
   '/savings': typeof AuthenticatedSavingsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/system-reset': typeof AuthenticatedSystemResetRoute
+  '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
 }
 export interface FileRoutesById {
@@ -234,6 +243,7 @@ export interface FileRoutesById {
   '/_authenticated/savings': typeof AuthenticatedSavingsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/system-reset': typeof AuthenticatedSystemResetRoute
+  '/_authenticated/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/_authenticated/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
 }
 export interface FileRouteTypes {
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/savings'
     | '/settings'
     | '/system-reset'
+    | '/weekly-expenditures'
     | '/loans/$loanId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/savings'
     | '/settings'
     | '/system-reset'
+    | '/weekly-expenditures'
     | '/loans/$loanId'
   id:
     | '__root__'
@@ -312,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/savings'
     | '/_authenticated/settings'
     | '/_authenticated/system-reset'
+    | '/_authenticated/weekly-expenditures'
     | '/_authenticated/loans/$loanId'
   fileRoutesById: FileRoutesById
 }
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/weekly-expenditures': {
+      id: '/_authenticated/weekly-expenditures'
+      path: '/weekly-expenditures'
+      fullPath: '/weekly-expenditures'
+      preLoaderRoute: typeof AuthenticatedWeeklyExpendituresRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/system-reset': {
       id: '/_authenticated/system-reset'
@@ -526,6 +546,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSavingsRoute: typeof AuthenticatedSavingsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSystemResetRoute: typeof AuthenticatedSystemResetRoute
+  AuthenticatedWeeklyExpendituresRoute: typeof AuthenticatedWeeklyExpendituresRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -545,6 +566,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSavingsRoute: AuthenticatedSavingsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSystemResetRoute: AuthenticatedSystemResetRoute,
+  AuthenticatedWeeklyExpendituresRoute: AuthenticatedWeeklyExpendituresRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -563,13 +585,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

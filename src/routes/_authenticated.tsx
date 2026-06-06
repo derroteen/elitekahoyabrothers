@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, BookOpen, Banknote, PiggyBank, Megaphone, FileBarChart, Settings, ShieldCheck, LogOut, Menu, X, Database, ClipboardList, Wallet } from "lucide-react";
+import { Home, Users, BookOpen, Banknote, PiggyBank, Megaphone, FileBarChart, Settings, ShieldCheck, LogOut, Menu, X, Database, ClipboardList, Wallet, Receipt } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
@@ -20,6 +20,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/collections", label: "Weekly Collections", icon: ClipboardList },
     { to: "/loans", label: "Loans", icon: Banknote },
     { to: "/savings", label: "Savings", icon: PiggyBank },
+    { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/audit", label: "Audit Log", icon: ShieldCheck },
@@ -33,6 +34,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/collections", label: "Weekly Collections", icon: ClipboardList },
     { to: "/loans", label: "Loans", icon: Banknote },
     { to: "/savings", label: "Savings", icon: PiggyBank },
+    { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/settings", label: "Settings", icon: Settings },
