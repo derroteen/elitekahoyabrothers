@@ -146,7 +146,7 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
     queryFn: async () => {
       const { fetchNonMemberIds, filterMembersOnly } = await import("@/lib/member-queries");
       const [profilesRes, nonMembers] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, membership_no").eq("is_active", true).order("membership_no"),
+        supabase.from("profiles").select("id, full_name, membership_no").eq("is_active", true).order("sort_order", { ascending: true, nullsFirst: false }).order("membership_no"),
         fetchNonMemberIds(),
       ]);
       return filterMembersOnly(profilesRes.data ?? [], nonMembers);

@@ -76,6 +76,7 @@ function OpeningBalancesPage() {
         supabase
           .from("profiles")
           .select("id, full_name, membership_no")
+          .order("sort_order", { ascending: true, nullsFirst: false })
           .order("membership_no"),
         supabase.from("member_opening_balances").select("*"),
         fetchNonMemberIds(),
