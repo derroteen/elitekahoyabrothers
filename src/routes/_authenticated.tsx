@@ -57,6 +57,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/my-loans", label: "My Loans", icon: Banknote },
     { to: "/my-savings", label: "My Savings", icon: PiggyBank },
     { to: "/my-benevolent", label: "My Benevolent Fund", icon: HeartHandshake },
+    { to: "/my-attendance", label: "My Attendance", icon: CalendarCheck },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
