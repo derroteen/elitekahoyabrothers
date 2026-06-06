@@ -27,6 +27,7 @@ import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
 import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
 import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
+import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
 import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -128,6 +129,12 @@ const AuthenticatedMyLoansRoute = AuthenticatedMyLoansRouteImport.update({
   path: '/my-loans',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMyBenevolentRoute =
+  AuthenticatedMyBenevolentRouteImport.update({
+    id: '/my-benevolent',
+    path: '/my-benevolent',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
@@ -213,6 +221,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/my-savings': typeof AuthenticatedMySavingsRoute
@@ -242,6 +251,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
   '/_authenticated/members': typeof AuthenticatedMembersRoute
+  '/_authenticated/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/_authenticated/my-loans': typeof AuthenticatedMyLoansRoute
   '/_authenticated/my-passbook': typeof AuthenticatedMyPassbookRoute
   '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
     | '/my-savings'
@@ -326,6 +338,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/loans'
     | '/_authenticated/members'
+    | '/_authenticated/my-benevolent'
     | '/_authenticated/my-loans'
     | '/_authenticated/my-passbook'
     | '/_authenticated/my-savings'
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyLoansRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/my-benevolent': {
+      id: '/_authenticated/my-benevolent'
+      path: '/my-benevolent'
+      fullPath: '/my-benevolent'
+      preLoaderRoute: typeof AuthenticatedMyBenevolentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/members': {
       id: '/_authenticated/members'
       path: '/members'
@@ -556,6 +576,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
+  AuthenticatedMyBenevolentRoute: typeof AuthenticatedMyBenevolentRoute
   AuthenticatedMyLoansRoute: typeof AuthenticatedMyLoansRoute
   AuthenticatedMyPassbookRoute: typeof AuthenticatedMyPassbookRoute
   AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
@@ -577,6 +598,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
+  AuthenticatedMyBenevolentRoute: AuthenticatedMyBenevolentRoute,
   AuthenticatedMyLoansRoute: AuthenticatedMyLoansRoute,
   AuthenticatedMyPassbookRoute: AuthenticatedMyPassbookRoute,
   AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
@@ -606,3 +628,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
