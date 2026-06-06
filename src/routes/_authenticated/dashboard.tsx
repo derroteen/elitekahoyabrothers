@@ -152,6 +152,9 @@ function Dashboard() {
           <StatCard label="Announcements" value={String(stats?.announcements ?? "—")} icon="📣" />
           <StatCard label="Weekly Expenditure" value={stats ? fmtKES(stats.weeklyExpenditure) : "—"} icon="🧾" />
           <StatCard label="Monthly Expenditure" value={stats ? fmtKES(stats.monthlyExpenditure) : "—"} icon="📅" />
+          <StatCard label="Benevolent Contributions" value={stats ? fmtKES(stats.benevContrib) : "—"} icon="🤝" />
+          <StatCard label="Benevolent Withdrawals" value={stats ? fmtKES(stats.benevWithdraw) : "—"} icon="💔" />
+          <StatCard label="Benevolent Balance" value={stats ? fmtKES(stats.benevBalance) : "—"} icon="❤️" />
         </div>
       )}
 
