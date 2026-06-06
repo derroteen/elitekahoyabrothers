@@ -51,7 +51,7 @@ function Dashboard() {
         if (excludeFilter) q = q.not("id", "in", excludeFilter);
         return q;
       };
-      const [members, active, loans, pending, savings, announce, openings] = await Promise.all([
+      const [members, active, loans, pending, savings, announce, openings, weekExp, monthExp] = await Promise.all([
         buildProfiles(),
         buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
@@ -59,6 +59,21 @@ function Dashboard() {
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
         supabase.from("announcements").select("id", { count: "exact", head: true }),
         supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan"),
+        (() => {
+          const now = new Date();
+          const day = now.getDay() || 7; // ISO: Mon=1..Sun=7
+          const monday = new Date(now); monday.setDate(now.getDate() - (day - 1));
+          const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+          const iso = (d: Date) => d.toISOString().slice(0, 10);
+          return supabase.from("weekly_expenditures").select("amount").gte("expenditure_date", iso(monday)).lte("expenditure_date", iso(sunday));
+        })(),
+        (() => {
+          const now = new Date();
+          const first = new Date(now.getFullYear(), now.getMonth(), 1);
+          const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          const iso = (d: Date) => d.toISOString().slice(0, 10);
+          return supabase.from("weekly_expenditures").select("amount").gte("expenditure_date", iso(first)).lte("expenditure_date", iso(last));
+        })(),
       ]);
       const allLoans = loans.data ?? [];
       const allOpenings = openings.data ?? [];
