@@ -168,9 +168,9 @@ function AttendancePage() {
           )}
           {sheet && (
             <div className="flex gap-2 ml-auto">
-              <Button variant="outline" size="sm" onClick={() => exportCSV(baseName, exportCols, exportRows)}><FileText className="w-4 h-4 mr-1" />CSV</Button>
-              <Button variant="outline" size="sm" onClick={() => exportXLSX(baseName, exportCols, exportRows)}><FileSpreadsheet className="w-4 h-4 mr-1" />Excel</Button>
-              <Button variant="outline" size="sm" onClick={() => exportPDF(baseName, `Attendance — ${MONTHS[month-1]} ${year}`, exportCols, exportRows)}><FileDown className="w-4 h-4 mr-1" />PDF</Button>
+              <Button variant="outline" size="sm" onClick={() => exportCSV(`${baseName}.csv`, exportCols, exportRows)}><FileText className="w-4 h-4 mr-1" />CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => exportXLSX(`${baseName}.xlsx`, [{ name: "Attendance", columns: exportCols, rows: exportRows }])}><FileSpreadsheet className="w-4 h-4 mr-1" />Excel</Button>
+              <Button variant="outline" size="sm" onClick={() => exportPDF(`${baseName}.pdf`, `Attendance — ${MONTHS[month-1]} ${year}`, [{ columns: exportCols, rows: exportRows }])}><FileDown className="w-4 h-4 mr-1" />PDF</Button>
             </div>
           )}
         </div>
