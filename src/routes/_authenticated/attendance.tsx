@@ -136,13 +136,13 @@ function AttendancePage() {
       const e = entryMap.get(`${m.id}:${w}`);
       row[`week_${w}`] = e ? (e.status === "present" ? "P" : e.status === "late" ? `L${e.arrival_time ? " "+e.arrival_time : ""}` : "A") : "";
     }
-    row.total = memberTotal(m.id);
+    row.total = fmtKES(memberTotal(m.id));
     return row;
   });
   const exportCols: Column[] = [
     { key: "no", header: "No" }, { key: "name", header: "Name" },
     ...Array.from({ length: weekCount }, (_, i) => ({ key: `week_${i+1}`, header: `Wk ${i+1}` })),
-    { key: "total", header: "Total Fine", format: (v: any) => fmtKES(v) },
+    { key: "total", header: "Total Fine", align: "right" },
   ];
   const baseName = `attendance-${year}-${String(month).padStart(2,"0")}`;
 
