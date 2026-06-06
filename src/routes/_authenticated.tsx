@@ -22,6 +22,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/savings", label: "Savings", icon: PiggyBank },
     { to: "/benevolent", label: "Benevolent Fund", icon: HeartHandshake },
     { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
+    { to: "/attendance", label: "Attendance", icon: CalendarCheck },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/audit", label: "Audit Log", icon: ShieldCheck },
