@@ -520,6 +520,7 @@ export type Database = {
           membership_no: string | null
           must_change_password: boolean
           phone: string | null
+          sort_order: number | null
           updated_at: string
         }
         Insert: {
@@ -532,6 +533,7 @@ export type Database = {
           membership_no?: string | null
           must_change_password?: boolean
           phone?: string | null
+          sort_order?: number | null
           updated_at?: string
         }
         Update: {
@@ -544,6 +546,7 @@ export type Database = {
           membership_no?: string | null
           must_change_password?: boolean
           phone?: string | null
+          sort_order?: number | null
           updated_at?: string
         }
         Relationships: []

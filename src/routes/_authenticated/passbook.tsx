@@ -47,7 +47,7 @@ function PassbookAdmin() {
     queryFn: async () => {
       const { fetchNonMemberIds, filterMembersOnly } = await import("@/lib/member-queries");
       const [profilesRes, nonMembers] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, membership_no").order("membership_no"),
+        supabase.from("profiles").select("id, full_name, membership_no").order("sort_order", { ascending: true, nullsFirst: false }).order("membership_no"),
         fetchNonMemberIds(),
       ]);
       return filterMembersOnly(profilesRes.data ?? [], nonMembers);

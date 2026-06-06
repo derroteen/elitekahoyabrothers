@@ -53,6 +53,7 @@ function MembersPage() {
         supabase
           .from("profiles")
           .select("id, full_name, email, phone, membership_no, is_active, date_joined")
+          .order("sort_order", { ascending: true, nullsFirst: false })
           .order("membership_no", { ascending: true, nullsFirst: false }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
