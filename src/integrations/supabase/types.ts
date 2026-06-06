@@ -44,6 +44,86 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_entries: {
+        Row: {
+          arrival_time: string | null
+          created_at: string
+          fine_amount: number
+          id: string
+          member_id: string
+          notes: string | null
+          sheet_id: string
+          status: string
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          arrival_time?: string | null
+          created_at?: string
+          fine_amount?: number
+          id?: string
+          member_id: string
+          notes?: string | null
+          sheet_id: string
+          status?: string
+          updated_at?: string
+          week_number: number
+        }
+        Update: {
+          arrival_time?: string | null
+          created_at?: string
+          fine_amount?: number
+          id?: string
+          member_id?: string
+          notes?: string | null
+          sheet_id?: string
+          status?: string
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_entries_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_sheets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          month: number
+          notes: string | null
+          updated_at: string
+          week_dates: string[]
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          month: number
+          notes?: string | null
+          updated_at?: string
+          week_dates?: string[]
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          month?: number
+          notes?: string | null
+          updated_at?: string
+          week_dates?: string[]
+          year?: number
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string

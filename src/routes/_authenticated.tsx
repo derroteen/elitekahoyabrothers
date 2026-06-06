@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, BookOpen, Banknote, PiggyBank, Megaphone, FileBarChart, Settings, ShieldCheck, LogOut, Menu, X, Database, ClipboardList, Wallet, Receipt, HeartHandshake } from "lucide-react";
+import { Home, Users, BookOpen, Banknote, PiggyBank, Megaphone, FileBarChart, Settings, ShieldCheck, LogOut, Menu, X, Database, ClipboardList, Wallet, Receipt, HeartHandshake, CalendarCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
@@ -22,6 +22,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/savings", label: "Savings", icon: PiggyBank },
     { to: "/benevolent", label: "Benevolent Fund", icon: HeartHandshake },
     { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
+    { to: "/attendance", label: "Attendance", icon: CalendarCheck },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/audit", label: "Audit Log", icon: ShieldCheck },
@@ -37,6 +38,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/savings", label: "Savings", icon: PiggyBank },
     { to: "/benevolent", label: "Benevolent Fund", icon: HeartHandshake },
     { to: "/weekly-expenditures", label: "Weekly Expenditures", icon: Receipt },
+    { to: "/attendance", label: "Attendance", icon: CalendarCheck },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/settings", label: "Settings", icon: Settings },
@@ -55,6 +57,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/my-loans", label: "My Loans", icon: Banknote },
     { to: "/my-savings", label: "My Savings", icon: PiggyBank },
     { to: "/my-benevolent", label: "My Benevolent Fund", icon: HeartHandshake },
+    { to: "/my-attendance", label: "My Attendance", icon: CalendarCheck },
     { to: "/announcements", label: "Announcements", icon: Megaphone },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
