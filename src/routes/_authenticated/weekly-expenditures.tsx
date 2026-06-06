@@ -62,7 +62,7 @@ function WeeklyExpendituresPage() {
     queryFn: async () => {
       let q = supabase
         .from("weekly_expenditures")
-        .select("*, recorder:profiles!weekly_expenditures_recorded_by_fkey(full_name)")
+        .select("*")
         .order("expenditure_date", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -79,13 +79,17 @@ function WeeklyExpendituresPage() {
       if (filters.to) q = q.lte("expenditure_date", filters.to);
 
       const { data, error } = await q;
-      if (error) {
-        // Fallback if FK alias not recognized
-        const r = await supabase.from("weekly_expenditures").select("*").order("expenditure_date", { ascending: false });
-        if (r.error) throw r.error;
-        return (r.data as any[]) as Expenditure[];
+      if (error) throw error;
+      const list = (data as any[]) as Expenditure[];
+
+      // Resolve recorder names from profiles
+      const ids = Array.from(new Set(list.map((r) => r.recorded_by).filter(Boolean))) as string[];
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+        const map = new Map((profs ?? []).map((p: any) => [p.id, p.full_name]));
+        for (const r of list) r.recorder = r.recorded_by ? { full_name: map.get(r.recorded_by) ?? null } : null;
       }
-      return (data as any[]) as Expenditure[];
+      return list;
     },
   });
 
