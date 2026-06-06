@@ -98,6 +98,20 @@ function Dashboard() {
       const weeklyExpenditure = (weekExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const monthlyExpenditure = (monthExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
 
+      // Benevolent fund: contributions, withdrawals, current balance (latest per member + openings for members with no entries)
+      const benevRows = (benev.data ?? []) as any[];
+      const benevContrib = benevRows.reduce((s, e) => s + Number(e.contribution ?? 0), 0);
+      const benevWithdraw = benevRows.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
+      const latestBenev = new Map<string, { date: string; balance: number }>();
+      for (const e of benevRows) {
+        const prev = latestBenev.get(e.member_id);
+        if (!prev || e.entry_date > prev.date) latestBenev.set(e.member_id, { date: e.entry_date, balance: Number(e.balance) });
+      }
+      let benevBalance = Array.from(latestBenev.values()).reduce((s, x) => s + x.balance, 0);
+      for (const o of allOpenings as any[]) {
+        if (!latestBenev.has(o.member_id)) benevBalance += Number(o.opening_benevolent ?? 0);
+      }
+
       return {
         members: members.count ?? 0,
         active: active.count ?? 0,
@@ -109,6 +123,9 @@ function Dashboard() {
         announcements: announce.count ?? 0,
         weeklyExpenditure,
         monthlyExpenditure,
+        benevContrib,
+        benevWithdraw,
+        benevBalance,
       };
     },
   });
