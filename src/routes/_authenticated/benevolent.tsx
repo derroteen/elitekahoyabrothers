@@ -162,7 +162,7 @@ function BenevolentLedger() {
           <div className="flex flex-wrap gap-2 mb-3 justify-end">
             <Button variant="outline" size="sm" onClick={() => exportCSV(`${baseName}.csv`, cols, exportRows)}>CSV</Button>
             <Button variant="outline" size="sm" onClick={() => exportXLSX(`${baseName}.xlsx`, [{ name: "Benevolent", columns: cols, rows: exportRows }])}>Excel</Button>
-            <Button variant="outline" size="sm" onClick={() => exportPDF(`${baseName}.pdf`, "Benevolent Fund Ledger", [{ heading: member?.full_name, columns: cols, rows: exportRows }], { subtitle: member?.membership_no })}>PDF</Button>
+            <Button variant="outline" size="sm" onClick={() => exportPDF(`${baseName}.pdf`, "Benevolent Fund Ledger", [{ heading: member?.full_name ?? undefined, columns: cols, rows: exportRows }], { subtitle: member?.membership_no ?? undefined })}>PDF</Button>
           </div>
 
           <Card>
