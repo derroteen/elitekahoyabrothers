@@ -39,7 +39,7 @@ function CollectionsPage() {
   if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (role === "member") return null;
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
 
   return (
     <div>
