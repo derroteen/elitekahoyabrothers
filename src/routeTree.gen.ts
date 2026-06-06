@@ -28,6 +28,7 @@ import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
 import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
 import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
+import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
 import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -136,6 +137,12 @@ const AuthenticatedMyBenevolentRoute =
     path: '/my-benevolent',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedMyAttendanceRoute =
+  AuthenticatedMyAttendanceRouteImport.update({
+    id: '/my-attendance',
+    path: '/my-attendance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -200,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
@@ -229,6 +237,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
+  '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/my-loans': typeof AuthenticatedMyLoansRoute
   '/my-passbook': typeof AuthenticatedMyPassbookRoute
@@ -260,6 +269,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
   '/_authenticated/members': typeof AuthenticatedMembersRoute
+  '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/_authenticated/my-benevolent': typeof AuthenticatedMyBenevolentRoute
   '/_authenticated/my-loans': typeof AuthenticatedMyLoansRoute
   '/_authenticated/my-passbook': typeof AuthenticatedMyPassbookRoute
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-attendance'
     | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/loans'
     | '/members'
+    | '/my-attendance'
     | '/my-benevolent'
     | '/my-loans'
     | '/my-passbook'
@@ -350,6 +362,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/loans'
     | '/_authenticated/members'
+    | '/_authenticated/my-attendance'
     | '/_authenticated/my-benevolent'
     | '/_authenticated/my-loans'
     | '/_authenticated/my-passbook'
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMyBenevolentRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/my-attendance': {
+      id: '/_authenticated/my-attendance'
+      path: '/my-attendance'
+      fullPath: '/my-attendance'
+      preLoaderRoute: typeof AuthenticatedMyAttendanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/members': {
       id: '/_authenticated/members'
       path: '/members'
@@ -596,6 +616,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
+  AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
   AuthenticatedMyBenevolentRoute: typeof AuthenticatedMyBenevolentRoute
   AuthenticatedMyLoansRoute: typeof AuthenticatedMyLoansRoute
   AuthenticatedMyPassbookRoute: typeof AuthenticatedMyPassbookRoute
@@ -619,6 +640,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
+  AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
   AuthenticatedMyBenevolentRoute: AuthenticatedMyBenevolentRoute,
   AuthenticatedMyLoansRoute: AuthenticatedMyLoansRoute,
   AuthenticatedMyPassbookRoute: AuthenticatedMyPassbookRoute,
