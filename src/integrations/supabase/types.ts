@@ -80,6 +80,69 @@ export type Database = {
         }
         Relationships: []
       }
+      benevolent_entries: {
+        Row: {
+          balance: number
+          contribution: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          entry_date: string
+          id: string
+          member_id: string
+          source: string
+          transaction_type: string
+          updated_at: string
+          weekly_entry_id: string | null
+          withdrawal: number
+        }
+        Insert: {
+          balance?: number
+          contribution?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entry_date?: string
+          id?: string
+          member_id: string
+          source?: string
+          transaction_type?: string
+          updated_at?: string
+          weekly_entry_id?: string | null
+          withdrawal?: number
+        }
+        Update: {
+          balance?: number
+          contribution?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entry_date?: string
+          id?: string
+          member_id?: string
+          source?: string
+          transaction_type?: string
+          updated_at?: string
+          weekly_entry_id?: string | null
+          withdrawal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benevolent_entries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "benevolent_entries_weekly_entry_id_fkey"
+            columns: ["weekly_entry_id"]
+            isOneToOne: true
+            referencedRelation: "weekly_collection_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_fines: {
         Row: {
           amount: number
