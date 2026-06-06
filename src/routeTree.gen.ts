@@ -31,6 +31,7 @@ import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
+import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
 import { Route as AuthenticatedLoansLoanIdRouteImport } from './routes/_authenticated/loans.$loanId'
@@ -148,6 +149,11 @@ const AuthenticatedCollectionsRoute =
     path: '/collections',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedBenevolentRoute = AuthenticatedBenevolentRouteImport.update({
+  id: '/benevolent',
+  path: '/benevolent',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/announcements': typeof AuthenticatedAnnouncementsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/loans': typeof AuthenticatedLoansRouteWithChildren
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/announcements': typeof AuthenticatedAnnouncementsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/benevolent': typeof AuthenticatedBenevolentRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/announcements'
     | '/audit'
+    | '/benevolent'
     | '/collections'
     | '/dashboard'
     | '/loans'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/announcements'
     | '/audit'
+    | '/benevolent'
     | '/collections'
     | '/dashboard'
     | '/loans'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/announcements'
     | '/_authenticated/audit'
+    | '/_authenticated/benevolent'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
     | '/_authenticated/loans'
@@ -494,6 +506,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCollectionsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/benevolent': {
+      id: '/_authenticated/benevolent'
+      path: '/benevolent'
+      fullPath: '/benevolent'
+      preLoaderRoute: typeof AuthenticatedBenevolentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
@@ -532,6 +551,7 @@ const AuthenticatedLoansRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedBenevolentRoute: typeof AuthenticatedBenevolentRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
@@ -552,6 +572,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnnouncementsRoute: AuthenticatedAnnouncementsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedBenevolentRoute: AuthenticatedBenevolentRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
@@ -585,3 +606,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
