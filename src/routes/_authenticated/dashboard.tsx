@@ -94,6 +94,9 @@ function Dashboard() {
         if (!latestByMember.has(o.member_id)) totalSavings += Number(o.opening_savings ?? 0);
       }
 
+      const weeklyExpenditure = (weekExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
+      const monthlyExpenditure = (monthExp.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
+
       return {
         members: members.count ?? 0,
         active: active.count ?? 0,
@@ -103,6 +106,8 @@ function Dashboard() {
         revenue,
         totalSavings,
         announcements: announce.count ?? 0,
+        weeklyExpenditure,
+        monthlyExpenditure,
       };
     },
   });
