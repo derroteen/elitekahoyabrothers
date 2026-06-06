@@ -51,14 +51,14 @@ function Dashboard() {
         if (excludeFilter) q = q.not("id", "in", excludeFilter);
         return q;
       };
-      const [members, active, loans, pending, savings, announce, openings, weekExp, monthExp] = await Promise.all([
+      const [members, active, loans, pending, savings, announce, openings, weekExp, monthExp, benev] = await Promise.all([
         buildProfiles(),
         buildActive(),
         supabase.from("loans").select("balance, amount_paid, status"),
         supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("passbook_entries").select("balance, entry_date, member_id"),
         supabase.from("announcements").select("id", { count: "exact", head: true }),
-        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan"),
+        supabase.from("member_opening_balances").select("member_id, opening_savings, opening_loan, opening_benevolent"),
         (() => {
           const now = new Date();
           const day = now.getDay() || 7; // ISO: Mon=1..Sun=7
@@ -74,6 +74,7 @@ function Dashboard() {
           const iso = (d: Date) => d.toISOString().slice(0, 10);
           return supabase.from("weekly_expenditures").select("amount").gte("expenditure_date", iso(first)).lte("expenditure_date", iso(last));
         })(),
+        supabase.from("benevolent_entries").select("member_id, entry_date, balance, contribution, withdrawal"),
       ]);
       const allLoans = loans.data ?? [];
       const allOpenings = openings.data ?? [];
