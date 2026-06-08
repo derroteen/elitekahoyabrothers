@@ -1,6 +1,11 @@
 // Loan calculation helpers
-// Insurance formula: (5.03 * months * 3.03 * totalLoanWithInterest) / 6000
-// Interest compounded annually: A = P * (1 + r) ^ (months / 12)
+//
+// Financial logic (simple interest, NOT compounded):
+//   Interest         = principal × (annualRate%) × (months / 12)
+//   Subtotal         = principal + interest
+//   Insurance        = (5.03 × months + 3.03 × Subtotal) / 6000
+//   Total Repayable  = Subtotal + Insurance
+//                    = principal + interest + insurance
 
 export type Frequency = "weekly" | "monthly";
 
@@ -9,7 +14,8 @@ export interface LoanCalc {
   interestRate: number;     // annual %, e.g. 10 means 10%
   termMonths: number;
   frequency: Frequency;
-  withInterest: number;     // principal + compound interest
+  interest: number;         // simple interest amount
+  withInterest: number;     // principal + interest (subtotal, base for insurance)
   insurance: number;
   totalRepayable: number;   // withInterest + insurance
   periods: number;          // number of periods
@@ -21,8 +27,11 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
   const r = Math.max(0, Number(ratePct) || 0) / 100;
   const t = Math.max(1, Number(termMonths) || 1);
 
-  const withInterest = p * Math.pow(1 + r, t / 12);
-  const insurance = (5.03 * t * 3.03 * withInterest) / 6000;
+  // Simple interest: I = P × r × (t / 12)
+  const interest = p * r * (t / 12);
+  const withInterest = p + interest;
+  // Insurance uses (loan + interest) as the base, plus the months term
+  const insurance = (5.03 * t + 3.03 * withInterest) / 6000;
   const totalRepayable = withInterest + insurance;
 
   const periods = frequency === "weekly" ? Math.max(1, Math.round((t / 12) * 52)) : t;
@@ -33,6 +42,7 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
     interestRate: ratePct,
     termMonths: t,
     frequency,
+    interest: round2(interest),
     withInterest: round2(withInterest),
     insurance: round2(insurance),
     totalRepayable: round2(totalRepayable),
