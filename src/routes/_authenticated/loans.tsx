@@ -289,7 +289,11 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
 
 
           <div className="bg-muted/40 rounded-md p-4 text-sm grid grid-cols-2 gap-x-6 gap-y-1.5">
-            <div className="text-muted-foreground">Principal + Compound Interest:</div>
+            <div className="text-muted-foreground">Principal:</div>
+            <div className="text-right font-mono">{fmtKES(calc.principal)}</div>
+            <div className="text-muted-foreground">Interest (simple, {calc.interestRate}% p.a.):</div>
+            <div className="text-right font-mono">{fmtKES(calc.interest)}</div>
+            <div className="text-muted-foreground">Subtotal (Loan + Interest):</div>
             <div className="text-right font-mono">{fmtKES(calc.withInterest)}</div>
             <div className="text-muted-foreground">Insurance:</div>
             <div className="text-right font-mono">{fmtKES(calc.insurance)}</div>
