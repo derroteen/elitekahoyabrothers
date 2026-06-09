@@ -63,9 +63,11 @@ function LoanLedger() {
   const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const backTo = isStaff ? "/loans" : "/my-loans";
+  const isCleared = Number(loan.balance) <= 0 && Number(loan.outstanding_fines ?? 0) <= 0;
 
   return (
-    <div>
+    <div className="relative">
+      {isCleared && <ClearedWatermark />}
       <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-navy mb-3">
         <ArrowLeft className="w-4 h-4" /> Back
       </Link>
@@ -201,6 +203,16 @@ function Stat({ label, value, highlight }: { label: string; value: any; highligh
     <div>
       <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
       <div className={`mt-1 font-mono ${highlight ? "font-bold text-navy text-base" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function ClearedWatermark() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-32 overflow-hidden">
+      <div className="select-none -rotate-12 text-[8rem] md:text-[12rem] font-black tracking-widest text-emerald-600/15 border-8 border-emerald-600/20 rounded-2xl px-12 py-6">
+        CLEARED
+      </div>
     </div>
   );
 }
