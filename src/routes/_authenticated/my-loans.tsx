@@ -10,6 +10,12 @@ export const Route = createFileRoute("/_authenticated/my-loans")({
   head: () => ({ meta: [{ title: "My Loans — EKB" }] }),
 });
 
+function addMonths(d: string, n: number) {
+  const dt = new Date(d);
+  dt.setMonth(dt.getMonth() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
 function MyLoans() {
   const { user } = useAuth();
   const { data: loans = [], isLoading } = useQuery({
@@ -20,48 +26,76 @@ function MyLoans() {
 
   return (
     <div>
-      <PageHeader title="My Loans" subtitle="Loans you've taken with the SACCO" />
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3 text-right">Borrowed</th>
-                <th className="px-4 py-3 text-right">Paid</th>
-                <th className="px-4 py-3 text-right">Balance</th>
-                <th className="px-4 py-3 text-right">Outstanding Fines</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-              {!isLoading && loans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
-              {loans.map((l: any) => {
-                const cleared = Number(l.balance) <= 0 && Number(l.outstanding_fines ?? 0) <= 0;
-                return (
-                <tr key={l.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{fmtDate(l.loan_date)}</td>
-                  <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
-                  <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
-                  <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
-                  <td className="px-4 py-3 text-xs uppercase tracking-wider">
-                    {cleared ? (
-                      <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-300">CLEARED</span>
-                    ) : (l.status ?? "").replace(/_/g, " ")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <PageHeader title="My Loans" subtitle="Your loan accounts, repayment summary and balance" />
+      {isLoading && <Card><div className="p-6 text-muted-foreground text-center">Loading…</div></Card>}
+      {!isLoading && loans.length === 0 && <Card><div className="p-6 text-muted-foreground text-center">No loans yet</div></Card>}
+      <div className="space-y-4">
+        {loans.map((l: any) => <LoanSummaryCard key={l.id} loan={l} />)}
+      </div>
+    </div>
+  );
+}
+
+function LoanSummaryCard({ loan }: { loan: any }) {
+  const cleared = Number(loan.balance) <= 0 && Number(loan.outstanding_fines ?? 0) <= 0;
+  const principal = Number(loan.amount_borrowed || 0);
+  const months = Number(loan.loan_term_months || 0);
+  const rate = Number(loan.interest_rate || 0);
+  const interest = principal * (rate / 100) * (months / 12);
+  const subtotal = principal + interest;
+  const insurance = Number(loan.insurance ?? 0);
+  const totalPayable = Number(loan.total_repayable ?? 0);
+  const firstRepayment = addMonths(loan.loan_date, 1);
+
+  return (
+    <Card className="relative overflow-hidden">
+      {cleared && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <div className="select-none -rotate-12 text-[5rem] md:text-[7rem] font-black tracking-widest text-emerald-600/20 border-8 border-emerald-600/25 rounded-2xl px-10 py-3">
+            CLEARED
+          </div>
         </div>
-      </Card>
+      )}
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <div className="font-serif text-lg text-navy">Loan · {fmtDate(loan.loan_date)}</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">{loan.payment_frequency} · {months} months · {rate}% p.a.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {cleared ? (
+              <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-300">CLEARED</span>
+            ) : (
+              <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium uppercase">{(loan.status ?? "").replace(/_/g, " ")}</span>
+            )}
+            <Link to="/loans/$loanId" params={{ loanId: loan.id }} className="text-navy hover:underline text-sm">View ledger →</Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <Field label="Principal" value={fmtKES(principal)} />
+          <Field label="Interest" value={fmtKES(interest)} />
+          <Field label="Insurance" value={fmtKES(insurance)} />
+          <Field label="Total Payable" value={fmtKES(totalPayable)} bold />
+          <Field label="Subtotal (P+I)" value={fmtKES(subtotal)} />
+          <Field label="Per Period" value={fmtKES(loan.period_payment)} />
+          <Field label="Amount Paid" value={fmtKES(loan.amount_paid)} />
+          <Field label="Outstanding Balance" value={fmtKES(loan.balance)} bold highlight />
+          <Field label="Loan Date" value={fmtDate(loan.loan_date)} />
+          <Field label="First Repayment" value={fmtDate(firstRepayment)} />
+          <Field label="Outstanding Fines" value={fmtKES(loan.outstanding_fines ?? 0)} highlight={Number(loan.outstanding_fines) > 0} />
+          <Field label="Status" value={cleared ? "CLEARED" : (loan.status ?? "").replace(/_/g, " ")} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function Field({ label, value, bold, highlight }: { label: string; value: any; bold?: boolean; highlight?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`font-mono ${bold ? "font-bold" : ""} ${highlight ? "text-navy" : ""}`}>{value}</div>
     </div>
   );
 }
