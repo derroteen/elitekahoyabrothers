@@ -38,19 +38,26 @@ function MyLoans() {
             <tbody>
               {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && loans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
-              {loans.map((l: any) => (
+              {loans.map((l: any) => {
+                const cleared = Number(l.balance) <= 0 && Number(l.outstanding_fines ?? 0) <= 0;
+                return (
                 <tr key={l.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3">{fmtDate(l.loan_date)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
                   <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                   <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
-                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{(l.status ?? "").replace(/_/g, " ")}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider">
+                    {cleared ? (
+                      <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-300">CLEARED</span>
+                    ) : (l.status ?? "").replace(/_/g, " ")}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
