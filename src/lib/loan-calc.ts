@@ -3,7 +3,7 @@
 // Financial logic (simple interest, NOT compounded):
 //   Interest         = principal × (annualRate%) × (months / 12)
 //   Subtotal         = principal + interest
-//   Insurance        = (5.03 × months + 3.03 × Subtotal) / 6000
+//   Insurance        = ([5.03 × months + 3.03] × Subtotal) / 6000
 //   Total Repayable  = Subtotal + Insurance
 //                    = principal + interest + insurance
 
@@ -31,7 +31,7 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
   const interest = p * r * (t / 12);
   const withInterest = p + interest;
   // Insurance uses (loan + interest) as the base, plus the months term
-  const insurance = (5.03 * t + 3.03 * withInterest) / 6000;
+  const insurance = ((5.03 * t + 3.03) * withInterest) / 6000;
   const totalRepayable = withInterest + insurance;
 
   const periods = frequency === "weekly" ? Math.max(1, Math.round((t / 12) * 52)) : t;
