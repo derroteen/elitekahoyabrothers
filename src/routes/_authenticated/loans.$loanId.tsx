@@ -126,7 +126,7 @@ function LoanLedger() {
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_paid ?? 0)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(Number(s.fine_amount ?? 0) - Number(s.fine_paid ?? 0))}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.balance_remaining)}</td>
-                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status}</span></td>
+                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status === "prepaid" ? "paid in advance" : s.status}</span></td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
                 </tr>
               ))}
