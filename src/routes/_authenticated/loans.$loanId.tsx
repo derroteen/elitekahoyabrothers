@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_authenticated/loans/$loanId")({
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   prepaid: "bg-emerald-100 text-emerald-700",
+  paid_in_advance: "bg-emerald-100 text-emerald-700",
   paid: "bg-green-100 text-green-700",
   overdue: "bg-red-100 text-red-700",
   active: "bg-blue-100 text-blue-700",
@@ -125,7 +126,7 @@ function LoanLedger() {
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_paid ?? 0)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(Number(s.fine_amount ?? 0) - Number(s.fine_paid ?? 0))}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.balance_remaining)}</td>
-                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status}</span></td>
+                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status === "prepaid" ? "paid in advance" : s.status}</span></td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
                 </tr>
               ))}
