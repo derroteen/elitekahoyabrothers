@@ -42,7 +42,10 @@ function MyPassbook() {
           <div className="p-4 border-b border-border font-serif text-lg">Loan Account</div>
           <div className="divide-y divide-border">
             {loans.map((l: any) => {
-              const cleared = Number(l.balance) <= 0 && Number(l.outstanding_fines ?? 0) <= 0;
+              const balance = Number(l.balance ?? 0);
+              const insBalance = Number(l.insurance_balance ?? l.insurance ?? 0);
+              const cleared = balance < 5;
+              const insCleared = insBalance < 5;
               return (
                 <div key={l.id} className="relative p-4">
                   {cleared && (
@@ -57,11 +60,11 @@ function MyPassbook() {
                     <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-xs text-navy hover:underline">View ledger →</Link>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                    <Stat label="Loan Amount" value={fmtKES(l.amount_borrowed)} />
-                    <Stat label="Insurance" value={fmtKES(l.insurance ?? 0)} />
-                    <Stat label="Total Payable" value={fmtKES(l.total_repayable)} />
-                    <Stat label="Paid" value={fmtKES(l.amount_paid)} />
-                    <Stat label="Balance" value={fmtKES(l.balance)} highlight />
+                    <Stat label="Amount Borrowed" value={fmtKES(l.amount_borrowed)} />
+                    <Stat label="Total Payable (P+I)" value={fmtKES(l.total_repayable)} />
+                    <Stat label="Loan Paid" value={fmtKES(l.amount_paid)} />
+                    <Stat label="Loan Balance" value={fmtKES(balance)} highlight />
+                    <Stat label={`Insurance · ${insCleared ? "PAID IN FULL" : "balance"}`} value={fmtKES(insBalance)} />
                   </div>
                 </div>
               );

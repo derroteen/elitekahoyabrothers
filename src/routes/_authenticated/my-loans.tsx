@@ -37,19 +37,22 @@ function MyLoans() {
 }
 
 function LoanSummaryCard({ loan }: { loan: any }) {
-  const cleared = Number(loan.balance) <= 0 && Number(loan.outstanding_fines ?? 0) <= 0;
   const principal = Number(loan.amount_borrowed || 0);
   const months = Number(loan.loan_term_months || 0);
   const rate = Number(loan.interest_rate || 0);
   const interest = principal * (rate / 100) * (months / 12);
-  const subtotal = principal + interest;
-  const insurance = Number(loan.insurance ?? 0);
-  const totalPayable = Number(loan.total_repayable ?? 0);
-  const firstRepayment = addMonths(loan.loan_date, 1);
+  const totalPayable = Number(loan.total_repayable ?? principal + interest);
+  const balance = Number(loan.balance ?? 0);
+  const insTotal = Number(loan.insurance ?? 0);
+  const insBalance = Number(loan.insurance_balance ?? insTotal);
+  const insPaid = Number(loan.insurance_paid ?? 0);
+  const firstRepayment = loan.payment_start_date ?? addMonths(loan.loan_date, 1);
+  const loanCleared = balance < 5;
+  const insCleared = insBalance < 5;
 
   return (
     <Card className="relative overflow-hidden">
-      {cleared && (
+      {loanCleared && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <div className="select-none -rotate-12 text-[5rem] md:text-[7rem] font-black tracking-widest text-emerald-600/20 border-8 border-emerald-600/25 rounded-2xl px-10 py-3">
             CLEARED
@@ -63,7 +66,7 @@ function LoanSummaryCard({ loan }: { loan: any }) {
             <div className="text-xs text-muted-foreground uppercase tracking-wider">{loan.payment_frequency} · {months} months · {rate}% p.a.</div>
           </div>
           <div className="flex items-center gap-2">
-            {cleared ? (
+            {loanCleared ? (
               <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-300">CLEARED</span>
             ) : (
               <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium uppercase">{(loan.status ?? "").replace(/_/g, " ")}</span>
@@ -73,18 +76,18 @@ function LoanSummaryCard({ loan }: { loan: any }) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <Field label="Principal" value={fmtKES(principal)} />
+          <Field label="Amount Borrowed" value={fmtKES(principal)} />
           <Field label="Interest" value={fmtKES(interest)} />
-          <Field label="Insurance" value={fmtKES(insurance)} />
-          <Field label="Total Payable" value={fmtKES(totalPayable)} bold />
-          <Field label="Subtotal (P+I)" value={fmtKES(subtotal)} />
+          <Field label="Total Payment (P+I)" value={fmtKES(totalPayable)} bold />
           <Field label="Per Period" value={fmtKES(loan.period_payment)} />
-          <Field label="Amount Paid" value={fmtKES(loan.amount_paid)} />
-          <Field label="Outstanding Balance" value={fmtKES(loan.balance)} bold highlight />
+          <Field label="Period" value={`${months} months`} />
           <Field label="Loan Date" value={fmtDate(loan.loan_date)} />
-          <Field label="First Repayment" value={fmtDate(firstRepayment)} />
-          <Field label="Outstanding Fines" value={fmtKES(loan.outstanding_fines ?? 0)} highlight={Number(loan.outstanding_fines) > 0} />
-          <Field label="Status" value={cleared ? "CLEARED" : (loan.status ?? "").replace(/_/g, " ")} />
+          <Field label="Payment Start Date" value={fmtDate(firstRepayment)} />
+          <Field label="Outstanding Balance" value={fmtKES(balance)} bold highlight />
+          <Field label="Insurance (Total)" value={fmtKES(insTotal)} />
+          <Field label="Insurance Paid" value={fmtKES(insPaid)} />
+          <Field label="Insurance Balance" value={fmtKES(insBalance)} highlight={insBalance > 0} />
+          <Field label="Insurance Status" value={insCleared ? "PAID IN FULL" : "Outstanding"} />
         </div>
       </div>
     </Card>
