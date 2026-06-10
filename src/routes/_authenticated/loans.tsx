@@ -214,6 +214,7 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
     setSubmitting(true);
     const purposeNote = form.purpose ? `Purpose: ${form.purpose}${form.notes ? ` · ${form.notes}` : ""}` : (form.notes || null);
+    const startDate = new Date(form.date); startDate.setMonth(startDate.getMonth() + 1);
     const { data: loan, error } = await supabase.from("loans").insert({
       member_id: form.member_id,
       amount_borrowed: calc.principal,
@@ -221,10 +222,13 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
       payment_frequency: form.freq as any,
       loan_term_months: calc.termMonths,
       insurance: calc.insurance,
+      insurance_balance: calc.insurance,
+      insurance_paid: 0,
       total_repayable: calc.totalRepayable,
       period_payment: calc.periodPayment,
       balance: calc.totalRepayable,
       loan_date: form.date,
+      payment_start_date: startDate.toISOString().slice(0, 10),
       notes: purposeNote,
       status: "pending",
     } as any).select("id").single();
@@ -293,14 +297,15 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
             <div className="text-right font-mono">{fmtKES(calc.principal)}</div>
             <div className="text-muted-foreground">Interest (simple, {calc.interestRate}% p.a.):</div>
             <div className="text-right font-mono">{fmtKES(calc.interest)}</div>
-            <div className="text-muted-foreground">Subtotal (Loan + Interest):</div>
-            <div className="text-right font-mono">{fmtKES(calc.withInterest)}</div>
-            <div className="text-muted-foreground">Insurance:</div>
-            <div className="text-right font-mono">{fmtKES(calc.insurance)}</div>
-            <div className="text-muted-foreground font-medium">Total Repayable:</div>
+            <div className="text-muted-foreground font-medium">Total Payable (Loan + Interest):</div>
             <div className="text-right font-mono font-bold">{fmtKES(calc.totalRepayable)}</div>
             <div className="text-muted-foreground">{calc.periods} × {form.freq === "weekly" ? "weekly" : "monthly"} payment:</div>
             <div className="text-right font-mono font-bold text-navy">{fmtKES(calc.periodPayment)}</div>
+            <div className="col-span-2 border-t border-border my-1" />
+            <div className="text-muted-foreground">Insurance (separate ledger):</div>
+            <div className="text-right font-mono">{fmtKES(calc.insurance)}</div>
+            <div className="text-muted-foreground">Payment Start Date:</div>
+            <div className="text-right font-mono">{(() => { const d = new Date(form.date); d.setMonth(d.getMonth()+1); return fmtDate(d); })()}</div>
           </div>
         </div>
         <DialogFooter>
