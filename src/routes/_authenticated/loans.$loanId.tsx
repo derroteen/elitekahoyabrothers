@@ -196,7 +196,7 @@ function LoanLedger() {
             </thead>
             <tbody>
               {insRows.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
-              {insRows.map((r) => (
+              {insRows.map((r: any) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">{fmtDate(r.date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
