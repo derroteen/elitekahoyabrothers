@@ -162,17 +162,24 @@ function LoanLedger() {
                 <th className="px-3 py-2 text-right">Remaining Balance</th>
                 <th className="px-3 py-2 text-right">Penalty</th>
                 <th className="px-3 py-2">Source</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {loanRows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No loan payments yet</td></tr>}
+              {loanRows.length === 0 && <tr><td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-muted-foreground">No loan payments yet</td></tr>}
               {loanRows.map((r: any) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">{fmtDate(r.date)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount + r.penalty)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
                   <td className="px-3 py-2 text-right font-mono text-red-600">{fmtKES(r.penalty)}</td>
                   <td className="px-3 py-2 text-xs capitalize text-muted-foreground">{(r.source ?? "manual").replace(/_/g, " ")}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditPay(r)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelPay(r)}>Delete</Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -192,22 +199,30 @@ function LoanLedger() {
                 <th className="px-3 py-2 text-right">Insurance Paid</th>
                 <th className="px-3 py-2 text-right">Insurance Balance</th>
                 <th className="px-3 py-2">Notes</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {insRows.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
+              {insRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
               {insRows.map((r: any) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">{fmtDate(r.date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditIns(r)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelIns(r)}>Delete</Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
 
       {/* Schedule */}
       <Card className="mb-4">
