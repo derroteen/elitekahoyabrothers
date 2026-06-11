@@ -27,6 +27,10 @@ function LoanLedger() {
   const { user, role } = useAuth();
   const qc = useQueryClient();
   const [insOpen, setInsOpen] = useState(false);
+  const [editPay, setEditPay] = useState<any>(null);
+  const [delPay, setDelPay] = useState<any>(null);
+  const [editIns, setEditIns] = useState<any>(null);
+  const [delIns, setDelIns] = useState<any>(null);
 
   const { data: loan } = useQuery({
     queryKey: ["loan", loanId],
@@ -162,17 +166,24 @@ function LoanLedger() {
                 <th className="px-3 py-2 text-right">Remaining Balance</th>
                 <th className="px-3 py-2 text-right">Penalty</th>
                 <th className="px-3 py-2">Source</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {loanRows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No loan payments yet</td></tr>}
+              {loanRows.length === 0 && <tr><td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-muted-foreground">No loan payments yet</td></tr>}
               {loanRows.map((r: any) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">{fmtDate(r.date)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount + r.penalty)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
                   <td className="px-3 py-2 text-right font-mono text-red-600">{fmtKES(r.penalty)}</td>
                   <td className="px-3 py-2 text-xs capitalize text-muted-foreground">{(r.source ?? "manual").replace(/_/g, " ")}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditPay(r)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelPay(r)}>Delete</Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -192,22 +203,30 @@ function LoanLedger() {
                 <th className="px-3 py-2 text-right">Insurance Paid</th>
                 <th className="px-3 py-2 text-right">Insurance Balance</th>
                 <th className="px-3 py-2">Notes</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {insRows.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
+              {insRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
               {insRows.map((r: any) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">{fmtDate(r.date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
+                  {canEdit && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditIns(r)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelIns(r)}>Delete</Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
 
       {/* Schedule */}
       <Card className="mb-4">
@@ -277,9 +296,88 @@ function LoanLedger() {
           }}
         />
       )}
+
+      {editPay && (
+        <EditPaymentDialog
+          loanId={loanId}
+          payment={editPay}
+          onClose={() => setEditPay(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
+          }}
+          actorId={user?.id ?? null}
+        />
+      )}
+
+      {delPay && (
+        <ConfirmDeleteDialog
+          title="Delete Payment"
+          message="Are you sure you want to delete this payment record?"
+          onClose={() => setDelPay(null)}
+          onConfirm={async () => {
+            const oldVal = { amount: delPay.amount, date: delPay.date };
+            const { error } = await supabase.from("loan_repayments").delete().eq("id", delPay.id);
+            if (error) { toast.error(error.message); return; }
+            await (supabase as any).rpc("recalc_loan_from_payments", { _loan_id: loanId });
+            await supabase.from("audit_logs").insert({
+              actor_id: user?.id ?? null, action: "delete_loan_payment",
+              table_name: "loan_repayments", record_id: delPay.id,
+              old_value: oldVal as any, new_value: null,
+              reason: "Payment deleted from ledger",
+            } as any);
+            toast.success("Payment deleted, balances recalculated");
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
+            setDelPay(null);
+          }}
+        />
+      )}
+
+      {editIns && (
+        <EditInsuranceDialog
+          loanId={loanId}
+          payment={editIns}
+          onClose={() => setEditIns(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
+          }}
+          actorId={user?.id ?? null}
+        />
+      )}
+
+      {delIns && (
+        <ConfirmDeleteDialog
+          title="Delete Insurance Payment"
+          message="Are you sure you want to delete this insurance payment record?"
+          onClose={() => setDelIns(null)}
+          onConfirm={async () => {
+            const oldVal = { amount: delIns.amount, date: delIns.date };
+            const { error } = await (supabase.from("loan_insurance_payments" as any) as any).delete().eq("id", delIns.id);
+            if (error) { toast.error(error.message); return; }
+            await (supabase as any).rpc("recalc_insurance_from_payments", { _loan_id: loanId });
+            await supabase.from("audit_logs").insert({
+              actor_id: user?.id ?? null, action: "delete_insurance_payment",
+              table_name: "loan_insurance_payments", record_id: delIns.id,
+              old_value: oldVal as any, new_value: null,
+              reason: "Insurance payment deleted from ledger",
+            } as any);
+            toast.success("Insurance payment deleted");
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
+            setDelIns(null);
+          }}
+        />
+      )}
     </div>
   );
 }
+
 
 function Stat({ label, value, highlight }: { label: string; value: any; highlight?: boolean }) {
   return (
