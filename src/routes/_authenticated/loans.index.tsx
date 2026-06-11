@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 
-export const Route = createFileRoute("/_authenticated/loans")({
+export const Route = createFileRoute("/_authenticated/loans/")({
   component: LoansAdmin,
   head: () => ({ meta: [{ title: "Loans — EKB" }] }),
 });
