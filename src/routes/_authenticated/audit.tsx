@@ -33,11 +33,11 @@ function AuditPage() {
       <Card>
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-            <th className="px-4 py-3">When</th>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">User</th>
             <th className="px-4 py-3">Action</th>
-            <th className="px-4 py-3">Table</th>
-            <th className="px-4 py-3">Record</th>
-            <th className="px-4 py-3">Actor</th>
+            <th className="px-4 py-3 text-right">Amount</th>
+            <th className="px-4 py-3">Loan ID</th>
           </tr></thead>
           <tbody>
             {isLoading && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
@@ -45,10 +45,10 @@ function AuditPage() {
             {logs.map((l: any) => (
               <tr key={l.id} className="border-b border-border last:border-0 font-mono text-xs">
                 <td className="px-4 py-3">{fmtDate(l.created_at)} {new Date(l.created_at).toLocaleTimeString()}</td>
-                <td className="px-4 py-3">{l.action}</td>
-                <td className="px-4 py-3">{l.table_name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{l.record_id?.slice(0, 8)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{l.actor_id?.slice(0, 8) ?? "system"}</td>
+                <td className="px-4 py-3">{l.action}</td>
+                <td className="px-4 py-3 text-right">{l.new_value?.amount ?? l.old_value?.amount ?? "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{(l.new_value?.loan_id ?? l.record_id)?.slice?.(0, 8) ?? "—"}</td>
               </tr>
             ))}
           </tbody>

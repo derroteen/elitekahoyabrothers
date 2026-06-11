@@ -21,7 +21,7 @@ import { Route as AuthenticatedSystemResetRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
-import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
+import { Route as AuthenticatedPassbooksRouteImport } from './routes/_authenticated/passbooks'
 import { Route as AuthenticatedOpeningBalancesRouteImport } from './routes/_authenticated/opening-balances'
 import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticated/my-weekly'
 import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
@@ -30,13 +30,13 @@ import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
+import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
-import { Route as AuthenticatedLoansIndexRouteImport } from './routes/_authenticated/loans.index'
 import { Route as AuthenticatedLoansLoanIdRouteImport } from './routes/_authenticated/loans.$loanId'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -100,9 +100,9 @@ const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
-  id: '/passbook',
-  path: '/passbook',
+const AuthenticatedPassbooksRoute = AuthenticatedPassbooksRouteImport.update({
+  id: '/passbooks',
+  path: '/passbooks',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOpeningBalancesRoute =
@@ -148,6 +148,11 @@ const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLoansRoute = AuthenticatedLoansRouteImport.update({
+  id: '/loans',
+  path: '/loans',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -180,16 +185,11 @@ const AuthenticatedAnnouncementsRoute =
     path: '/announcements',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedLoansIndexRoute = AuthenticatedLoansIndexRouteImport.update({
-  id: '/loans/',
-  path: '/loans/',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedLoansLoanIdRoute =
   AuthenticatedLoansLoanIdRouteImport.update({
-    id: '/loans/$loanId',
-    path: '/loans/$loanId',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/$loanId',
+    path: '/$loanId',
+    getParentRoute: () => AuthenticatedLoansRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -205,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -213,14 +214,13 @@ export interface FileRoutesByFullPath {
   '/my-savings': typeof AuthenticatedMySavingsRoute
   '/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
-  '/passbook': typeof AuthenticatedPassbookRoute
+  '/passbooks': typeof AuthenticatedPassbooksRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/savings': typeof AuthenticatedSavingsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/system-reset': typeof AuthenticatedSystemResetRoute
   '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
-  '/loans/': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -235,6 +235,7 @@ export interface FileRoutesByTo {
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -243,14 +244,13 @@ export interface FileRoutesByTo {
   '/my-savings': typeof AuthenticatedMySavingsRoute
   '/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
-  '/passbook': typeof AuthenticatedPassbookRoute
+  '/passbooks': typeof AuthenticatedPassbooksRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/savings': typeof AuthenticatedSavingsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/system-reset': typeof AuthenticatedSystemResetRoute
   '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
-  '/loans': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -267,6 +267,7 @@ export interface FileRoutesById {
   '/_authenticated/benevolent': typeof AuthenticatedBenevolentRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
   '/_authenticated/members': typeof AuthenticatedMembersRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/_authenticated/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -275,14 +276,13 @@ export interface FileRoutesById {
   '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
   '/_authenticated/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/_authenticated/opening-balances': typeof AuthenticatedOpeningBalancesRoute
-  '/_authenticated/passbook': typeof AuthenticatedPassbookRoute
+  '/_authenticated/passbooks': typeof AuthenticatedPassbooksRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/savings': typeof AuthenticatedSavingsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/system-reset': typeof AuthenticatedSystemResetRoute
   '/_authenticated/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/_authenticated/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
-  '/_authenticated/loans/': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -299,6 +299,7 @@ export interface FileRouteTypes {
     | '/benevolent'
     | '/collections'
     | '/dashboard'
+    | '/loans'
     | '/members'
     | '/my-attendance'
     | '/my-benevolent'
@@ -307,14 +308,13 @@ export interface FileRouteTypes {
     | '/my-savings'
     | '/my-weekly'
     | '/opening-balances'
-    | '/passbook'
+    | '/passbooks'
     | '/reports'
     | '/savings'
     | '/settings'
     | '/system-reset'
     | '/weekly-expenditures'
     | '/loans/$loanId'
-    | '/loans/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -329,6 +329,7 @@ export interface FileRouteTypes {
     | '/benevolent'
     | '/collections'
     | '/dashboard'
+    | '/loans'
     | '/members'
     | '/my-attendance'
     | '/my-benevolent'
@@ -337,14 +338,13 @@ export interface FileRouteTypes {
     | '/my-savings'
     | '/my-weekly'
     | '/opening-balances'
-    | '/passbook'
+    | '/passbooks'
     | '/reports'
     | '/savings'
     | '/settings'
     | '/system-reset'
     | '/weekly-expenditures'
     | '/loans/$loanId'
-    | '/loans'
   id:
     | '__root__'
     | '/'
@@ -360,6 +360,7 @@ export interface FileRouteTypes {
     | '/_authenticated/benevolent'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
+    | '/_authenticated/loans'
     | '/_authenticated/members'
     | '/_authenticated/my-attendance'
     | '/_authenticated/my-benevolent'
@@ -368,14 +369,13 @@ export interface FileRouteTypes {
     | '/_authenticated/my-savings'
     | '/_authenticated/my-weekly'
     | '/_authenticated/opening-balances'
-    | '/_authenticated/passbook'
+    | '/_authenticated/passbooks'
     | '/_authenticated/reports'
     | '/_authenticated/savings'
     | '/_authenticated/settings'
     | '/_authenticated/system-reset'
     | '/_authenticated/weekly-expenditures'
     | '/_authenticated/loans/$loanId'
-    | '/_authenticated/loans/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -474,11 +474,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/passbook': {
-      id: '/_authenticated/passbook'
-      path: '/passbook'
-      fullPath: '/passbook'
-      preLoaderRoute: typeof AuthenticatedPassbookRouteImport
+    '/_authenticated/passbooks': {
+      id: '/_authenticated/passbooks'
+      path: '/passbooks'
+      fullPath: '/passbooks'
+      preLoaderRoute: typeof AuthenticatedPassbooksRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/opening-balances': {
@@ -537,6 +537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMembersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/loans': {
+      id: '/_authenticated/loans'
+      path: '/loans'
+      fullPath: '/loans'
+      preLoaderRoute: typeof AuthenticatedLoansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -579,22 +586,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/loans/': {
-      id: '/_authenticated/loans/'
-      path: '/loans'
-      fullPath: '/loans/'
-      preLoaderRoute: typeof AuthenticatedLoansIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/loans/$loanId': {
       id: '/_authenticated/loans/$loanId'
-      path: '/loans/$loanId'
+      path: '/$loanId'
       fullPath: '/loans/$loanId'
       preLoaderRoute: typeof AuthenticatedLoansLoanIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedLoansRoute
     }
   }
 }
+
+interface AuthenticatedLoansRouteChildren {
+  AuthenticatedLoansLoanIdRoute: typeof AuthenticatedLoansLoanIdRoute
+}
+
+const AuthenticatedLoansRouteChildren: AuthenticatedLoansRouteChildren = {
+  AuthenticatedLoansLoanIdRoute: AuthenticatedLoansLoanIdRoute,
+}
+
+const AuthenticatedLoansRouteWithChildren =
+  AuthenticatedLoansRoute._addFileChildren(AuthenticatedLoansRouteChildren)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
@@ -603,6 +614,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBenevolentRoute: typeof AuthenticatedBenevolentRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
   AuthenticatedMyBenevolentRoute: typeof AuthenticatedMyBenevolentRoute
@@ -611,14 +623,12 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
   AuthenticatedMyWeeklyRoute: typeof AuthenticatedMyWeeklyRoute
   AuthenticatedOpeningBalancesRoute: typeof AuthenticatedOpeningBalancesRoute
-  AuthenticatedPassbookRoute: typeof AuthenticatedPassbookRoute
+  AuthenticatedPassbooksRoute: typeof AuthenticatedPassbooksRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSavingsRoute: typeof AuthenticatedSavingsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSystemResetRoute: typeof AuthenticatedSystemResetRoute
   AuthenticatedWeeklyExpendituresRoute: typeof AuthenticatedWeeklyExpendituresRoute
-  AuthenticatedLoansLoanIdRoute: typeof AuthenticatedLoansLoanIdRoute
-  AuthenticatedLoansIndexRoute: typeof AuthenticatedLoansIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -628,6 +638,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenevolentRoute: AuthenticatedBenevolentRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
   AuthenticatedMyBenevolentRoute: AuthenticatedMyBenevolentRoute,
@@ -636,14 +647,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
   AuthenticatedMyWeeklyRoute: AuthenticatedMyWeeklyRoute,
   AuthenticatedOpeningBalancesRoute: AuthenticatedOpeningBalancesRoute,
-  AuthenticatedPassbookRoute: AuthenticatedPassbookRoute,
+  AuthenticatedPassbooksRoute: AuthenticatedPassbooksRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSavingsRoute: AuthenticatedSavingsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSystemResetRoute: AuthenticatedSystemResetRoute,
   AuthenticatedWeeklyExpendituresRoute: AuthenticatedWeeklyExpendituresRoute,
-  AuthenticatedLoansLoanIdRoute: AuthenticatedLoansLoanIdRoute,
-  AuthenticatedLoansIndexRoute: AuthenticatedLoansIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -662,13 +671,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

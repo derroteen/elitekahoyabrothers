@@ -1,25 +1,25 @@
 // Loan calculation helpers
 //
 // Financial logic (simple interest, NOT compounded):
-//   Interest      = principal × (annualRate%) × (months / 12)
-//   Total Payable = principal + interest     ← insurance is NOT included
-//   Insurance     = ([5.03 × months + 3.03] × (principal + interest)) / 6000
-//                   tracked SEPARATELY from the loan balance
-//   Per Period    = Total Payable / number of periods
+//   Interest         = principal × (annualRate%) × (months / 12)
+//   Subtotal         = principal + interest
+//   Insurance        = (5.03 × months + 3.03 × Subtotal) / 6000
+//   Total Repayable  = Subtotal + Insurance
+//                    = principal + interest + insurance
 
 export type Frequency = "weekly" | "monthly";
 
 export interface LoanCalc {
   principal: number;
-  interestRate: number;
+  interestRate: number;     // annual %, e.g. 10 means 10%
   termMonths: number;
   frequency: Frequency;
-  interest: number;
-  withInterest: number;     // principal + interest
-  insurance: number;        // separate — NOT part of total payable
-  totalRepayable: number;   // principal + interest only
-  periods: number;
-  periodPayment: number;
+  interest: number;         // simple interest amount
+  withInterest: number;     // principal + interest (subtotal, base for insurance)
+  insurance: number;
+  totalRepayable: number;   // withInterest + insurance
+  periods: number;          // number of periods
+  periodPayment: number;    // payment per period
 }
 
 export function calcLoan(principal: number, ratePct: number, termMonths: number, frequency: Frequency): LoanCalc {
@@ -27,10 +27,12 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
   const r = Math.max(0, Number(ratePct) || 0) / 100;
   const t = Math.max(1, Number(termMonths) || 1);
 
+  // Simple interest: I = P × r × (t / 12)
   const interest = p * r * (t / 12);
   const withInterest = p + interest;
-  const insurance = ((5.03 * t + 3.03) * withInterest) / 6000;
-  const totalRepayable = withInterest; // Loan + Interest ONLY
+  // Insurance uses (loan + interest) as the base, plus the months term
+  const insurance = (5.03 * t + 3.03 * withInterest) / 6000;
+  const totalRepayable = withInterest + insurance;
 
   const periods = frequency === "weekly" ? Math.max(1, Math.round((t / 12) * 52)) : t;
   const periodPayment = totalRepayable / periods;

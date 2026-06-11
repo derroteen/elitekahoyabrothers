@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -9,28 +10,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtKES, fmtDate } from "@/lib/format";
-import { toast } from "sonner";
+import { deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/loans/$loanId")({
   component: LoanLedger,
   head: () => ({ meta: [{ title: "Loan Ledger — EKB" }] }),
 });
 
-function addMonths(d: string, n: number) {
-  const dt = new Date(d); dt.setMonth(dt.getMonth() + n);
-  return dt.toISOString().slice(0, 10);
-}
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  prepaid: "bg-emerald-100 text-emerald-700",
+  paid: "bg-green-100 text-green-700",
+  overdue: "bg-red-100 text-red-700",
+  active: "bg-blue-100 text-blue-700",
+  completed: "bg-gray-100 text-gray-700",
+  completed_with_fine: "bg-orange-100 text-orange-700",
+  rejected: "bg-red-50 text-red-700",
+  unpaid: "bg-red-100 text-red-700",
+  partial: "bg-amber-100 text-amber-700",
+};
 
 function LoanLedger() {
   const { loanId } = Route.useParams();
   const { user, role } = useAuth();
   const qc = useQueryClient();
-  const [insOpen, setInsOpen] = useState(false);
-  const [editPay, setEditPay] = useState<any>(null);
-  const [delPay, setDelPay] = useState<any>(null);
-  const [editIns, setEditIns] = useState<any>(null);
-  const [delIns, setDelIns] = useState<any>(null);
+  const doDeletePayment = useServerFn(deleteLoanPayment);
+  const [editPayment, setEditPayment] = useState<any>(null);
 
   const { data: loan } = useQuery({
     queryKey: ["loan", loanId],
@@ -49,210 +56,102 @@ function LoanLedger() {
     queryFn: async () => (await (supabase.from("loan_schedule" as any) as any).select("*").eq("loan_id", loanId).order("period_number")).data ?? [],
   });
 
-  const { data: repayments = [] } = useQuery({
-    queryKey: ["loan-repayments", loanId],
-    enabled: !!user,
-    queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
-  });
-
-  const { data: insurance = [] } = useQuery({
-    queryKey: ["loan-insurance", loanId],
-    enabled: !!user,
-    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
-  });
-
   const { data: fines = [] } = useQuery({
     queryKey: ["loan-fines", loanId],
     enabled: !!user,
     queryFn: async () => (await (supabase.from("loan_fines" as any) as any).select("*").eq("loan_id", loanId).order("fine_date")).data ?? [],
   });
 
-  if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
-
-  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
-  const canEdit = role === "super_admin" || role === "admin";
-  const backTo = isStaff ? "/loans" : "/my-loans";
-
-  const principal = Number(loan.amount_borrowed || 0);
-  const months = Number(loan.loan_term_months || 0);
-  const rate = Number(loan.interest_rate || 0);
-  const interest = principal * (rate / 100) * (months / 12);
-  const totalPayable = Number(loan.total_repayable ?? principal + interest);
-  const balance = Number(loan.balance ?? 0);
-  const insBalance = Number(loan.insurance_balance ?? loan.insurance ?? 0);
-  const insPaid = Number(loan.insurance_paid ?? 0);
-  const insTotal = Number(loan.insurance ?? 0);
-  const startDate = loan.payment_start_date ?? addMonths(loan.loan_date, 1);
-
-  const loanCleared = balance < 5;
-  const insCleared = insBalance < 5;
-
-  // Build a running loan-payment ledger (Date / Amount Paid / Balance / Penalty)
-  let running = totalPayable;
-  const loanRows = repayments.map((r: any) => {
-    const principalPart = Number(r.principal_paid ?? r.amount ?? 0);
-    running = Math.max(0, running - principalPart);
-    return {
-      id: r.id,
-      date: r.payment_date,
-      amount: principalPart,
-      penalty: Number(r.fine_paid ?? 0),
-      balance: running,
-      source: r.source,
-      notes: r.notes,
-    };
+  const { data: repayments = [] } = useQuery({
+    queryKey: ["loan-repayments", loanId],
+    enabled: !!user,
+    queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
   });
 
-  // Build insurance ledger
-  const insRows = insurance.map((i: any) => ({
-    id: i.id, date: i.payment_date, amount: Number(i.amount), balance: Number(i.balance_after), notes: i.notes,
-  }));
+  if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
+
+  const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
+  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
+  const canEditPayments = role === "super_admin" || role === "admin";
+  const backTo = isStaff ? "/loans" : "/my-loans";
+  const refreshLoan = () => {
+    qc.invalidateQueries({ queryKey: ["loan", loanId] });
+    qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
+    qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
+    qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+  };
+  const onDeletePayment = async (payment: any) => {
+    if (!confirm("Are you sure you want to delete this payment?")) return;
+    try {
+      await doDeletePayment({ data: { id: payment.id, loan_id: loanId } });
+      toast.success("Payment deleted and balances recalculated");
+      refreshLoan();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete payment");
+    }
+  };
 
   return (
-    <div className="relative">
+    <div>
       <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-navy mb-3">
         <ArrowLeft className="w-4 h-4" /> Back
       </Link>
       <PageHeader title={`Loan Ledger — ${loan.profile?.full_name ?? ""}`} subtitle={loan.profile?.membership_no ?? ""} />
 
-      {/* Loan Details */}
-      <Card className="mb-4 relative overflow-hidden">
-        {loanCleared && <Watermark text="CLEARED" />}
-        <div className="p-4 border-b border-border font-serif text-lg">Loan Details</div>
+      <Card className="mb-4">
         <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <Stat label="Loan Amount" value={fmtKES(loan.amount_borrowed)} />
+          <Stat label="Interest Rate" value={`${Number(loan.interest_rate).toFixed(1)}%`} />
+          <Stat label="Payment Frequency" value={loan.payment_frequency} />
+          <Stat label="Term" value={`${loan.loan_term_months} months`} />
           <Stat label="Loan Date" value={fmtDate(loan.loan_date)} />
-          <Stat label="Amount Borrowed" value={fmtKES(principal)} />
-          <Stat label="Interest Rate" value={`${rate.toFixed(1)}% p.a.`} />
-          <Stat label="Frequency" value={loan.payment_frequency} />
-          <Stat label="Total Payment (P+I)" value={fmtKES(totalPayable)} />
-          <Stat label="Per Period" value={fmtKES(loan.period_payment)} />
-          <Stat label="Period of Payment" value={`${months} months`} />
-          <Stat label="Payment Start Date" value={fmtDate(startDate)} />
-          <Stat label="Total Paid (loan)" value={fmtKES(loan.amount_paid)} />
-          <Stat label="Outstanding Balance" value={fmtKES(balance)} highlight />
+          <Stat label="Total Repayable" value={fmtKES(loan.total_repayable)} />
+          <Stat label="Total Paid" value={fmtKES(loan.amount_paid)} />
+          <Stat label="Outstanding Balance" value={fmtKES(loan.balance)} highlight />
+          <Stat label="Total Interest Added" value={fmtKES(loan.total_interest_added ?? 0)} />
+          <Stat label="Total Fines Charged" value={fmtKES(loan.total_fines_charged ?? 0)} />
+          <Stat label="Total Fines Paid" value={fmtKES(loan.total_fines_paid ?? 0)} />
           <Stat label="Outstanding Fines" value={fmtKES(loan.outstanding_fines ?? 0)} highlight={Number(loan.outstanding_fines) > 0} />
+          <Stat label="Next Payment Due" value={nextDue ? fmtDate(nextDue.due_date) : "—"} />
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Status</div>
-            <div className="mt-1 text-sm font-medium">{loanCleared ? "CLEARED" : (loan.status ?? "").replace(/_/g, " ")}</div>
+            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[loan.status] ?? "bg-gray-100 text-gray-700"}`}>{loan.status.replace(/_/g, " ")}</span>
           </div>
         </div>
       </Card>
 
-      {/* Insurance Details */}
-      <Card className="mb-4 relative overflow-hidden">
-        {insCleared && <Watermark text="PAID IN FULL" color="blue" />}
-        <div className="p-4 border-b border-border font-serif text-lg flex items-center justify-between">
-          <span>Insurance (separate from loan)</span>
-          {canEdit && !insCleared && <Button size="sm" onClick={() => setInsOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ Insurance Payment</Button>}
-        </div>
-        <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <Stat label="Total Insurance" value={fmtKES(insTotal)} />
-          <Stat label="Insurance Paid" value={fmtKES(insPaid)} />
-          <Stat label="Insurance Balance" value={fmtKES(insBalance)} highlight />
-          <Stat label="Status" value={insCleared ? "PAID IN FULL" : "Outstanding"} />
-        </div>
-      </Card>
-
-      {/* Loan payment table */}
-      <Card className="mb-4 relative overflow-hidden">
-        {loanCleared && <Watermark text="CLEARED" />}
-        <div className="p-4 border-b border-border font-serif text-lg">Loan Payment Table</div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2 text-right">Amount Paid</th>
-                <th className="px-3 py-2 text-right">Remaining Balance</th>
-                <th className="px-3 py-2 text-right">Penalty</th>
-                <th className="px-3 py-2">Source</th>
-                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {loanRows.length === 0 && <tr><td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-muted-foreground">No loan payments yet</td></tr>}
-              {loanRows.map((r: any) => (
-                <tr key={r.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2">{fmtDate(r.date)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount + r.penalty)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-red-600">{fmtKES(r.penalty)}</td>
-                  <td className="px-3 py-2 text-xs capitalize text-muted-foreground">{(r.source ?? "manual").replace(/_/g, " ")}</td>
-                  {canEdit && (
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditPay(r)}>Edit</Button>
-                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelPay(r)}>Delete</Button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Insurance payment table */}
-      <Card className="mb-4 relative overflow-hidden">
-        {insCleared && <Watermark text="PAID IN FULL" color="blue" />}
-        <div className="p-4 border-b border-border font-serif text-lg">Insurance Payment Table</div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2 text-right">Insurance Paid</th>
-                <th className="px-3 py-2 text-right">Insurance Balance</th>
-                <th className="px-3 py-2">Notes</th>
-                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {insRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-center text-muted-foreground">No insurance payments yet</td></tr>}
-              {insRows.map((r: any) => (
-                <tr key={r.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2">{fmtDate(r.date)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.balance)}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
-                  {canEdit && (
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <Button size="sm" variant="outline" className="mr-1" onClick={() => setEditIns(r)}>Edit</Button>
-                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setDelIns(r)}>Delete</Button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-
-      {/* Schedule */}
       <Card className="mb-4">
-        <div className="p-4 border-b border-border font-serif text-lg">Repayment Schedule</div>
+        <div className="p-4 border-b border-border font-serif text-lg">Running Loan Ledger</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-3 py-2">#</th>
                 <th className="px-3 py-2">Due Date</th>
                 <th className="px-3 py-2 text-right">Expected</th>
                 <th className="px-3 py-2 text-right">Paid</th>
-                <th className="px-3 py-2 text-right">Fine</th>
+                <th className="px-3 py-2 text-right">Fine Charged</th>
+                <th className="px-3 py-2 text-right">Fine Paid</th>
+                <th className="px-3 py-2 text-right">Outstanding Fine</th>
+                <th className="px-3 py-2 text-right">Balance</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Remarks</th>
               </tr>
             </thead>
             <tbody>
-              {schedule.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
+              {schedule.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
               {schedule.map((s: any) => (
                 <tr key={s.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-mono">{s.period_number}</td>
                   <td className="px-3 py-2">{fmtDate(s.due_date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.expected_amount)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.amount_paid)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-red-600">{fmtKES(s.fine_amount ?? 0)}</td>
-                  <td className="px-3 py-2 text-xs">{loanCleared ? "paid" : s.status === "prepaid" ? "paid in advance" : s.status}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_amount ?? 0)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_paid ?? 0)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(Number(s.fine_amount ?? 0) - Number(s.fine_paid ?? 0))}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(s.balance_remaining)}</td>
+                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status}</span></td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -260,9 +159,8 @@ function LoanLedger() {
         </div>
       </Card>
 
-      {/* Penalty History */}
-      <Card>
-        <div className="p-4 border-b border-border font-serif text-lg">Penalty History</div>
+      <Card className="mb-4">
+        <div className="p-4 border-b border-border font-serif text-lg">Fine History</div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -271,113 +169,119 @@ function LoanLedger() {
             </tr>
           </thead>
           <tbody>
-            {fines.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No penalties</td></tr>}
+            {fines.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
             {fines.map((f: any) => (
               <tr key={f.id} className="border-b last:border-0">
                 <td className="px-3 py-2">{fmtDate(f.fine_date)}</td>
                 <td className="px-3 py-2">{f.reason}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
-                <td className="px-3 py-2 text-xs">{f.status}</td>
+                <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[f.status] ?? "bg-gray-100"}`}>{f.status}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
       </Card>
 
-      {insOpen && (
-        <InsurancePaymentDialog
-          loanId={loanId}
-          insBalance={insBalance}
-          onClose={() => setInsOpen(false)}
-          onSaved={() => {
-            qc.invalidateQueries({ queryKey: ["loan", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
-          }}
-        />
-      )}
-
-      {editPay && (
-        <EditPaymentDialog
-          loanId={loanId}
-          payment={editPay}
-          onClose={() => setEditPay(null)}
-          onSaved={() => {
-            qc.invalidateQueries({ queryKey: ["loan", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
-          }}
-          actorId={user?.id ?? null}
-        />
-      )}
-
-      {delPay && (
-        <ConfirmDeleteDialog
-          title="Delete Payment"
-          message="Are you sure you want to delete this payment record?"
-          onClose={() => setDelPay(null)}
-          onConfirm={async () => {
-            const oldVal = { amount: delPay.amount, date: delPay.date };
-            const { error } = await supabase.from("loan_repayments").delete().eq("id", delPay.id);
-            if (error) { toast.error(error.message); return; }
-            await (supabase as any).rpc("recalc_loan_from_payments", { _loan_id: loanId });
-            await supabase.from("audit_logs").insert({
-              actor_id: user?.id ?? null, action: "delete_loan_payment",
-              table_name: "loan_repayments", record_id: delPay.id,
-              old_value: oldVal as any, new_value: null,
-              reason: "Payment deleted from ledger",
-            } as any);
-            toast.success("Payment deleted, balances recalculated");
-            qc.invalidateQueries({ queryKey: ["loan", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
-            setDelPay(null);
-          }}
-        />
-      )}
-
-      {editIns && (
-        <EditInsuranceDialog
-          loanId={loanId}
-          payment={editIns}
-          onClose={() => setEditIns(null)}
-          onSaved={() => {
-            qc.invalidateQueries({ queryKey: ["loan", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
-          }}
-          actorId={user?.id ?? null}
-        />
-      )}
-
-      {delIns && (
-        <ConfirmDeleteDialog
-          title="Delete Insurance Payment"
-          message="Are you sure you want to delete this insurance payment record?"
-          onClose={() => setDelIns(null)}
-          onConfirm={async () => {
-            const oldVal = { amount: delIns.amount, date: delIns.date };
-            const { error } = await (supabase.from("loan_insurance_payments" as any) as any).delete().eq("id", delIns.id);
-            if (error) { toast.error(error.message); return; }
-            await (supabase as any).rpc("recalc_insurance_from_payments", { _loan_id: loanId });
-            await supabase.from("audit_logs").insert({
-              actor_id: user?.id ?? null, action: "delete_insurance_payment",
-              table_name: "loan_insurance_payments", record_id: delIns.id,
-              old_value: oldVal as any, new_value: null,
-              reason: "Insurance payment deleted from ledger",
-            } as any);
-            toast.success("Insurance payment deleted");
-            qc.invalidateQueries({ queryKey: ["loan", loanId] });
-            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
-            setDelIns(null);
-          }}
-        />
-      )}
+      <Card>
+        <div className="p-4 border-b border-border font-serif text-lg">Payment History</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[860px]">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Method</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-right">Fine Paid</th>
+                <th className="px-3 py-2 text-right">Principal Paid</th>
+                <th className="px-3 py-2">Notes</th>
+                {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {repayments.length === 0 && <tr><td colSpan={canEditPayments ? 8 : 7} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
+              {repayments.map((r: any) => (
+                <tr key={r.id} className="border-b last:border-0">
+                  <td className="px-3 py-2">{fmtDate(r.payment_date)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.source === "weekly" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
+                      {r.source === "weekly" ? "Weekly Sheet" : "Manual"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs capitalize">{(r.payment_method ?? "").replace(/_/g, " ") || "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.fine_paid ?? 0)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.principal_paid ?? 0)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
+                  {canEditPayments && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="ghost" onClick={() => setEditPayment(r)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => onDeletePayment(r)}>Delete</Button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
     </div>
   );
 }
 
+function EditPaymentDialog({ payment, loanId, onClose, onSaved }: any) {
+  const doEditPayment = useServerFn(editLoanPayment);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ payment_date: "", amount: "", reference: "", notes: "" });
+
+  useEffect(() => {
+    if (!payment) return;
+    const notes = payment.notes ?? "";
+    const match = notes.match(/^Reference: ([^|]+)(?: \| (.*))?$/);
+    setForm({
+      payment_date: payment.payment_date ?? "",
+      amount: String(payment.amount ?? ""),
+      reference: match?.[1]?.trim() ?? "",
+      notes: match ? (match[2] ?? "") : notes,
+    });
+  }, [payment?.id]);
+
+  const submit = async () => {
+    if (!payment) return;
+    if (!form.amount) { toast.error("Amount required"); return; }
+    setSubmitting(true);
+    try {
+      await doEditPayment({ data: { id: payment.id, loan_id: loanId, amount: Number(form.amount), payment_date: form.payment_date, payment_method: payment.payment_method ?? null, reference: form.reference || null, notes: form.notes || null } });
+      toast.success("Payment updated and balances recalculated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to edit payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!payment} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Loan Payment</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Reference</Label><Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Payment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function Stat({ label, value, highlight }: { label: string; value: any; highlight?: boolean }) {
   return (
@@ -385,51 +289,5 @@ function Stat({ label, value, highlight }: { label: string; value: any; highligh
       <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
       <div className={`mt-1 font-mono ${highlight ? "font-bold text-navy text-base" : ""}`}>{value}</div>
     </div>
-  );
-}
-
-function Watermark({ text, color = "emerald" }: { text: string; color?: "emerald" | "blue" }) {
-  const c = color === "blue" ? "text-blue-600/15 border-blue-600/20" : "text-emerald-600/15 border-emerald-600/20";
-  return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden">
-      <div className={`select-none -rotate-12 text-[4rem] md:text-[7rem] font-black tracking-widest ${c} border-8 rounded-2xl px-10 py-3`}>
-        {text}
-      </div>
-    </div>
-  );
-}
-
-function InsurancePaymentDialog({ loanId, insBalance, onClose, onSaved }: { loanId: string; insBalance: number; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), notes: "" });
-  const submit = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await (supabase as any).rpc("record_insurance_payment", {
-        _loan_id: loanId,
-        _amount: Number(form.amount),
-        _payment_date: form.payment_date,
-        _notes: form.notes || null,
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => { toast.success("Insurance payment recorded"); onSaved(); onClose(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader><DialogTitle className="font-serif">Insurance Payment</DialogTitle></DialogHeader>
-        <div className="text-xs text-muted-foreground mb-2">Current insurance balance: <span className="font-mono">{fmtKES(insBalance)}</span></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
-          <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => submit.mutate()} disabled={submit.isPending || !form.amount} className="bg-navy text-white hover:bg-navy-2">{submit.isPending ? "Saving…" : "Record"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

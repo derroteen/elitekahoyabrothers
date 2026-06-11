@@ -16,7 +16,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/members", label: "Members", icon: Users },
     { to: "/opening-balances", label: "Opening Balances", icon: Wallet },
-    { to: "/passbook", label: "Passbook", icon: BookOpen },
+    { to: "/passbooks", label: "Passbooks", icon: BookOpen },
     { to: "/collections", label: "Weekly Collections", icon: ClipboardList },
     { to: "/loans", label: "Loans", icon: Banknote },
     { to: "/savings", label: "Savings", icon: PiggyBank },
@@ -32,7 +32,7 @@ const NAV: Record<AppRole, NavItem[]> = {
     { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/members", label: "Members", icon: Users },
     { to: "/opening-balances", label: "Opening Balances", icon: Wallet },
-    { to: "/passbook", label: "Passbook", icon: BookOpen },
+    { to: "/passbooks", label: "Passbooks", icon: BookOpen },
     { to: "/collections", label: "Weekly Collections", icon: ClipboardList },
     { to: "/loans", label: "Loans", icon: Banknote },
     { to: "/savings", label: "Savings", icon: PiggyBank },
@@ -45,7 +45,7 @@ const NAV: Record<AppRole, NavItem[]> = {
   ],
   auditor: [
     { to: "/dashboard", label: "Dashboard", icon: Home },
-    { to: "/passbook", label: "Passbooks", icon: BookOpen },
+    { to: "/passbooks", label: "Passbooks", icon: BookOpen },
     { to: "/reports", label: "Reports", icon: FileBarChart },
     { to: "/audit", label: "Audit Log", icon: ShieldCheck },
     { to: "/settings", label: "Settings", icon: Settings },
@@ -166,50 +166,9 @@ function AuthLayout() {
         </div>
       )}
 
-      {/* Mobile bottom navigation */}
-      <BottomNav role={role} pathname={pathname} />
-
-      <main className="flex-1 min-w-0 min-h-screen w-full md:ml-[240px] pt-14 md:pt-0 pb-16 md:pb-0 p-4 sm:p-6 md:p-7">
+      <main className="flex-1 min-w-0 min-h-screen w-full md:ml-[240px] pt-14 md:pt-0 p-4 sm:p-6 md:p-7">
         <Outlet />
       </main>
     </div>
-  );
-}
-
-function BottomNav({ role, pathname }: { role: AppRole; pathname: string }) {
-  const isStaff = role === "super_admin" || role === "admin";
-  const links: { to: string; label: string; icon: any }[] = isStaff
-    ? [
-        { to: "/dashboard", label: "Home", icon: Home },
-        { to: "/loans", label: "Loans", icon: Banknote },
-        { to: "/collections", label: "Weekly", icon: ClipboardList },
-        { to: "/members", label: "Members", icon: Users },
-        { to: "/settings", label: "Settings", icon: Settings },
-      ]
-    : [
-        { to: "/dashboard", label: "Home", icon: Home },
-        { to: "/my-passbook", label: "Passbook", icon: BookOpen },
-        { to: "/my-loans", label: "Loans", icon: Banknote },
-        { to: "/my-weekly", label: "Weekly", icon: ClipboardList },
-        { to: "/settings", label: "Settings", icon: Settings },
-      ];
-  return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy border-t border-gold/20 flex items-center justify-around safe-area-bottom">
-      {links.map(({ to, label, icon: Icon }) => {
-        const active = pathname.startsWith(to);
-        return (
-          <Link
-            key={to}
-            to={to}
-            className={`flex flex-col items-center gap-0.5 py-2 px-2 min-w-0 flex-1 transition ${
-              active ? "text-gold" : "text-white/50 hover:text-white/80"
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-[10px] font-medium truncate w-full text-center">{label}</span>
-          </Link>
-        );
-      })}
-    </nav>
   );
 }

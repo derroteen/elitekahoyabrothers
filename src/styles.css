@@ -112,25 +112,6 @@
   .font-mono { font-family: var(--font-mono); }
 }
 
-/* ============ MOBILE SAFE AREA & RESPONSIVE UTILITIES ============ */
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Mobile-friendly touch targets */
-@media (max-width: 767px) {
-  button, a, select, input[type="checkbox"], input[type="radio"] {
-    min-height: 44px;
-  }
-  button.text-xs, a.text-xs {
-    min-height: auto;
-  }
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
 /* ============ PASSBOOK STYLES (port of prototype) ============ */
 .pb-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 900px; font-family: var(--font-mono); }
 .pb-section-header th { background: var(--navy-2); color: var(--gold); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; text-align: center; padding: 8px 10px; font-weight: 600; font-family: var(--font-sans); }

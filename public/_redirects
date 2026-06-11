@@ -1,5 +1,1 @@
-# SPA fallback — all routes handled by TanStack Router (SSR)
 /*    /index.html   200
-
-# PWA service worker must not be cached
-/sw.js    /sw.js   200
