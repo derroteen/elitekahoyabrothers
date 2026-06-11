@@ -296,9 +296,88 @@ function LoanLedger() {
           }}
         />
       )}
+
+      {editPay && (
+        <EditPaymentDialog
+          loanId={loanId}
+          payment={editPay}
+          onClose={() => setEditPay(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
+          }}
+          actorId={user?.id ?? null}
+        />
+      )}
+
+      {delPay && (
+        <ConfirmDeleteDialog
+          title="Delete Payment"
+          message="Are you sure you want to delete this payment record?"
+          onClose={() => setDelPay(null)}
+          onConfirm={async () => {
+            const oldVal = { amount: delPay.amount, date: delPay.date };
+            const { error } = await supabase.from("loan_repayments").delete().eq("id", delPay.id);
+            if (error) { toast.error(error.message); return; }
+            await (supabase as any).rpc("recalc_loan_from_payments", { _loan_id: loanId });
+            await supabase.from("audit_logs").insert({
+              actor_id: user?.id ?? null, action: "delete_loan_payment",
+              table_name: "loan_repayments", record_id: delPay.id,
+              old_value: oldVal as any, new_value: null,
+              reason: "Payment deleted from ledger",
+            } as any);
+            toast.success("Payment deleted, balances recalculated");
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
+            setDelPay(null);
+          }}
+        />
+      )}
+
+      {editIns && (
+        <EditInsuranceDialog
+          loanId={loanId}
+          payment={editIns}
+          onClose={() => setEditIns(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
+          }}
+          actorId={user?.id ?? null}
+        />
+      )}
+
+      {delIns && (
+        <ConfirmDeleteDialog
+          title="Delete Insurance Payment"
+          message="Are you sure you want to delete this insurance payment record?"
+          onClose={() => setDelIns(null)}
+          onConfirm={async () => {
+            const oldVal = { amount: delIns.amount, date: delIns.date };
+            const { error } = await (supabase.from("loan_insurance_payments" as any) as any).delete().eq("id", delIns.id);
+            if (error) { toast.error(error.message); return; }
+            await (supabase as any).rpc("recalc_insurance_from_payments", { _loan_id: loanId });
+            await supabase.from("audit_logs").insert({
+              actor_id: user?.id ?? null, action: "delete_insurance_payment",
+              table_name: "loan_insurance_payments", record_id: delIns.id,
+              old_value: oldVal as any, new_value: null,
+              reason: "Insurance payment deleted from ledger",
+            } as any);
+            toast.success("Insurance payment deleted");
+            qc.invalidateQueries({ queryKey: ["loan", loanId] });
+            qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
+            setDelIns(null);
+          }}
+        />
+      )}
     </div>
   );
 }
+
 
 function Stat({ label, value, highlight }: { label: string; value: any; highlight?: boolean }) {
   return (
