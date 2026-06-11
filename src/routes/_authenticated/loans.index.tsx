@@ -235,9 +235,31 @@ function LoansAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!rejectFor} onOpenChange={(o) => !o && setRejectFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-serif">Reject Loan</DialogTitle></DialogHeader>
+          <p className="text-sm">
+            Reject loan application from <span className="font-medium">{rejectFor?.profile?.full_name}</span> for{" "}
+            <span className="font-mono font-bold">{fmtKES(rejectFor?.amount_borrowed ?? 0)}</span>?
+          </p>
+          <div>
+            <Label>Rejection reason (optional)</Label>
+            <Input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. Insufficient savings" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectFor(null)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => rejectLoan.mutate({ loan: rejectFor, reason: rejectReason })} disabled={rejectLoan.isPending}>
+              {rejectLoan.isPending ? "Rejecting…" : "Reject Loan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   const { data: members = [] } = useQuery({
