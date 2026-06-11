@@ -30,13 +30,13 @@ import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
-import { Route as AuthenticatedLoansRouteImport } from './routes/_authenticated/loans'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
+import { Route as AuthenticatedLoansIndexRouteImport } from './routes/_authenticated/loans.index'
 import { Route as AuthenticatedLoansLoanIdRouteImport } from './routes/_authenticated/loans.$loanId'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -148,11 +148,6 @@ const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedLoansRoute = AuthenticatedLoansRouteImport.update({
-  id: '/loans',
-  path: '/loans',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -185,11 +180,16 @@ const AuthenticatedAnnouncementsRoute =
     path: '/announcements',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedLoansIndexRoute = AuthenticatedLoansIndexRouteImport.update({
+  id: '/loans/',
+  path: '/loans/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedLoansLoanIdRoute =
   AuthenticatedLoansLoanIdRouteImport.update({
-    id: '/$loanId',
-    path: '/$loanId',
-    getParentRoute: () => AuthenticatedLoansRoute,
+    id: '/loans/$loanId',
+    path: '/loans/$loanId',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -205,7 +205,6 @@ export interface FileRoutesByFullPath {
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -221,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/system-reset': typeof AuthenticatedSystemResetRoute
   '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
+  '/loans/': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -235,7 +235,6 @@ export interface FileRoutesByTo {
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/loans': typeof AuthenticatedLoansRouteWithChildren
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -251,6 +250,7 @@ export interface FileRoutesByTo {
   '/system-reset': typeof AuthenticatedSystemResetRoute
   '/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
+  '/loans': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -267,7 +267,6 @@ export interface FileRoutesById {
   '/_authenticated/benevolent': typeof AuthenticatedBenevolentRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/loans': typeof AuthenticatedLoansRouteWithChildren
   '/_authenticated/members': typeof AuthenticatedMembersRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
   '/_authenticated/my-benevolent': typeof AuthenticatedMyBenevolentRoute
@@ -283,6 +282,7 @@ export interface FileRoutesById {
   '/_authenticated/system-reset': typeof AuthenticatedSystemResetRoute
   '/_authenticated/weekly-expenditures': typeof AuthenticatedWeeklyExpendituresRoute
   '/_authenticated/loans/$loanId': typeof AuthenticatedLoansLoanIdRoute
+  '/_authenticated/loans/': typeof AuthenticatedLoansIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -299,7 +299,6 @@ export interface FileRouteTypes {
     | '/benevolent'
     | '/collections'
     | '/dashboard'
-    | '/loans'
     | '/members'
     | '/my-attendance'
     | '/my-benevolent'
@@ -315,6 +314,7 @@ export interface FileRouteTypes {
     | '/system-reset'
     | '/weekly-expenditures'
     | '/loans/$loanId'
+    | '/loans/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -329,7 +329,6 @@ export interface FileRouteTypes {
     | '/benevolent'
     | '/collections'
     | '/dashboard'
-    | '/loans'
     | '/members'
     | '/my-attendance'
     | '/my-benevolent'
@@ -345,6 +344,7 @@ export interface FileRouteTypes {
     | '/system-reset'
     | '/weekly-expenditures'
     | '/loans/$loanId'
+    | '/loans'
   id:
     | '__root__'
     | '/'
@@ -360,7 +360,6 @@ export interface FileRouteTypes {
     | '/_authenticated/benevolent'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
-    | '/_authenticated/loans'
     | '/_authenticated/members'
     | '/_authenticated/my-attendance'
     | '/_authenticated/my-benevolent'
@@ -376,6 +375,7 @@ export interface FileRouteTypes {
     | '/_authenticated/system-reset'
     | '/_authenticated/weekly-expenditures'
     | '/_authenticated/loans/$loanId'
+    | '/_authenticated/loans/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -537,13 +537,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMembersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/loans': {
-      id: '/_authenticated/loans'
-      path: '/loans'
-      fullPath: '/loans'
-      preLoaderRoute: typeof AuthenticatedLoansRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -586,26 +579,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/loans/': {
+      id: '/_authenticated/loans/'
+      path: '/loans'
+      fullPath: '/loans/'
+      preLoaderRoute: typeof AuthenticatedLoansIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/loans/$loanId': {
       id: '/_authenticated/loans/$loanId'
-      path: '/$loanId'
+      path: '/loans/$loanId'
       fullPath: '/loans/$loanId'
       preLoaderRoute: typeof AuthenticatedLoansLoanIdRouteImport
-      parentRoute: typeof AuthenticatedLoansRoute
+      parentRoute: typeof AuthenticatedRoute
     }
   }
 }
-
-interface AuthenticatedLoansRouteChildren {
-  AuthenticatedLoansLoanIdRoute: typeof AuthenticatedLoansLoanIdRoute
-}
-
-const AuthenticatedLoansRouteChildren: AuthenticatedLoansRouteChildren = {
-  AuthenticatedLoansLoanIdRoute: AuthenticatedLoansLoanIdRoute,
-}
-
-const AuthenticatedLoansRouteWithChildren =
-  AuthenticatedLoansRoute._addFileChildren(AuthenticatedLoansRouteChildren)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAnnouncementsRoute: typeof AuthenticatedAnnouncementsRoute
@@ -614,7 +603,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBenevolentRoute: typeof AuthenticatedBenevolentRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedLoansRoute: typeof AuthenticatedLoansRouteWithChildren
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
   AuthenticatedMyBenevolentRoute: typeof AuthenticatedMyBenevolentRoute
@@ -629,6 +617,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSystemResetRoute: typeof AuthenticatedSystemResetRoute
   AuthenticatedWeeklyExpendituresRoute: typeof AuthenticatedWeeklyExpendituresRoute
+  AuthenticatedLoansLoanIdRoute: typeof AuthenticatedLoansLoanIdRoute
+  AuthenticatedLoansIndexRoute: typeof AuthenticatedLoansIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -638,7 +628,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenevolentRoute: AuthenticatedBenevolentRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedLoansRoute: AuthenticatedLoansRouteWithChildren,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
   AuthenticatedMyBenevolentRoute: AuthenticatedMyBenevolentRoute,
@@ -653,6 +642,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSystemResetRoute: AuthenticatedSystemResetRoute,
   AuthenticatedWeeklyExpendituresRoute: AuthenticatedWeeklyExpendituresRoute,
+  AuthenticatedLoansLoanIdRoute: AuthenticatedLoansLoanIdRoute,
+  AuthenticatedLoansIndexRoute: AuthenticatedLoansIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

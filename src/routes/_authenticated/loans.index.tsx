@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 
-export const Route = createFileRoute("/_authenticated/loans")({
+export const Route = createFileRoute("/_authenticated/loans/")({
   component: LoansAdmin,
   head: () => ({ meta: [{ title: "Loans — EKB" }] }),
 });
@@ -29,12 +29,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function LoansAdmin() {
-  const { role, loading } = useAuth();
+  const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [repayFor, setRepayFor] = useState<any>(null);
-  const [scheduleFor, setScheduleFor] = useState<any>(null);
+  const [removeFinesFor, setRemoveFinesFor] = useState<any>(null);
 
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ["loans-all"],
@@ -49,27 +48,6 @@ function LoansAdmin() {
     },
   });
 
-  const deleteLoan = useMutation({
-    mutationFn: async (id: string) => {
-      await (supabase.from("loan_fines" as any) as any).delete().eq("loan_id", id);
-      await (supabase.from("loan_schedule" as any) as any).delete().eq("loan_id", id);
-      await supabase.from("loan_repayments").delete().eq("loan_id", id);
-      const { error } = await supabase.from("loans").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Loan deleted"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: any }) => {
-      const { error } = await supabase.from("loans").update({ status }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Loan updated"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const applyFines = useMutation({
     mutationFn: async () => {
       const { data, error } = await (supabase as any).rpc("apply_loan_fines", { _loan_id: null });
@@ -80,14 +58,38 @@ function LoansAdmin() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const applyInterest = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await (supabase as any).rpc("apply_annual_interest", { _loan_id: null });
-      if (error) throw error;
-      return data as number;
+  const removeFines = useMutation({
+    mutationFn: async (loan: any) => {
+      // Mark all unpaid/partial fines as waived
+      const { data: fines } = await (supabase.from("loan_fines" as any) as any)
+        .select("id, amount, amount_paid").eq("loan_id", loan.id).in("status", ["unpaid", "partial"]);
+      const totalWaived = (fines ?? []).reduce((s: number, f: any) => s + (Number(f.amount) - Number(f.amount_paid || 0)), 0);
+      if ((fines ?? []).length) {
+        await (supabase.from("loan_fines" as any) as any)
+          .update({ status: "waived" }).in("id", (fines as any[]).map((f) => f.id));
+      }
+      // Clear outstanding fines + waived from schedule
+      await supabase.from("loans").update({ outstanding_fines: 0 } as any).eq("id", loan.id);
+      await (supabase.from("loan_schedule" as any) as any)
+        .update({ fine_amount: 0 }).eq("loan_id", loan.id);
+      // Audit log
+      await supabase.from("audit_logs").insert({
+        actor_id: user?.id ?? null,
+        action: "remove_fines",
+        table_name: "loans",
+        record_id: loan.id,
+        old_value: { outstanding_fines: Number(loan.outstanding_fines || 0) } as any,
+        new_value: { outstanding_fines: 0, waived: totalWaived } as any,
+        reason: `Removed fines for ${loan.profile?.full_name ?? loan.member_id}`,
+      } as any);
+      return totalWaived;
     },
-    onSuccess: (n) => { toast.success(`Annual interest applied to ${n} loan(s)`); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: (waived) => {
+      toast.success(`Fines removed (${fmtKES(waived)} waived)`);
+      qc.invalidateQueries({ queryKey: ["loans-all"] });
+      setRemoveFinesFor(null);
+    },
+    onError: (e: any) => { toast.error(e.message); setRemoveFinesFor(null); },
   });
 
   useEffect(() => { if (!loading && role === "member") navigate({ to: "/dashboard" }); }, [loading, role, navigate]);
@@ -98,90 +100,82 @@ function LoansAdmin() {
 
   return (
     <div>
-      <PageHeader title="Loan Register" subtitle={`${loans.length} loans on file`}
+      <PageHeader title="Member Loans" subtitle={`${loans.length} loans on file`}
         actions={canEdit ? (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => applyFines.mutate()} disabled={applyFines.isPending}>Apply Fines</Button>
-            <Button variant="outline" size="sm" onClick={() => applyInterest.mutate()} disabled={applyInterest.isPending}>Annual Interest</Button>
             <Button onClick={() => setOpen(true)} size="lg" className="bg-navy text-white hover:bg-navy-2 shadow-md">+ New Loan</Button>
           </div>
         ) : undefined} />
 
-      {canEdit && (
-        <div className="mb-4 flex gap-2 sm:hidden">
-          <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2 flex-1">+ New Loan</Button>
-        </div>
-      )}
       <Card>
-
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-3 py-3">Date</th>
                 <th className="px-3 py-3">Member</th>
-                <th className="px-3 py-3 text-right">Borrowed</th>
-                <th className="px-3 py-3 text-right">Rate</th>
-                <th className="px-3 py-3">Freq</th>
-                <th className="px-3 py-3 text-right">Per Period</th>
-                <th className="px-3 py-3 text-right">Paid</th>
-                <th className="px-3 py-3 text-right">Balance</th>
-                <th className="px-3 py-3 text-right">Outstanding Fines</th>
+                <th className="px-3 py-3">Loan Date</th>
                 <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3"></th>
+                <th className="px-3 py-3 text-right">Outstanding Balance</th>
+                <th className="px-3 py-3 text-right">Outstanding Fines</th>
+                <th className="px-3 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-              {!isLoading && loans.length === 0 && <tr><td colSpan={11} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
-              {loans.map((l: any) => (
-                <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(l.loan_date)}</td>
-                  <td className="px-3 py-3">
-                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="font-medium text-navy hover:underline">
-                      {l.profile?.full_name ?? l.member_id.slice(0, 8)}
-                    </Link>
-                    <div className="text-xs text-muted-foreground font-mono">{l.profile?.membership_no}</div>
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
-                  <td className="px-3 py-3 text-right">{Number(l.interest_rate).toFixed(1)}%</td>
-                  <td className="px-3 py-3 text-xs capitalize">{l.payment_frequency}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.period_payment)}</td>
-                  <td className="px-3 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
-                  <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
-                  <td className={`px-3 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
-                  <td className="px-3 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700"}`}>{l.status.replace(/_/g, " ")}</span>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <Link to="/loans/$loanId" params={{ loanId: l.id }}>
-                      <Button size="sm" variant="ghost">Ledger</Button>
-                    </Link>
-                    {canEdit && l.status === "pending" && (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "approved" })}>Approve</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: l.id, status: "rejected" })}>Reject</Button>
-                      </>
-                    )}
-                    {canEdit && (l.status === "approved" || l.status === "active" || l.status === "overdue" || l.status === "completed_with_fine") && (
-                      <Button size="sm" variant="ghost" onClick={() => setRepayFor(l)}>Repayment</Button>
-                    )}
-                    {role === "super_admin" && (
-                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => {
-                        if (confirm(`Delete this loan for ${l.profile?.full_name ?? "member"}? This removes the loan, its schedule, fines, and repayments. This cannot be undone.`)) deleteLoan.mutate(l.id);
-                      }}>Delete</Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {!isLoading && loans.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
+              {loans.map((l: any) => {
+                const cleared = Number(l.balance || 0) < 5;
+                const hasFines = Number(l.outstanding_fines || 0) > 0;
+                return (
+                  <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-navy">{l.profile?.full_name ?? l.member_id.slice(0, 8)}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{l.profile?.membership_no}</div>
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(l.loan_date)}</td>
+                    <td className="px-3 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${cleared ? "bg-emerald-100 text-emerald-700 font-bold" : (STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700")}`}>
+                        {cleared ? "CLEARED" : l.status.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
+                    <td className={`px-3 py-3 text-right font-mono ${hasFines ? "text-red-600 font-bold" : "text-muted-foreground"}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <Link to="/loans/$loanId" params={{ loanId: l.id }}>
+                        <Button size="sm" className="bg-navy text-white hover:bg-navy-2">View Ledger</Button>
+                      </Link>
+                      {canEdit && hasFines && (
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-1" onClick={() => setRemoveFinesFor(l)}>
+                          Remove Fines
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </Card>
 
       <NewLoanDialog open={open} onOpenChange={setOpen} onCreated={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />
-      {repayFor && <RepaymentDialog loan={repayFor} onClose={() => setRepayFor(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />}
-      {scheduleFor && <ScheduleDialog loan={scheduleFor} onClose={() => setScheduleFor(null)} />}
+
+      <Dialog open={!!removeFinesFor} onOpenChange={(o) => !o && setRemoveFinesFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-serif">Remove Fines</DialogTitle></DialogHeader>
+          <p className="text-sm">
+            Are you sure you want to remove fines for <span className="font-medium">{removeFinesFor?.profile?.full_name}</span>?
+            This will waive <span className="font-mono font-bold">{fmtKES(removeFinesFor?.outstanding_fines ?? 0)}</span> of outstanding penalties.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRemoveFinesFor(null)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => removeFines.mutate(removeFinesFor)} disabled={removeFines.isPending}>
+              {removeFines.isPending ? "Removing…" : "Remove Fines"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
