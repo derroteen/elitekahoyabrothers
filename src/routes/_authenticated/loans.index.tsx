@@ -34,6 +34,8 @@ function LoansAdmin() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [removeFinesFor, setRemoveFinesFor] = useState<any>(null);
+  const [rejectFor, setRejectFor] = useState<any>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ["loans-all"],
@@ -58,9 +60,57 @@ function LoansAdmin() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const approveLoan = useMutation({
+    mutationFn: async (loan: any) => {
+      const { error } = await supabase.from("loans")
+        .update({ status: "approved" } as any).eq("id", loan.id);
+      if (error) throw error;
+      await supabase.from("audit_logs").insert({
+        actor_id: user?.id ?? null, action: "approve_loan", table_name: "loans",
+        record_id: loan.id, old_value: { status: loan.status } as any,
+        new_value: { status: "approved" } as any,
+        reason: `Approved loan for ${loan.profile?.full_name ?? loan.member_id}`,
+      } as any);
+      await supabase.from("notifications").insert({
+        user_id: loan.member_id, title: "Loan Approved",
+        message: `Your loan of ${fmtKES(loan.amount_borrowed)} has been approved.`,
+        type: "loan",
+      } as any);
+    },
+    onSuccess: () => { toast.success("Loan approved"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const rejectLoan = useMutation({
+    mutationFn: async ({ loan, reason }: { loan: any; reason: string }) => {
+      const stamp = new Date().toISOString();
+      const note = `[REJECTED ${stamp}]${reason ? ` ${reason}` : ""}${loan.notes ? `\n---\n${loan.notes}` : ""}`;
+      const { error } = await supabase.from("loans")
+        .update({ status: "rejected", notes: note } as any).eq("id", loan.id);
+      if (error) throw error;
+      await (supabase.from("loan_schedule" as any) as any).delete().eq("loan_id", loan.id);
+      await supabase.from("audit_logs").insert({
+        actor_id: user?.id ?? null, action: "reject_loan", table_name: "loans",
+        record_id: loan.id, old_value: { status: loan.status } as any,
+        new_value: { status: "rejected", reason } as any,
+        reason: `Rejected loan for ${loan.profile?.full_name ?? loan.member_id}`,
+      } as any);
+      await supabase.from("notifications").insert({
+        user_id: loan.member_id, title: "Loan Rejected",
+        message: `Your loan application of ${fmtKES(loan.amount_borrowed)} was rejected.${reason ? ` Reason: ${reason}` : ""}`,
+        type: "loan",
+      } as any);
+    },
+    onSuccess: () => {
+      toast.success("Loan rejected");
+      qc.invalidateQueries({ queryKey: ["loans-all"] });
+      setRejectFor(null); setRejectReason("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const removeFines = useMutation({
     mutationFn: async (loan: any) => {
-      // Mark all unpaid/partial fines as waived
       const { data: fines } = await (supabase.from("loan_fines" as any) as any)
         .select("id, amount, amount_paid").eq("loan_id", loan.id).in("status", ["unpaid", "partial"]);
       const totalWaived = (fines ?? []).reduce((s: number, f: any) => s + (Number(f.amount) - Number(f.amount_paid || 0)), 0);
@@ -68,15 +118,11 @@ function LoansAdmin() {
         await (supabase.from("loan_fines" as any) as any)
           .update({ status: "waived" }).in("id", (fines as any[]).map((f) => f.id));
       }
-      // Clear outstanding fines + waived from schedule
       await supabase.from("loans").update({ outstanding_fines: 0 } as any).eq("id", loan.id);
       await (supabase.from("loan_schedule" as any) as any)
         .update({ fine_amount: 0 }).eq("loan_id", loan.id);
-      // Audit log
       await supabase.from("audit_logs").insert({
-        actor_id: user?.id ?? null,
-        action: "remove_fines",
-        table_name: "loans",
+        actor_id: user?.id ?? null, action: "remove_fines", table_name: "loans",
         record_id: loan.id,
         old_value: { outstanding_fines: Number(loan.outstanding_fines || 0) } as any,
         new_value: { outstanding_fines: 0, waived: totalWaived } as any,
