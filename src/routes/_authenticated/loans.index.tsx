@@ -191,12 +191,25 @@ function LoansAdmin() {
                       <Link to="/loans/$loanId" params={{ loanId: l.id }}>
                         <Button size="sm" className="bg-navy text-white hover:bg-navy-2">View Ledger</Button>
                       </Link>
+                      {canEdit && l.status === "pending" && (
+                        <>
+                          <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700 ml-1"
+                            onClick={() => approveLoan.mutate(l)} disabled={approveLoan.isPending}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 ml-1"
+                            onClick={() => { setRejectFor(l); setRejectReason(""); }}>
+                            Reject
+                          </Button>
+                        </>
+                      )}
                       {canEdit && hasFines && (
                         <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-1" onClick={() => setRemoveFinesFor(l)}>
                           Remove Fines
                         </Button>
                       )}
                     </td>
+
                   </tr>
                 );
               })}
