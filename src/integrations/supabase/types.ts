@@ -1007,6 +1007,14 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
+      recalc_insurance_from_payments: {
+        Args: { _loan_id: string }
+        Returns: undefined
+      }
+      recalc_loan_from_payments: {
+        Args: { _loan_id: string }
+        Returns: undefined
+      }
       recompute_benevolent_balances: {
         Args: { _member: string }
         Returns: undefined
