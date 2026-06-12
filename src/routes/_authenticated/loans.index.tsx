@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
+import { LoanActions } from "@/components/LoanActions";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
   component: LoansAdmin,
@@ -188,37 +189,27 @@ function LoansAdmin() {
                     <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                     <td className={`px-3 py-3 text-right font-mono ${hasFines ? "text-red-600 font-bold" : "text-muted-foreground"}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <Button
-                        size="sm"
-                        type="button"
-                        className="bg-navy text-white hover:bg-navy-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!l?.id) { toast.error("Missing loan id"); return; }
-                          navigate({ to: "/loans/$loanId", params: { loanId: String(l.id) } });
-                        }}
-                      >
-                        View Ledger
-                      </Button>
-                      {canEdit && l.status === "pending" && (
-                        <>
-                          <Button size="sm" type="button" className="bg-emerald-600 text-white hover:bg-emerald-700 ml-1"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveLoan.mutate(l); }} disabled={approveLoan.isPending}>
-                            Approve
+                      <div className="flex flex-wrap justify-end items-center gap-1">
+                        <LoanActions loan={l} role={role} />
+                        {canEdit && l.status === "pending" && (
+                          <>
+                            <Button size="sm" type="button" className="bg-emerald-600 text-white hover:bg-emerald-700"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveLoan.mutate(l); }} disabled={approveLoan.isPending}>
+                              Approve
+                            </Button>
+                            <Button size="sm" type="button" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRejectFor(l); setRejectReason(""); }}>
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                        {canEdit && hasFines && (
+                          <Button size="sm" type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRemoveFinesFor(l); }}>
+                            Remove Fines
                           </Button>
-                          <Button size="sm" type="button" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 ml-1"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRejectFor(l); setRejectReason(""); }}>
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                      {canEdit && hasFines && (
-                        <Button size="sm" type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-1"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRemoveFinesFor(l); }}>
-                          Remove Fines
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </td>
 
                   </tr>

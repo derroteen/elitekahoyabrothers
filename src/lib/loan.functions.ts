@@ -208,7 +208,7 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
 
 export const deleteLoan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), reason: z.string().min(1).max(500) }).parse(i))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -222,6 +222,14 @@ export const deleteLoan = createServerFn({ method: "POST" })
     await (supabaseAdmin.from("loan_insurance" as any) as any).delete().eq("loan_id", data.id);
     const { error } = await supabaseAdmin.from("loans").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
-    await writeLoanAudit(context.userId, "Loan Deleted", data.id, Number((before as any).amount_borrowed || 0), before, null);
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_id: context.userId,
+      action: "Loan Deleted",
+      table_name: "loans",
+      record_id: data.id,
+      old_value: before as any,
+      new_value: { reason: data.reason, member_id: (before as any).member_id, amount_borrowed: (before as any).amount_borrowed } as any,
+      reason: data.reason,
+    } as any);
     return { ok: true };
   });
