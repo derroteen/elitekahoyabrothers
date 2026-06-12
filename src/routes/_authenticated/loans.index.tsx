@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
+import { LoanActions } from "@/components/LoanActions";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
   component: LoansAdmin,
