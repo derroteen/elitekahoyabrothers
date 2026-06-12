@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -188,23 +188,34 @@ function LoansAdmin() {
                     <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                     <td className={`px-3 py-3 text-right font-mono ${hasFines ? "text-red-600 font-bold" : "text-muted-foreground"}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <Link to="/loans/$loanId" params={{ loanId: l.id }}>
-                        <Button size="sm" className="bg-navy text-white hover:bg-navy-2">View Ledger</Button>
-                      </Link>
+                      <Button
+                        size="sm"
+                        type="button"
+                        className="bg-navy text-white hover:bg-navy-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!l?.id) { toast.error("Missing loan id"); return; }
+                          navigate({ to: "/loans/$loanId", params: { loanId: String(l.id) } });
+                        }}
+                      >
+                        View Ledger
+                      </Button>
                       {canEdit && l.status === "pending" && (
                         <>
-                          <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700 ml-1"
-                            onClick={() => approveLoan.mutate(l)} disabled={approveLoan.isPending}>
+                          <Button size="sm" type="button" className="bg-emerald-600 text-white hover:bg-emerald-700 ml-1"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveLoan.mutate(l); }} disabled={approveLoan.isPending}>
                             Approve
                           </Button>
-                          <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 ml-1"
-                            onClick={() => { setRejectFor(l); setRejectReason(""); }}>
+                          <Button size="sm" type="button" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 ml-1"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRejectFor(l); setRejectReason(""); }}>
                             Reject
                           </Button>
                         </>
                       )}
                       {canEdit && hasFines && (
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-1" onClick={() => setRemoveFinesFor(l)}>
+                        <Button size="sm" type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-1"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRemoveFinesFor(l); }}>
                           Remove Fines
                         </Button>
                       )}
