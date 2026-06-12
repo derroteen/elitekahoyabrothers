@@ -277,6 +277,47 @@ export type Database = {
           },
         ]
       }
+      loan_insurance_payments: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          created_by: string | null
+          id: string
+          loan_id: string
+          notes: string | null
+          payment_date: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loan_id: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loan_id?: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_insurance_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_repayments: {
         Row: {
           amount: number
@@ -408,6 +449,8 @@ export type Database = {
           created_by: string | null
           id: string
           insurance: number
+          insurance_balance: number
+          insurance_paid: number
           interest_rate: number
           last_interest_year: number | null
           loan_date: string
@@ -416,6 +459,7 @@ export type Database = {
           notes: string | null
           outstanding_fines: number
           payment_frequency: Database["public"]["Enums"]["payment_frequency"]
+          payment_start_date: string | null
           period_payment: number
           status: Database["public"]["Enums"]["loan_status"]
           total_fines_charged: number
@@ -432,6 +476,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           insurance?: number
+          insurance_balance?: number
+          insurance_paid?: number
           interest_rate?: number
           last_interest_year?: number | null
           loan_date?: string
@@ -440,6 +486,7 @@ export type Database = {
           notes?: string | null
           outstanding_fines?: number
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          payment_start_date?: string | null
           period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
           total_fines_charged?: number
@@ -456,6 +503,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           insurance?: number
+          insurance_balance?: number
+          insurance_paid?: number
           interest_rate?: number
           last_interest_year?: number | null
           loan_date?: string
@@ -464,6 +513,7 @@ export type Database = {
           notes?: string | null
           outstanding_fines?: number
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
+          payment_start_date?: string | null
           period_payment?: number
           status?: Database["public"]["Enums"]["loan_status"]
           total_fines_charged?: number
@@ -957,6 +1007,14 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_membership_no: { Args: never; Returns: string }
+      recalc_insurance_from_payments: {
+        Args: { _loan_id: string }
+        Returns: undefined
+      }
+      recalc_loan_from_payments: {
+        Args: { _loan_id: string }
+        Returns: undefined
+      }
       recompute_benevolent_balances: {
         Args: { _member: string }
         Returns: undefined
@@ -968,6 +1026,15 @@ export type Database = {
       recompute_savings_balances: {
         Args: { _member: string }
         Returns: undefined
+      }
+      record_insurance_payment: {
+        Args: {
+          _amount: number
+          _loan_id: string
+          _notes?: string
+          _payment_date?: string
+        }
+        Returns: Json
       }
       record_loan_repayment:
         | {
