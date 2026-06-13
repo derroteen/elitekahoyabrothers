@@ -196,8 +196,8 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
 
   const saveAll = useMutation({
     mutationFn: async () => {
-      // Upsert all members with any non-zero values
-      const rows: any[] = [];
+      const inserts: any[] = [];
+      const updates: { id: string; payload: any }[] = [];
       for (const m of members as any[]) {
         const total = rowTotal(m.id);
         const existing = byMember.get(m.id);
@@ -213,14 +213,20 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
           remarks: getVal(m.id, "remarks") || null,
         };
         if (existing) {
-          rows.push({ ...payload, id: existing.id });
+          updates.push({ id: existing.id, payload });
         } else if (total > 0) {
-          rows.push(payload);
+          // Omit id so the DB default (gen_random_uuid()) fills it in
+          inserts.push(payload);
         }
       }
-      if (rows.length === 0) return;
-      const { error } = await (supabase.from("weekly_collection_entries" as any) as any).upsert(rows);
-      if (error) throw error;
+      if (inserts.length > 0) {
+        const { error } = await (supabase.from("weekly_collection_entries" as any) as any).insert(inserts);
+        if (error) throw error;
+      }
+      for (const u of updates) {
+        const { error } = await (supabase.from("weekly_collection_entries" as any) as any).update(u.payload).eq("id", u.id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => { toast.success("Saved"); setDraft({}); refetchEntries(); qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); },
     onError: (e: any) => toast.error(e.message),

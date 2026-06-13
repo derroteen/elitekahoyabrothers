@@ -2,10 +2,10 @@
 //
 // Financial logic (simple interest, NOT compounded):
 //   Interest         = principal × (annualRate%) × (months / 12)
-//   Subtotal         = principal + interest
-//   Insurance        = (5.03 × months + 3.03 × Subtotal) / 6000
-//   Total Repayable  = Subtotal + Insurance
-//                    = principal + interest + insurance
+//   Subtotal         = principal + interest         (= Total Repayable)
+//   Insurance        = ((5.03 × months + 3.03) × Subtotal) / 6000
+//                      Insurance is tracked separately and is NOT added
+//                      to the loan balance or repayment schedule.
 
 export type Frequency = "weekly" | "monthly";
 
@@ -16,8 +16,8 @@ export interface LoanCalc {
   frequency: Frequency;
   interest: number;         // simple interest amount
   withInterest: number;     // principal + interest (subtotal, base for insurance)
-  insurance: number;
-  totalRepayable: number;   // withInterest + insurance
+  insurance: number;        // separate from loan balance
+  totalRepayable: number;   // = withInterest (insurance is separate)
   periods: number;          // number of periods
   periodPayment: number;    // payment per period
 }
@@ -30,9 +30,10 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
   // Simple interest: I = P × r × (t / 12)
   const interest = p * r * (t / 12);
   const withInterest = p + interest;
-  // Insurance uses (loan + interest) as the base, plus the months term
-  const insurance = (5.03 * t + 3.03 * withInterest) / 6000;
-  const totalRepayable = withInterest + insurance;
+  // Insurance: ((5.03 × months + 3.03) × Subtotal) / 6000  — separate ledger
+  const insurance = ((5.03 * t + 3.03) * withInterest) / 6000;
+  // Loan balance / schedule excludes insurance
+  const totalRepayable = withInterest;
 
   const periods = frequency === "weekly" ? Math.max(1, Math.round((t / 12) * 52)) : t;
   const periodPayment = totalRepayable / periods;
