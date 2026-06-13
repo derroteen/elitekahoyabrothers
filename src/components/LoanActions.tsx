@@ -67,15 +67,17 @@ function RecordPaymentDialog({ loan, open, onClose, onSaved }: any) {
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!form.amount || Number(form.amount) <= 0) { toast.error("Enter a valid amount"); return; }
+    const amt = Number(form.amount);
+    if (form.amount === "" || Number.isNaN(amt) || amt < 0) { toast.error("Enter a valid amount (0 or more)"); return; }
+    const notes = form.notes?.trim() || (amt === 0 ? "No Payment Received" : "");
     setBusy(true);
     try {
       await doAdd({ data: {
         loan_id: loan.id,
-        amount: Number(form.amount),
+        amount: amt,
         payment_date: form.payment_date,
         payment_method: form.payment_method,
-        notes: form.notes || null,
+        notes: notes || null,
       }});
       toast.success("Payment recorded");
       onClose();

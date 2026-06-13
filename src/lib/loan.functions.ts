@@ -142,7 +142,7 @@ async function deletePassbookPayment(payment: any) {
 
 const PaymentInput = z.object({
   loan_id: z.string().uuid(),
-  amount: z.number().positive(),
+  amount: z.number().nonnegative(),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   payment_method: z.string().optional().nullable(),
   reference: z.string().max(200).optional().nullable(),
