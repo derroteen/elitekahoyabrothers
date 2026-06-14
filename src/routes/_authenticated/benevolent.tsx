@@ -214,14 +214,13 @@ function BenevolentLedger() {
                       <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
                       {canEdit && (
                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {e.source !== "weekly" ? (
-                            <>
-                              <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
-                              {canDelete && (
-                                <button onClick={() => onDelete(e.id)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
-                              )}
-                            </>
-                          ) : <span className="text-[9px] text-muted-foreground">Auto-posted</span>}
+                          {e.source !== "weekly" && (
+                            <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => onDelete(e)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
+                          )}
+                          {e.source === "weekly" && !canDelete && <span className="text-[9px] text-muted-foreground">Auto-posted</span>}
                         </td>
                       )}
                     </tr>
