@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fmtKES, fmtDate } from "@/lib/format";
-import { deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
+import { fmtKES } from "@/lib/format";
+import { addLoanPayment, deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment } from "@/lib/entries.functions";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/loans/$loanId")({
@@ -33,6 +33,43 @@ const STATUS_COLORS: Record<string, string> = {
   partial: "bg-amber-100 text-amber-700",
 };
 
+const FINE_PENALTY = 200;
+
+/** DD/MM/YYYY for ledger tables and forms */
+function fmtLedgerDate(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  const raw = typeof d === "string" ? d.split("T")[0] : d.toISOString().slice(0, 10);
+  const [y, m, day] = raw.split("-");
+  if (!y || !m || !day) return "—";
+  return `${day}/${m}/${y}`;
+}
+
+function repayDate(r: { repayment_date?: string; payment_date?: string } | null | undefined) {
+  return r?.repayment_date ?? r?.payment_date ?? "";
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function finePeriodLabel(fine: any, schedule: any[]) {
+  if (fine.schedule_id) {
+    const row = schedule.find((s: any) => s.id === fine.schedule_id);
+    if (row?.period_number) return `Week ${row.period_number}`;
+  }
+  const match = fine.reason?.match(/Week\s+(\d+)/i);
+  if (match) return `Week ${match[1]}`;
+  return fine.reason?.replace(/\s*\[Paid.*$/, "") ?? "—";
+}
+
+function fineRepaymentDate(f: any) {
+  const dmy = f.reason?.match(/\[Paid (\d{2}\/\d{2}\/\d{4})/);
+  if (dmy) return dmy[1];
+  const iso = f.reason?.match(/\[Paid (\d{4}-\d{2}-\d{2})/);
+  if (iso) return fmtLedgerDate(iso[1]);
+  return fmtLedgerDate(f.updated_at ?? f.fine_date);
+}
+
 function LoanLedger() {
   const { loanId } = Route.useParams();
   const { user, role } = useAuth();
@@ -43,6 +80,10 @@ function LoanLedger() {
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editFine, setEditFineState] = useState<any>(null);
   const [editIns, setEditInsState] = useState<any>(null);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [addInsOpen, setAddInsOpen] = useState(false);
+  const [recordFineOpen, setRecordFineOpen] = useState(false);
+  const finesGeneratedRef = useRef(false);
 
   const { data: loan } = useQuery({
     queryKey: ["loan", loanId],
@@ -70,22 +111,26 @@ function LoanLedger() {
   const { data: repayments = [] } = useQuery({
     queryKey: ["loan-repayments", loanId],
     enabled: !!user,
-    queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("repayment_date")).data ?? [],
+    queryFn: async () => {
+      let res = await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("repayment_date");
+      if (res.error) {
+        res = await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date");
+      }
+      return res.data ?? [];
+    },
   });
 
   const { data: insurancePayments = [] } = useQuery({
     queryKey: ["loan-insurance", loanId],
     enabled: !!user,
-    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("repayment_date")).data ?? [],
+    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
   });
 
-  if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
-
-  const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEditPayments = role === "super_admin" || role === "admin";
   const canDelete = role === "super_admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
+
   const refreshLoan = () => {
     qc.invalidateQueries({ queryKey: ["loan", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
@@ -93,6 +138,128 @@ function LoanLedger() {
     qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
   };
+
+  const ledgerRows = useMemo(() => {
+    if (schedule.length > 0) return schedule;
+    const sorted = [...repayments].sort((a, b) => repayDate(a).localeCompare(repayDate(b)));
+    let balance = Number(loan?.total_repayable ?? 0);
+    return sorted.map((r: any, i: number) => {
+      const paid = Number(r.amount ?? 0);
+      balance = Math.max(0, balance - paid);
+      return {
+        id: r.id,
+        period_number: i + 1,
+        due_date: repayDate(r),
+        expected_amount: paid,
+        amount_paid: paid,
+        fine_amount: 0,
+        fine_paid: 0,
+        balance_remaining: balance,
+        status: "paid",
+        prepaid: false,
+        remarks: r.notes ?? "",
+      };
+    });
+  }, [schedule, repayments, loan?.total_repayable]);
+
+  const ledgerTotals = useMemo(() => {
+    const expected = ledgerRows.reduce((s: number, r: any) => s + Number(r.expected_amount ?? 0), 0);
+    const paid = ledgerRows.reduce((s: number, r: any) => s + Number(r.amount_paid ?? 0), 0);
+    const fineCharged = ledgerRows.reduce((s: number, r: any) => s + Number(r.fine_amount ?? 0), 0);
+    const finePaid = ledgerRows.reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0);
+    return {
+      expected,
+      paid,
+      fineCharged,
+      finePaid,
+      outstandingFine: fineCharged - finePaid,
+      currentBalance: Number(loan?.balance ?? 0),
+    };
+  }, [ledgerRows, loan?.balance]);
+
+  const paymentTotals = useMemo(() => ({
+    amount: repayments.reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0),
+    finePaid: repayments.reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0),
+    principalPaid: repayments.reduce((s: number, r: any) => s + Number(r.principal_paid ?? 0), 0),
+  }), [repayments]);
+
+  const fineHistoryTotals = useMemo(() => ({
+    amount: fines.reduce((s: number, f: any) => s + Number(f.amount ?? 0), 0),
+    paid: fines.reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0),
+  }), [fines]);
+
+  const fineRepayments = useMemo(
+    () => fines.filter((f: any) => Number(f.amount_paid ?? 0) > 0),
+    [fines],
+  );
+
+  const fineRepaymentTotals = useMemo(() => ({
+    paid: fineRepayments.reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0),
+  }), [fineRepayments]);
+
+  const insuranceTotals = useMemo(() => ({
+    amount: insurancePayments.reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0),
+  }), [insurancePayments]);
+
+  const unpaidFines = useMemo(
+    () => fines.filter((f: any) => f.status !== "paid" && f.status !== "waived" && Number(f.amount_paid ?? 0) < Number(f.amount ?? 0)),
+    [fines],
+  );
+
+  useEffect(() => {
+    if (!canEditPayments || !loanId || schedule.length === 0 || finesGeneratedRef.current) return;
+    let cancelled = false;
+
+    (async () => {
+      const today = todayISO();
+      const existingScheduleIds = new Set(fines.filter((f: any) => f.schedule_id).map((f: any) => f.schedule_id));
+      let created = 0;
+
+      for (const s of schedule as any[]) {
+        if (cancelled) return;
+        if (s.due_date >= today) continue;
+        if (Number(s.amount_paid ?? 0) > 0) continue;
+        if (s.prepaid) continue;
+        if (s.status === "paid" || s.status === "prepaid") continue;
+        if (existingScheduleIds.has(s.id)) continue;
+
+        const { error: fineErr } = await (supabase.from("loan_fines" as any) as any).insert({
+          loan_id: loanId,
+          schedule_id: s.id,
+          fine_date: s.due_date,
+          amount: FINE_PENALTY,
+          reason: `Missed payment - Week ${s.period_number}`,
+          status: "unpaid",
+        });
+        if (fineErr) continue;
+
+        await (supabase.from("loan_schedule" as any) as any).update({
+          fine_amount: Number(s.fine_amount ?? 0) + FINE_PENALTY,
+          status: "overdue",
+        }).eq("id", s.id);
+
+        const { data: currentLoan } = await supabase.from("loans").select("total_fines_charged, outstanding_fines").eq("id", loanId).single();
+        if (currentLoan) {
+          await supabase.from("loans").update({
+            total_fines_charged: Number((currentLoan as any).total_fines_charged ?? 0) + FINE_PENALTY,
+            outstanding_fines: Number((currentLoan as any).outstanding_fines ?? 0) + FINE_PENALTY,
+          } as any).eq("id", loanId);
+        }
+        created += 1;
+        existingScheduleIds.add(s.id);
+      }
+
+      finesGeneratedRef.current = true;
+      if (created > 0 && !cancelled) refreshLoan();
+    })();
+
+    return () => { cancelled = true; };
+  }, [canEditPayments, loanId, schedule, fines]);
+
+  if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
+
+  const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
+
   const onDeletePayment = async (payment: any) => {
     if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) return;
     try {
@@ -127,7 +294,7 @@ function LoanLedger() {
           <Stat label="Interest Rate" value={`${Number(loan.interest_rate).toFixed(1)}%`} />
           <Stat label="Payment Frequency" value={loan.payment_frequency} />
           <Stat label="Term" value={`${loan.loan_term_months} months`} />
-          <Stat label="Loan Date" value={fmtDate(loan.loan_date)} />
+          <Stat label="Loan Date" value={fmtLedgerDate(loan.loan_date)} />
           <Stat label="Total Repayable" value={fmtKES(loan.total_repayable)} />
           <Stat label="Total Paid" value={fmtKES(loan.amount_paid)} />
           <Stat label="Outstanding Balance" value={fmtKES(loan.balance)} highlight />
@@ -135,7 +302,7 @@ function LoanLedger() {
           <Stat label="Total Fines Charged" value={fmtKES(loan.total_fines_charged ?? 0)} />
           <Stat label="Total Fines Paid" value={fmtKES(loan.total_fines_paid ?? 0)} />
           <Stat label="Outstanding Fines" value={fmtKES(loan.outstanding_fines ?? 0)} highlight={Number(loan.outstanding_fines) > 0} />
-          <Stat label="Next Payment Due" value={nextDue ? fmtDate(nextDue.due_date) : "—"} />
+          <Stat label="Next Payment Due" value={nextDue ? fmtLedgerDate(nextDue.due_date) : "—"} />
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Status</div>
             <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[loan.status] ?? "bg-gray-100 text-gray-700"}`}>{loan.status.replace(/_/g, " ")}</span>
@@ -162,11 +329,11 @@ function LoanLedger() {
               </tr>
             </thead>
             <tbody>
-              {schedule.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
-              {schedule.map((s: any) => (
+              {ledgerRows.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
+              {ledgerRows.map((s: any) => (
                 <tr key={s.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-mono">{s.period_number}</td>
-                  <td className="px-3 py-2">{fmtDate(s.due_date)}</td>
+                  <td className="px-3 py-2">{fmtLedgerDate(s.due_date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.expected_amount)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.amount_paid)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_amount ?? 0)}</td>
@@ -177,6 +344,18 @@ function LoanLedger() {
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
                 </tr>
               ))}
+              {ledgerRows.length > 0 && (
+                <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                  <td className="px-3 py-2" colSpan={2}>TOTALS</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.expected)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.paid)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.fineCharged)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.finePaid)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.outstandingFine)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.currentBalance)}</td>
+                  <td className="px-3 py-2" colSpan={2} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -196,7 +375,7 @@ function LoanLedger() {
             {fines.length === 0 && <tr><td colSpan={canEditPayments ? 6 : 5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
             {fines.map((f: any) => (
               <tr key={f.id} className="border-b last:border-0">
-                <td className="px-3 py-2">{fmtDate(f.fine_date)}</td>
+                <td className="px-3 py-2">{fmtLedgerDate(f.fine_date)}</td>
                 <td className="px-3 py-2">{f.reason}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
@@ -209,30 +388,89 @@ function LoanLedger() {
                 )}
               </tr>
             ))}
+            {fines.length > 0 && (
+              <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                <td className="px-3 py-2" colSpan={2}>TOTALS</td>
+                <td className="px-3 py-2 text-right font-mono">{fmtKES(fineHistoryTotals.amount)}</td>
+                <td className="px-3 py-2 text-right font-mono">{fmtKES(fineHistoryTotals.paid)}</td>
+                <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
 
       <Card className="mb-4">
-        <div className="p-4 border-b border-border font-serif text-lg">Insurance Payments</div>
+        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+          <span className="font-serif text-lg">Fine Repayments</span>
+          {canEditPayments && (
+            <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setRecordFineOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Record Fine Payment
+            </Button>
+          )}
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Fine Period</th>
+              <th className="px-3 py-2 text-right">Amount Paid</th>
+              <th className="px-3 py-2">Notes</th>
+              {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {fineRepayments.length === 0 && <tr><td colSpan={canEditPayments ? 5 : 4} className="p-4 text-center text-muted-foreground">No fine repayments recorded</td></tr>}
+            {fineRepayments.map((f: any) => (
+              <tr key={f.id} className="border-b last:border-0">
+                <td className="px-3 py-2">{fineRepaymentDate(f)}</td>
+                <td className="px-3 py-2">{finePeriodLabel(f, schedule)}</td>
+                <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{f.reason?.replace(/\s*\[Paid.*$/, "") ?? ""}</td>
+                {canEditPayments && (
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => setEditFineState(f)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                    {canDelete && <button onClick={() => onDeleteFine(f)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
+                  </td>
+                )}
+              </tr>
+            ))}
+            {fineRepayments.length > 0 && (
+              <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                <td className="px-3 py-2" colSpan={2}>TOTALS</td>
+                <td className="px-3 py-2 text-right font-mono">{fmtKES(fineRepaymentTotals.paid)}</td>
+                <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+          <span className="font-serif text-lg">Insurance Payments</span>
+          {canEditPayments && (
+            <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setAddInsOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Add Insurance Payment
+            </Button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-                <th className="px-3 py-2 text-right">Balance After</th>
+                <th className="px-3 py-2 text-right">Amount Paid</th>
                 <th className="px-3 py-2">Notes</th>
                 {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {insurancePayments.length === 0 && <tr><td colSpan={canEditPayments ? 5 : 4} className="p-4 text-center text-muted-foreground">No insurance payments</td></tr>}
+              {insurancePayments.length === 0 && <tr><td colSpan={canEditPayments ? 4 : 3} className="p-4 text-center text-muted-foreground">No insurance payments</td></tr>}
               {insurancePayments.map((p: any) => (
                 <tr key={p.id} className="border-b last:border-0">
-                  <td className="px-3 py-2">{fmtDate(p.payment_date)}</td>
+                  <td className="px-3 py-2">{fmtLedgerDate(p.payment_date)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(p.amount)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(p.balance_after)}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{p.notes ?? ""}</td>
                   {canEditPayments && (
                     <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -242,13 +480,27 @@ function LoanLedger() {
                   )}
                 </tr>
               ))}
+              {insurancePayments.length > 0 && (
+                <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                  <td className="px-3 py-2">TOTALS</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(insuranceTotals.amount)}</td>
+                  <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </Card>
 
       <Card>
-        <div className="p-4 border-b border-border font-serif text-lg">Payment History</div>
+        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+          <span className="font-serif text-lg">Payment History</span>
+          {canEditPayments && (
+            <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setAddPaymentOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Add Payment
+            </Button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[860px]">
             <thead>
@@ -267,7 +519,7 @@ function LoanLedger() {
               {repayments.length === 0 && <tr><td colSpan={canEditPayments ? 8 : 7} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
               {repayments.map((r: any) => (
                 <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-3 py-2">{fmtDate(r.repayment_date)}</td>
+                  <td className="px-3 py-2">{fmtLedgerDate(repayDate(r))}</td>
                   <td className="px-3 py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${r.source === "weekly" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
                       {r.source === "weekly" ? "Weekly Sheet" : "Manual"}
@@ -286,14 +538,287 @@ function LoanLedger() {
                   )}
                 </tr>
               ))}
+              {repayments.length > 0 && (
+                <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                  <td className="px-3 py-2" colSpan={3}>TOTALS</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.finePaid)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.principalPaid)}</td>
+                  <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <AddPaymentDialog open={addPaymentOpen} loanId={loanId} loan={loan} onClose={() => setAddPaymentOpen(false)} onSaved={refreshLoan} />
+      <AddInsuranceDialog open={addInsOpen} loanId={loanId} onClose={() => setAddInsOpen(false)} onSaved={refreshLoan} />
+      <RecordFinePaymentDialog open={recordFineOpen} loanId={loanId} unpaidFines={unpaidFines} schedule={schedule} onClose={() => setRecordFineOpen(false)} onSaved={refreshLoan} />
       <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
       <EditFineDialog fine={editFine} onClose={() => setEditFineState(null)} onSaved={refreshLoan} />
       <EditInsuranceDialog payment={editIns} onClose={() => setEditInsState(null)} onSaved={refreshLoan} />
     </div>
+  );
+}
+
+function AddPaymentDialog({ open, loanId, loan, onClose, onSaved }: any) {
+  const doAdd = useServerFn(addLoanPayment);
+  const [form, setForm] = useState({
+    repayment_date: todayISO(),
+    amount: "",
+    payment_method: "cash",
+    notes: "",
+  });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm({ repayment_date: todayISO(), amount: "", payment_method: "cash", notes: "" });
+    }
+  }, [open]);
+
+  const submit = async () => {
+    const amt = Number(form.amount);
+    if (!form.repayment_date) { toast.error("Repayment date required"); return; }
+    if (form.amount === "" || Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    setBusy(true);
+    try {
+      await doAdd({
+        data: {
+          loan_id: loanId,
+          amount: amt,
+          payment_date: form.repayment_date,
+          payment_method: form.payment_method,
+          notes: form.notes || null,
+        },
+      });
+      toast.success("Payment recorded and balances updated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to record payment");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-serif">Add Payment</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          {loan?.profile?.full_name ?? ""} · Outstanding {fmtKES(loan?.balance ?? 0)}
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Repayment Date</Label>
+            <Input type="date" value={form.repayment_date} onChange={(e) => setForm({ ...form, repayment_date: e.target.value })} />
+            {form.repayment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.repayment_date)}</p>}
+          </div>
+          <div>
+            <Label>Amount (KES)</Label>
+            <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Payment Method</Label>
+            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
+              <option value="cash">Cash</option>
+              <option value="mpesa">M-Pesa</option>
+              <option value="bank_transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <Label>Notes (optional)</Label>
+            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save Payment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddInsuranceDialog({ open, loanId, onClose, onSaved }: any) {
+  const [form, setForm] = useState({ payment_date: todayISO(), amount: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setForm({ payment_date: todayISO(), amount: "", notes: "" });
+  }, [open]);
+
+  const submit = async () => {
+    const amt = Number(form.amount);
+    if (!form.payment_date) { toast.error("Payment date required"); return; }
+    if (form.amount === "" || Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    setBusy(true);
+    try {
+      const { error } = await (supabase as any).rpc("record_insurance_payment", {
+        _loan_id: loanId,
+        _amount: amt,
+        _payment_date: form.payment_date,
+        _notes: form.notes || null,
+      });
+      if (error) throw error;
+      toast.success("Insurance payment recorded");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to record insurance payment");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Add Insurance Payment</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Payment Date</Label>
+            <Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} />
+            {form.payment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.payment_date)}</p>}
+          </div>
+          <div>
+            <Label>Amount (KES)</Label>
+            <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes (optional)</Label>
+            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecordFinePaymentDialog({ open, loanId, unpaidFines, schedule, onClose, onSaved }: any) {
+  const [form, setForm] = useState({ payment_date: todayISO(), fine_id: "", amount: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const first = unpaidFines[0];
+      setForm({
+        payment_date: todayISO(),
+        fine_id: first?.id ?? "",
+        amount: first ? String(Number(first.amount) - Number(first.amount_paid ?? 0)) : "",
+        notes: "",
+      });
+    }
+  }, [open, unpaidFines]);
+
+  const selectedFine = unpaidFines.find((f: any) => f.id === form.fine_id);
+
+  const submit = async () => {
+    if (!form.payment_date || !form.fine_id) { toast.error("Date and fine are required"); return; }
+    const amt = Number(form.amount);
+    if (Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (!selectedFine) { toast.error("Select a fine"); return; }
+
+    setBusy(true);
+    try {
+      const newPaid = Number(selectedFine.amount_paid ?? 0) + amt;
+      const fineAmount = Number(selectedFine.amount ?? 0);
+      const status = newPaid >= fineAmount ? "paid" : "partial";
+      const noteSuffix = form.notes ? ` | ${form.notes}` : "";
+      const reason = `${selectedFine.reason ?? ""} [Paid ${fmtLedgerDate(form.payment_date)}${noteSuffix}]`.trim();
+
+      const { error: fineErr } = await (supabase.from("loan_fines" as any) as any).update({
+        amount_paid: newPaid,
+        status,
+        reason,
+      }).eq("id", form.fine_id);
+      if (fineErr) throw fineErr;
+
+      if (selectedFine.schedule_id) {
+        await (supabase.from("loan_schedule" as any) as any).update({
+          fine_paid: newPaid,
+        }).eq("id", selectedFine.schedule_id);
+      }
+
+      const { data: allFines } = await (supabase.from("loan_fines" as any) as any).select("amount, amount_paid").eq("loan_id", loanId);
+      const totalCharged = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount ?? 0), 0);
+      const totalPaid = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0);
+
+      await supabase.from("loans").update({
+        total_fines_paid: totalPaid,
+        outstanding_fines: Math.max(0, totalCharged - totalPaid),
+      } as any).eq("id", loanId);
+
+      toast.success("Fine payment recorded");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to record fine payment");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Record Fine Payment</DialogTitle></DialogHeader>
+        {unpaidFines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No unpaid fines to record payment against.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Payment Date</Label>
+              <Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} />
+              {form.payment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.payment_date)}</p>}
+            </div>
+            <div>
+              <Label>Amount Paid (KES)</Label>
+              <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <Label>Fine</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={form.fine_id}
+                onChange={(e) => {
+                  const f = unpaidFines.find((x: any) => x.id === e.target.value);
+                  setForm({
+                    ...form,
+                    fine_id: e.target.value,
+                    amount: f ? String(Number(f.amount) - Number(f.amount_paid ?? 0)) : "",
+                  });
+                }}
+              >
+                {unpaidFines.map((f: any) => (
+                  <option key={f.id} value={f.id}>
+                    {finePeriodLabel(f, schedule)} — {fmtKES(Number(f.amount) - Number(f.amount_paid ?? 0))} due
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <Label>Notes (optional)</Label>
+              <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || unpaidFines.length === 0} className="bg-navy text-white hover:bg-navy-2">
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -356,7 +881,11 @@ function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
       <DialogContent>
         <DialogHeader><DialogTitle className="font-serif">Edit Insurance Payment</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div>
+            <Label>Date</Label>
+            <Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} />
+            {form.payment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.payment_date)}</p>}
+          </div>
           <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
           <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
@@ -372,14 +901,14 @@ function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
 function EditPaymentDialog({ payment, loanId, onClose, onSaved }: any) {
   const doEditPayment = useServerFn(editLoanPayment);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ payment_date: "", amount: "", reference: "", notes: "" });
+  const [form, setForm] = useState({ repayment_date: "", amount: "", reference: "", notes: "" });
 
   useEffect(() => {
     if (!payment) return;
     const notes = payment.notes ?? "";
     const match = notes.match(/^Reference: ([^|]+)(?: \| (.*))?$/);
     setForm({
-      payment_date: payment.payment_date ?? "",
+      repayment_date: repayDate(payment),
       amount: String(payment.amount ?? ""),
       reference: match?.[1]?.trim() ?? "",
       notes: match ? (match[2] ?? "") : notes,
@@ -391,7 +920,17 @@ function EditPaymentDialog({ payment, loanId, onClose, onSaved }: any) {
     if (!form.amount) { toast.error("Amount required"); return; }
     setSubmitting(true);
     try {
-      await doEditPayment({ data: { id: payment.id, loan_id: loanId, amount: Number(form.amount), payment_date: form.payment_date, payment_method: payment.payment_method ?? null, reference: form.reference || null, notes: form.notes || null } });
+      await doEditPayment({
+        data: {
+          id: payment.id,
+          loan_id: loanId,
+          amount: Number(form.amount),
+          payment_date: form.repayment_date,
+          payment_method: payment.payment_method ?? null,
+          reference: form.reference || null,
+          notes: form.notes || null,
+        },
+      });
       toast.success("Payment updated and balances recalculated");
       onClose();
       onSaved();
@@ -407,7 +946,11 @@ function EditPaymentDialog({ payment, loanId, onClose, onSaved }: any) {
       <DialogContent>
         <DialogHeader><DialogTitle className="font-serif">Edit Loan Payment</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Payment Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div>
+            <Label>Repayment Date</Label>
+            <Input type="date" value={form.repayment_date} onChange={(e) => setForm({ ...form, repayment_date: e.target.value })} />
+            {form.repayment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.repayment_date)}</p>}
+          </div>
           <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
           <div className="col-span-2"><Label>Reference</Label><Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></div>
           <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
