@@ -73,6 +73,12 @@ function LoanLedger() {
     queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
   });
 
+  const { data: insurancePayments = [] } = useQuery({
+    queryKey: ["loan-insurance", loanId],
+    enabled: !!user,
+    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
+  });
+
   if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
 
   const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
