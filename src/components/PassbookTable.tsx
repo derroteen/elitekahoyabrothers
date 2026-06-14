@@ -25,7 +25,7 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
-export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, onEdit }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; onEdit?: (entry: any) => void }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
