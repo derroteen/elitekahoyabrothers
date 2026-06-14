@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Pencil, Trash2 } from "lucide-react";
+import { deleteSavingsEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/savings")({
   component: SavingsAdmin,
