@@ -183,10 +183,22 @@ function OpeningBalancesPage() {
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(r.opening_fine)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(r.opening_insurance)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(r.opening_benevolent)}</td>
-                <td className="px-3 py-2 text-right">
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(r)} className="text-blue-600 hover:text-blue-800">
                     Edit
                   </Button>
+                  {canDelete && (r.opening_savings || r.opening_loan || r.opening_fine || r.opening_insurance || r.opening_benevolent || r.effective_date) ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600 hover:text-red-800"
+                      onClick={async () => {
+                        if (!confirm(`Delete opening balances for ${r.full_name}? This action cannot be undone.`)) return;
+                        try { await doDelete({ data: { member_id: r.id } }); toast.success("Opening balance deleted"); qc.invalidateQueries({ queryKey: ["opening-balances"] }); }
+                        catch (err: any) { toast.error(err?.message ?? "Failed"); }
+                      }}
+                    >Delete</Button>
+                  ) : null}
                 </td>
               </tr>
             ))}
