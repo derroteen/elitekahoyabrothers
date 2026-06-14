@@ -328,6 +328,7 @@ function SheetEditor({ id, onClose, canEdit, canDelete }: { id: string; onClose:
                 <td className="px-2 py-2 text-right font-mono">{fmtKES(totals.fine)}</td>
                 <td className="px-2 py-2 text-right font-mono">{fmtKES(totals.insurance)}</td>
                 <td className="px-2 py-2 text-right font-mono text-navy">{fmtKES(totals.grand)}</td>
+                {canDelete && <td></td>}
               </tr>
             </tfoot>
           </table>
