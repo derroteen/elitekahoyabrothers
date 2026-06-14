@@ -135,8 +135,9 @@ function NewSheetDialog({ open, onOpenChange, lastSheet, onCreated }: any) {
   );
 }
 
-function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void; canEdit: boolean }) {
+function SheetEditor({ id, onClose, canEdit, canDelete }: { id: string; onClose: () => void; canEdit: boolean; canDelete: boolean }) {
   const qc = useQueryClient();
+  const doDeleteEntry = useServerFn(deleteWeeklyCollectionEntry);
   const { data: sheet } = useQuery({
     queryKey: ["collection-sheet", id],
     queryFn: async () => {
