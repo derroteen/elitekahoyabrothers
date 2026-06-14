@@ -252,6 +252,17 @@ function AttendancePage() {
                                 {status === "late" && e && (
                                   <Input type="time" className="h-7 text-xs" value={arrival} onChange={ev => upsertEntry.mutate({ member_id: m.id, week_number: w, status: "late", arrival_time: ev.target.value })} />
                                 )}
+                                {e && canDelete && (
+                                  <button
+                                    className="text-red-600 hover:text-red-800 text-[10px] inline-flex items-center justify-center gap-0.5"
+                                    title="Delete entry"
+                                    onClick={async () => {
+                                      if (!confirm("Delete this attendance entry? This action cannot be undone.")) return;
+                                      try { await doDeleteEntry({ data: { id: e.id } }); toast.success("Deleted"); qc.invalidateQueries({ queryKey: ["attendance-entries", sheet?.id] }); }
+                                      catch (err: any) { toast.error(err?.message ?? "Failed"); }
+                                    }}
+                                  ><Trash2 className="w-3 h-3" /></button>
+                                )}
                               </>
                             ) : (
                               <span className={`inline-block px-2 py-1 rounded text-xs text-center ${e ? statusColor(status) : "text-muted-foreground"}`}>
