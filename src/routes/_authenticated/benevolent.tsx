@@ -37,6 +37,7 @@ function BenevolentLedger() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const doForceDelete = useServerFn(deleteBenevolentEntry);
   const [memberId, setMemberId] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
