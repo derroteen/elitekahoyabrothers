@@ -84,15 +84,17 @@ function LoanLedger() {
   const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEditPayments = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
   const refreshLoan = () => {
     qc.invalidateQueries({ queryKey: ["loan", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+    qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
   };
   const onDeletePayment = async (payment: any) => {
-    if (!confirm("Are you sure you want to delete this payment?")) return;
+    if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) return;
     try {
       await doDeletePayment({ data: { id: payment.id, loan_id: loanId } });
       toast.success("Payment deleted and balances recalculated");
@@ -100,6 +102,16 @@ function LoanLedger() {
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to delete payment");
     }
+  };
+  const onDeleteFine = async (f: any) => {
+    if (!confirm("Delete this fine? This action cannot be undone.")) return;
+    try { await doDeleteFine({ data: { id: f.id } }); toast.success("Fine deleted"); refreshLoan(); }
+    catch (err: any) { toast.error(err?.message ?? "Failed"); }
+  };
+  const onDeleteIns = async (p: any) => {
+    if (!confirm("Delete this insurance payment? This action cannot be undone.")) return;
+    try { await doDeleteIns({ data: { id: p.id } }); toast.success("Insurance payment deleted"); refreshLoan(); }
+    catch (err: any) { toast.error(err?.message ?? "Failed"); }
   };
 
   return (
