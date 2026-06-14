@@ -299,18 +299,21 @@ function WeeklyExpendituresPage() {
                   <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(r.created_at)}</TableCell>
                   {canEdit && (
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" onClick={() => setDialog({ open: true, editing: r })}>
+                      <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800" onClick={() => setDialog({ open: true, editing: r })}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm("Delete this expenditure?")) del.mutate(r.id);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-800"
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this entry? This action cannot be undone.")) del.mutate(r.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>
