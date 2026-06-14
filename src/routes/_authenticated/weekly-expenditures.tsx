@@ -134,8 +134,7 @@ function WeeklyExpendituresPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("weekly_expenditures").delete().eq("id", id);
-      if (error) throw error;
+      await doDelete({ data: { id } });
     },
     onSuccess: () => {
       toast.success("Expenditure deleted");
