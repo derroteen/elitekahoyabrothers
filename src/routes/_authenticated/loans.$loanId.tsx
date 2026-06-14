@@ -291,7 +291,81 @@ function LoanLedger() {
         </div>
       </Card>
       <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
+      <EditFineDialog fine={editFine} onClose={() => setEditFineState(null)} onSaved={refreshLoan} />
+      <EditInsuranceDialog payment={editIns} onClose={() => setEditInsState(null)} onSaved={refreshLoan} />
     </div>
+  );
+}
+
+function EditFineDialog({ fine, onClose, onSaved }: any) {
+  const doEdit = useServerFn(editLoanFine);
+  const [form, setForm] = useState({ amount: "", reason: "", status: "unpaid" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (fine) setForm({ amount: String(fine.amount ?? ""), reason: fine.reason ?? "", status: fine.status ?? "unpaid" }); }, [fine?.id]);
+  const submit = async () => {
+    if (!fine) return;
+    setBusy(true);
+    try {
+      await doEdit({ data: { id: fine.id, amount: Number(form.amount || 0), reason: form.reason || null, status: form.status as any } });
+      toast.success("Fine updated"); onClose(); onSaved();
+    } catch (err: any) { toast.error(err?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Dialog open={!!fine} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Fine</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div>
+            <Label>Status</Label>
+            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+              <option value="waived">Waived</option>
+            </select>
+          </div>
+          <div className="col-span-2"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
+  const doEdit = useServerFn(editInsurancePayment);
+  const [form, setForm] = useState({ payment_date: "", amount: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (payment) setForm({ payment_date: payment.payment_date ?? "", amount: String(payment.amount ?? ""), notes: payment.notes ?? "" }); }, [payment?.id]);
+  const submit = async () => {
+    if (!payment) return;
+    setBusy(true);
+    try {
+      await doEdit({ data: { id: payment.id, amount: Number(form.amount || 0), payment_date: form.payment_date, notes: form.notes || null } });
+      toast.success("Insurance payment updated"); onClose(); onSaved();
+    } catch (err: any) { toast.error(err?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Dialog open={!!payment} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Insurance Payment</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
