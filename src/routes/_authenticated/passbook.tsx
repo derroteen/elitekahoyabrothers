@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
-import { createManualPassbookEntry, updatePassbookEntry } from "@/lib/passbook.functions";
+import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry } from "@/lib/passbook.functions";
+import { forceDeletePassbookEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
   component: PassbookAdmin,
