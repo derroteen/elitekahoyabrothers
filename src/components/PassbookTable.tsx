@@ -1,7 +1,7 @@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Pencil, FileSpreadsheet, FileText } from "lucide-react";
+import { Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
 
 const CATEGORY_LABELS: Record<string, string> = {
