@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
 import { Pencil, Trash2, FileText, FileSpreadsheet, FileDown } from "lucide-react";
+import { deleteWeeklyExpenditure } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/weekly-expenditures")({
   component: WeeklyExpendituresPage,
@@ -46,6 +48,8 @@ function WeeklyExpendituresPage() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
+  const doDelete = useServerFn(deleteWeeklyExpenditure);
 
   const today = new Date();
   const [filters, setFilters] = useState({
@@ -130,8 +134,7 @@ function WeeklyExpendituresPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("weekly_expenditures").delete().eq("id", id);
-      if (error) throw error;
+      await doDelete({ data: { id } });
     },
     onSuccess: () => {
       toast.success("Expenditure deleted");
@@ -296,18 +299,21 @@ function WeeklyExpendituresPage() {
                   <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(r.created_at)}</TableCell>
                   {canEdit && (
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" onClick={() => setDialog({ open: true, editing: r })}>
+                      <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800" onClick={() => setDialog({ open: true, editing: r })}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm("Delete this expenditure?")) del.mutate(r.id);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-800"
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this entry? This action cannot be undone.")) del.mutate(r.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>

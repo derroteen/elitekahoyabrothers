@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -12,7 +13,8 @@ import { toast } from "sonner";
 import { fmtKES } from "@/lib/format";
 import { fetchNonMemberIds, filterMembersOnly } from "@/lib/member-queries";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
-import { FileText, FileSpreadsheet, FileDown, Plus } from "lucide-react";
+import { FileText, FileSpreadsheet, FileDown, Plus, Trash2 } from "lucide-react";
+import { deleteAttendanceEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   component: AttendancePage,
@@ -38,6 +40,8 @@ function AttendancePage() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
+  const doDeleteEntry = useServerFn(deleteAttendanceEntry);
   const today = new Date();
   const [year, setYear] = useState<number>(today.getFullYear());
   const [month, setMonth] = useState<number>(today.getMonth() + 1);
@@ -247,6 +251,17 @@ function AttendancePage() {
                                 </Select>
                                 {status === "late" && e && (
                                   <Input type="time" className="h-7 text-xs" value={arrival} onChange={ev => upsertEntry.mutate({ member_id: m.id, week_number: w, status: "late", arrival_time: ev.target.value })} />
+                                )}
+                                {e && canDelete && (
+                                  <button
+                                    className="text-red-600 hover:text-red-800 text-[10px] inline-flex items-center justify-center gap-0.5"
+                                    title="Delete entry"
+                                    onClick={async () => {
+                                      if (!confirm("Delete this attendance entry? This action cannot be undone.")) return;
+                                      try { await doDeleteEntry({ data: { id: e.id } }); toast.success("Deleted"); qc.invalidateQueries({ queryKey: ["attendance-entries", sheet?.id] }); }
+                                      catch (err: any) { toast.error(err?.message ?? "Failed"); }
+                                    }}
+                                  ><Trash2 className="w-3 h-3" /></button>
                                 )}
                               </>
                             ) : (

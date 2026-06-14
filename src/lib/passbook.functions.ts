@@ -184,9 +184,8 @@ export const deletePassbookEntry = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (!before) throw new Error("Entry not found");
-    if (before.source === "weekly") {
-      throw new Error("Weekly-sheet entries cannot be deleted directly. Edit the Weekly Collection Sheet instead.");
-    }
+    // Auto-posted (weekly) entries are deletable too — Super Admin override.
+    // NOTE: if the source weekly sheet is re-saved, the entry will be recreated.
 
     const { error } = await supabaseAdmin.from("passbook_entries").delete().eq("id", data.id);
     if (error) throw new Error(error.message);

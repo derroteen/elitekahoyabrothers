@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
 import { Pencil, Trash2 } from "lucide-react";
+import { deleteBenevolentEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/benevolent")({
   component: BenevolentLedger,
@@ -35,6 +37,7 @@ function BenevolentLedger() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const doForceDelete = useServerFn(deleteBenevolentEntry);
   const [memberId, setMemberId] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -87,12 +90,21 @@ function BenevolentLedger() {
 
   const member = members.find((m: any) => m.id === memberId);
 
-  const onDelete = async (id: string) => {
-    if (!confirm("Delete this entry? This action is logged.")) return;
-    const { error } = await supabase.from("benevolent_entries").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Entry deleted");
-    qc.invalidateQueries({ queryKey: ["benevolent-entries", memberId] });
+  const onDelete = async (e: Entry) => {
+    if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
+    try {
+      if (e.source === "weekly") {
+        await doForceDelete({ data: { id: e.id } });
+      } else {
+        const { error } = await supabase.from("benevolent_entries").delete().eq("id", e.id);
+        if (error) throw error;
+        await supabase.rpc("recompute_benevolent_balances", { _member: memberId } as any);
+      }
+      toast.success("Entry deleted");
+      qc.invalidateQueries({ queryKey: ["benevolent-entries", memberId] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete");
+    }
   };
 
   const exportRows = filtered.map((e) => ({
@@ -202,14 +214,13 @@ function BenevolentLedger() {
                       <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
                       {canEdit && (
                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {e.source !== "weekly" ? (
-                            <>
-                              <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
-                              {canDelete && (
-                                <button onClick={() => onDelete(e.id)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
-                              )}
-                            </>
-                          ) : <span className="text-[9px] text-muted-foreground">Auto-posted</span>}
+                          {e.source !== "weekly" && (
+                            <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => onDelete(e)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
+                          )}
+                          {e.source === "weekly" && !canDelete && <span className="text-[9px] text-muted-foreground">Auto-posted</span>}
                         </td>
                       )}
                     </tr>

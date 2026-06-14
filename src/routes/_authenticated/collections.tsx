@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -10,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
+import { Trash2 } from "lucide-react";
+import { deleteWeeklyCollectionEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/collections")({
   component: CollectionsPage,
@@ -83,7 +86,7 @@ function CollectionsPage() {
       </Card>
 
       <NewSheetDialog open={openNew} onOpenChange={setOpenNew} lastSheet={sheets[0]} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
-      {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} />}
+      {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} canDelete={canDelete} />}
       {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
   );
@@ -132,8 +135,9 @@ function NewSheetDialog({ open, onOpenChange, lastSheet, onCreated }: any) {
   );
 }
 
-function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void; canEdit: boolean }) {
+function SheetEditor({ id, onClose, canEdit, canDelete }: { id: string; onClose: () => void; canEdit: boolean; canDelete: boolean }) {
   const qc = useQueryClient();
+  const doDeleteEntry = useServerFn(deleteWeeklyCollectionEntry);
   const { data: sheet } = useQuery({
     queryKey: ["collection-sheet", id],
     queryFn: async () => {
@@ -279,10 +283,13 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
                 <th className="px-2 py-2 text-right">Fine</th>
                 <th className="px-2 py-2 text-right">Insurance</th>
                 <th className="px-2 py-2 text-right">Total</th>
+                {canDelete && <th className="px-2 py-2 w-10"></th>}
               </tr>
             </thead>
             <tbody>
-              {members.map((m: any, i: number) => (
+              {members.map((m: any, i: number) => {
+                const existing = byMember.get(m.id);
+                return (
                 <tr key={m.id} className="border-t border-border">
                   <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
                   <td className="px-2 py-1.5 font-medium">{m.full_name}</td>
@@ -294,8 +301,23 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
                     </td>
                   ))}
                   <td className="px-2 py-1.5 text-right font-mono font-semibold">{rowTotal(m.id) > 0 ? fmtKES(rowTotal(m.id)) : "—"}</td>
+                  {canDelete && (
+                    <td className="px-2 py-1.5 text-center">
+                      {existing && (
+                        <button
+                          className="text-red-600 hover:text-red-800"
+                          title="Delete this member's entry for this week"
+                          onClick={async () => {
+                            if (!confirm(`Delete this entry for ${m.full_name}? This action cannot be undone.`)) return;
+                            try { await doDeleteEntry({ data: { id: existing.id } }); toast.success("Entry deleted"); refetchEntries(); }
+                            catch (err: any) { toast.error(err?.message ?? "Failed"); }
+                          }}
+                        ><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                      )}
+                    </td>
+                  )}
                 </tr>
-              ))}
+              );})}
             </tbody>
             <tfoot className="bg-muted/60 font-semibold">
               <tr>
@@ -306,6 +328,7 @@ function SheetEditor({ id, onClose, canEdit }: { id: string; onClose: () => void
                 <td className="px-2 py-2 text-right font-mono">{fmtKES(totals.fine)}</td>
                 <td className="px-2 py-2 text-right font-mono">{fmtKES(totals.insurance)}</td>
                 <td className="px-2 py-2 text-right font-mono text-navy">{fmtKES(totals.grand)}</td>
+                {canDelete && <td></td>}
               </tr>
             </tfoot>
           </table>

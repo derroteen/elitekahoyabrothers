@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
-import { ArrowLeft } from "lucide-react";
+import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment } from "@/lib/entries.functions";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/loans/$loanId")({
@@ -37,7 +38,11 @@ function LoanLedger() {
   const { user, role } = useAuth();
   const qc = useQueryClient();
   const doDeletePayment = useServerFn(deleteLoanPayment);
+  const doDeleteFine = useServerFn(deleteLoanFine);
+  const doDeleteIns = useServerFn(deleteInsurancePayment);
   const [editPayment, setEditPayment] = useState<any>(null);
+  const [editFine, setEditFineState] = useState<any>(null);
+  const [editIns, setEditInsState] = useState<any>(null);
 
   const { data: loan } = useQuery({
     queryKey: ["loan", loanId],
@@ -68,20 +73,28 @@ function LoanLedger() {
     queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
   });
 
+  const { data: insurancePayments = [] } = useQuery({
+    queryKey: ["loan-insurance", loanId],
+    enabled: !!user,
+    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
+  });
+
   if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
 
   const nextDue = schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid");
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEditPayments = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
   const refreshLoan = () => {
     qc.invalidateQueries({ queryKey: ["loan", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-schedule", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-fines", loanId] });
     qc.invalidateQueries({ queryKey: ["loan-repayments", loanId] });
+    qc.invalidateQueries({ queryKey: ["loan-insurance", loanId] });
   };
   const onDeletePayment = async (payment: any) => {
-    if (!confirm("Are you sure you want to delete this payment?")) return;
+    if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) return;
     try {
       await doDeletePayment({ data: { id: payment.id, loan_id: loanId } });
       toast.success("Payment deleted and balances recalculated");
@@ -89,6 +102,16 @@ function LoanLedger() {
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to delete payment");
     }
+  };
+  const onDeleteFine = async (f: any) => {
+    if (!confirm("Delete this fine? This action cannot be undone.")) return;
+    try { await doDeleteFine({ data: { id: f.id } }); toast.success("Fine deleted"); refreshLoan(); }
+    catch (err: any) { toast.error(err?.message ?? "Failed"); }
+  };
+  const onDeleteIns = async (p: any) => {
+    if (!confirm("Delete this insurance payment? This action cannot be undone.")) return;
+    try { await doDeleteIns({ data: { id: p.id } }); toast.success("Insurance payment deleted"); refreshLoan(); }
+    catch (err: any) { toast.error(err?.message ?? "Failed"); }
   };
 
   return (
@@ -166,10 +189,11 @@ function LoanLedger() {
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="px-3 py-2">Date</th><th className="px-3 py-2">Reason</th>
               <th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-right">Paid</th><th className="px-3 py-2">Status</th>
+              {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {fines.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
+            {fines.length === 0 && <tr><td colSpan={canEditPayments ? 6 : 5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
             {fines.map((f: any) => (
               <tr key={f.id} className="border-b last:border-0">
                 <td className="px-3 py-2">{fmtDate(f.fine_date)}</td>
@@ -177,10 +201,50 @@ function LoanLedger() {
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
                 <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[f.status] ?? "bg-gray-100"}`}>{f.status}</span></td>
+                {canEditPayments && (
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => setEditFineState(f)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                    {canDelete && <button onClick={() => onDeleteFine(f)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="p-4 border-b border-border font-serif text-lg">Insurance Payments</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-right">Balance After</th>
+                <th className="px-3 py-2">Notes</th>
+                {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {insurancePayments.length === 0 && <tr><td colSpan={canEditPayments ? 5 : 4} className="p-4 text-center text-muted-foreground">No insurance payments</td></tr>}
+              {insurancePayments.map((p: any) => (
+                <tr key={p.id} className="border-b last:border-0">
+                  <td className="px-3 py-2">{fmtDate(p.payment_date)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(p.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(p.balance_after)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{p.notes ?? ""}</td>
+                  {canEditPayments && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <button onClick={() => setEditInsState(p)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                      {canDelete && <button onClick={() => onDeleteIns(p)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <Card>
@@ -227,7 +291,81 @@ function LoanLedger() {
         </div>
       </Card>
       <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
+      <EditFineDialog fine={editFine} onClose={() => setEditFineState(null)} onSaved={refreshLoan} />
+      <EditInsuranceDialog payment={editIns} onClose={() => setEditInsState(null)} onSaved={refreshLoan} />
     </div>
+  );
+}
+
+function EditFineDialog({ fine, onClose, onSaved }: any) {
+  const doEdit = useServerFn(editLoanFine);
+  const [form, setForm] = useState({ amount: "", reason: "", status: "unpaid" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (fine) setForm({ amount: String(fine.amount ?? ""), reason: fine.reason ?? "", status: fine.status ?? "unpaid" }); }, [fine?.id]);
+  const submit = async () => {
+    if (!fine) return;
+    setBusy(true);
+    try {
+      await doEdit({ data: { id: fine.id, amount: Number(form.amount || 0), reason: form.reason || null, status: form.status as any } });
+      toast.success("Fine updated"); onClose(); onSaved();
+    } catch (err: any) { toast.error(err?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Dialog open={!!fine} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Fine</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div>
+            <Label>Status</Label>
+            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+              <option value="waived">Waived</option>
+            </select>
+          </div>
+          <div className="col-span-2"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
+  const doEdit = useServerFn(editInsurancePayment);
+  const [form, setForm] = useState({ payment_date: "", amount: "", notes: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (payment) setForm({ payment_date: payment.payment_date ?? "", amount: String(payment.amount ?? ""), notes: payment.notes ?? "" }); }, [payment?.id]);
+  const submit = async () => {
+    if (!payment) return;
+    setBusy(true);
+    try {
+      await doEdit({ data: { id: payment.id, amount: Number(form.amount || 0), payment_date: form.payment_date, notes: form.notes || null } });
+      toast.success("Insurance payment updated"); onClose(); onSaved();
+    } catch (err: any) { toast.error(err?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Dialog open={!!payment} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Insurance Payment</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Date</Label><Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} /></div>
+          <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+          <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

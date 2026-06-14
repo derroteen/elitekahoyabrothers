@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Pencil, Trash2 } from "lucide-react";
+import { deleteSavingsEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/savings")({
   component: SavingsAdmin,
@@ -25,6 +27,7 @@ type Entry = {
 };
 
 function SavingsAdmin() {
+  const doForceDelete = useServerFn(deleteSavingsEntry);
   const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -64,13 +67,21 @@ function SavingsAdmin() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["savings", memberId] });
 
   const onDelete = async (e: Entry) => {
-    if (e.passbook_entry_id) return toast.error("Auto-posted from passbook — edit at source.");
-    if (!confirm("Delete this savings entry? This action is logged.")) return;
-    const { error } = await supabase.from("savings_entries").delete().eq("id", e.id);
-    if (error) return toast.error(error.message);
-    await supabase.rpc("recompute_savings_balances", { _member: memberId });
-    toast.success("Entry deleted");
-    refresh();
+    if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
+    try {
+      if (e.passbook_entry_id) {
+        // auto-posted from passbook → use audited server fn
+        await doForceDelete({ data: { id: e.id } });
+      } else {
+        const { error } = await supabase.from("savings_entries").delete().eq("id", e.id);
+        if (error) throw error;
+        await supabase.rpc("recompute_savings_balances", { _member: memberId });
+      }
+      toast.success("Entry deleted");
+      refresh();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete");
+    }
   };
 
   return (
@@ -112,15 +123,14 @@ function SavingsAdmin() {
                     <td className="px-3 py-2 text-xs text-muted-foreground">{e.notes ?? ""}</td>
                     {canEdit && (
                       <td className="px-3 py-2 text-right whitespace-nowrap">
-                        {e.passbook_entry_id ? (
+                        {!e.passbook_entry_id && (
+                          <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => onDelete(e)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
+                        )}
+                        {e.passbook_entry_id && !canDelete && (
                           <span className="text-[9px] text-muted-foreground">Auto-posted</span>
-                        ) : (
-                          <>
-                            <button onClick={() => { setEditing(e); setOpen(true); }} className="text-blue-600 hover:text-blue-800 mr-3" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
-                            {canDelete && (
-                              <button onClick={() => onDelete(e)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>
-                            )}
-                          </>
                         )}
                       </td>
                     )}

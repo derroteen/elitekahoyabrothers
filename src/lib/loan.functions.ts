@@ -198,6 +198,11 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
     if (!before) throw new Error("Payment not found");
+    const { data: loan } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).single();
+    const status = (loan as any)?.status;
+    if (status === "completed" || status === "completed_with_fine" || status === "closed" || status === "rejected") {
+      throw new Error(`Cannot delete payment: loan is ${status}. Reopen the loan first if a correction is needed.`);
+    }
     const { error } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     await deletePassbookPayment(before);

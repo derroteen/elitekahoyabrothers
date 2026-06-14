@@ -1,7 +1,7 @@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Pencil, FileSpreadsheet, FileText } from "lucide-react";
+import { Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -25,7 +25,7 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
-export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, onEdit }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; onEdit?: (entry: any) => void }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
@@ -98,11 +98,12 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
                     {bf ? <span className="text-gold-3 font-semibold">Opening</span> : isWeekly ? <span className="text-navy">Weekly Sheet</span> : <span className="text-muted-foreground">Manual</span>}
                   </td>
                   {canEdit && (
-                    <td className="px-3 py-2 text-left">
+                    <td className="px-3 py-2 text-left whitespace-nowrap">
                       {!bf && (
-                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onEdit?.(e)}>
-                          <Pencil className="h-3 w-3 mr-1" /> Edit
-                        </Button>
+                        <button onClick={() => onEdit?.(e)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="h-4 w-4 inline" /></button>
+                      )}
+                      {!bf && canDelete && (
+                        <button onClick={() => onDelete?.(e)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="h-4 w-4 inline" /></button>
                       )}
                     </td>
                   )}
