@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
-import { ArrowLeft } from "lucide-react";
+import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment } from "@/lib/entries.functions";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/loans/$loanId")({
