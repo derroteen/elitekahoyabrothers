@@ -38,7 +38,11 @@ function LoanLedger() {
   const { user, role } = useAuth();
   const qc = useQueryClient();
   const doDeletePayment = useServerFn(deleteLoanPayment);
+  const doDeleteFine = useServerFn(deleteLoanFine);
+  const doDeleteIns = useServerFn(deleteInsurancePayment);
   const [editPayment, setEditPayment] = useState<any>(null);
+  const [editFine, setEditFineState] = useState<any>(null);
+  const [editIns, setEditInsState] = useState<any>(null);
 
   const { data: loan } = useQuery({
     queryKey: ["loan", loanId],
