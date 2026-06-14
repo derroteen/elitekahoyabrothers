@@ -24,6 +24,7 @@ import {
   upsertOpeningBalance,
   bulkImportOpeningBalances,
 } from "@/lib/opening-balances.functions";
+import { deleteOpeningBalance } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/opening-balances")({
   component: OpeningBalancesPage,
