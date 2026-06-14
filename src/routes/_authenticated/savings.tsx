@@ -27,6 +27,7 @@ type Entry = {
 };
 
 function SavingsAdmin() {
+  const doForceDelete = useServerFn(deleteSavingsEntry);
   const { role, loading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
