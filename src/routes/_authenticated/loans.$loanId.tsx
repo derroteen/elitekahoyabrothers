@@ -70,13 +70,13 @@ function LoanLedger() {
   const { data: repayments = [] } = useQuery({
     queryKey: ["loan-repayments", loanId],
     enabled: !!user,
-    queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
+    queryFn: async () => (await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("repayment_date")).data ?? [],
   });
 
   const { data: insurancePayments = [] } = useQuery({
     queryKey: ["loan-insurance", loanId],
     enabled: !!user,
-    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
+    queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("repayment_date")).data ?? [],
   });
 
   if (!loan) return <div className="p-8 text-muted-foreground">Loading…</div>;
@@ -267,7 +267,7 @@ function LoanLedger() {
               {repayments.length === 0 && <tr><td colSpan={canEditPayments ? 8 : 7} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
               {repayments.map((r: any) => (
                 <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-3 py-2">{fmtDate(r.payment_date)}</td>
+                  <td className="px-3 py-2">{fmtDate(r.repayment_date)}</td>
                   <td className="px-3 py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${r.source === "weekly" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
                       {r.source === "weekly" ? "Weekly Sheet" : "Manual"}
