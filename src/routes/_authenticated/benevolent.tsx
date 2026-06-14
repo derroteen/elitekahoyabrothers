@@ -87,12 +87,24 @@ function BenevolentLedger() {
 
   const member = members.find((m: any) => m.id === memberId);
 
-  const onDelete = async (id: string) => {
-    if (!confirm("Delete this entry? This action is logged.")) return;
-    const { error } = await supabase.from("benevolent_entries").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Entry deleted");
-    qc.invalidateQueries({ queryKey: ["benevolent-entries", memberId] });
+  const onDelete = async (e: Entry) => {
+    if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
+    try {
+      if (e.source === "weekly") {
+        const { deleteBenevolentEntry } = await import("@/lib/entries.functions");
+        const { useServerFn } = await import("@tanstack/react-start");
+        // call directly without hook (one-off)
+        await deleteBenevolentEntry({ data: { id: e.id } } as any);
+        void useServerFn;
+      } else {
+        const { error } = await supabase.from("benevolent_entries").delete().eq("id", e.id);
+        if (error) throw error;
+      }
+      toast.success("Entry deleted");
+      qc.invalidateQueries({ queryKey: ["benevolent-entries", memberId] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete");
+    }
   };
 
   const exportRows = filtered.map((e) => ({
