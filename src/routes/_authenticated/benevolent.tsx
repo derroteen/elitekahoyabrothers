@@ -94,14 +94,11 @@ function BenevolentLedger() {
     if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
     try {
       if (e.source === "weekly") {
-        const { deleteBenevolentEntry } = await import("@/lib/entries.functions");
-        const { useServerFn } = await import("@tanstack/react-start");
-        // call directly without hook (one-off)
-        await deleteBenevolentEntry({ data: { id: e.id } } as any);
-        void useServerFn;
+        await doForceDelete({ data: { id: e.id } });
       } else {
         const { error } = await supabase.from("benevolent_entries").delete().eq("id", e.id);
         if (error) throw error;
+        await supabase.rpc("recompute_benevolent_balances", { _member: memberId } as any);
       }
       toast.success("Entry deleted");
       qc.invalidateQueries({ queryKey: ["benevolent-entries", memberId] });
