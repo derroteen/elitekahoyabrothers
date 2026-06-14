@@ -189,10 +189,11 @@ function LoanLedger() {
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="px-3 py-2">Date</th><th className="px-3 py-2">Reason</th>
               <th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-right">Paid</th><th className="px-3 py-2">Status</th>
+              {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {fines.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
+            {fines.length === 0 && <tr><td colSpan={canEditPayments ? 6 : 5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
             {fines.map((f: any) => (
               <tr key={f.id} className="border-b last:border-0">
                 <td className="px-3 py-2">{fmtDate(f.fine_date)}</td>
@@ -200,10 +201,50 @@ function LoanLedger() {
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount)}</td>
                 <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
                 <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[f.status] ?? "bg-gray-100"}`}>{f.status}</span></td>
+                {canEditPayments && (
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => setEditFineState(f)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                    {canDelete && <button onClick={() => onDeleteFine(f)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="p-4 border-b border-border font-serif text-lg">Insurance Payments</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-right">Balance After</th>
+                <th className="px-3 py-2">Notes</th>
+                {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {insurancePayments.length === 0 && <tr><td colSpan={canEditPayments ? 5 : 4} className="p-4 text-center text-muted-foreground">No insurance payments</td></tr>}
+              {insurancePayments.map((p: any) => (
+                <tr key={p.id} className="border-b last:border-0">
+                  <td className="px-3 py-2">{fmtDate(p.payment_date)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(p.amount)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(p.balance_after)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{p.notes ?? ""}</td>
+                  {canEditPayments && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <button onClick={() => setEditInsState(p)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
+                      {canDelete && <button onClick={() => onDeleteIns(p)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       <Card>
