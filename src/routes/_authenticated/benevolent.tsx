@@ -180,7 +180,7 @@ function BenevolentLedger() {
 
           <Card>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm font-mono">
+              <table className="w-full text-sm font-mono min-w-[760px]">
                 <thead><tr className="bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground">
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Type</th>
