@@ -236,6 +236,7 @@ export const deleteInsurancePayment = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await (supabaseAdmin.from("loan_insurance_payments" as any) as any).select("*").eq("id", data.id).maybeSingle();
     if (!before) throw new Error("Payment not found");
+    await deletePassbookInsurance(before);
     const { error } = await (supabaseAdmin.from("loan_insurance_payments" as any) as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     await supabaseAdmin.rpc("recalc_insurance_from_payments", { _loan_id: (before as any).loan_id } as any);
