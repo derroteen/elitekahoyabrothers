@@ -644,7 +644,7 @@ function LoanLedger() {
   );
 }
 
-function AddPaymentDialog({ open, loanId, loan, onClose, onSaved }: any) {
+function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any) {
   const doAdd = useServerFn(addLoanPayment);
   const [form, setForm] = useState({
     repayment_date: todayISO(),
@@ -656,9 +656,14 @@ function AddPaymentDialog({ open, loanId, loan, onClose, onSaved }: any) {
 
   useEffect(() => {
     if (open) {
-      setForm({ repayment_date: todayISO(), amount: "", payment_method: "cash", notes: "" });
+      setForm({
+        repayment_date: todayISO(),
+        amount: prefill?.amount ?? "",
+        payment_method: "cash",
+        notes: prefill?.notes ?? "",
+      });
     }
-  }, [open]);
+  }, [open, prefill?.amount, prefill?.notes]);
 
   const submit = async () => {
     const amt = Number(form.amount);
