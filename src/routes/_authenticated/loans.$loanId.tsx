@@ -633,8 +633,9 @@ function LoanLedger() {
         </div>
       </Card>
 
-      <AddPaymentDialog open={addPaymentOpen} loanId={loanId} loan={loan} onClose={() => setAddPaymentOpen(false)} onSaved={refreshLoan} />
+      <AddPaymentDialog open={addPaymentOpen} loanId={loanId} loan={loan} prefill={addPaymentPrefill} onClose={() => { setAddPaymentOpen(false); setAddPaymentPrefill(null); }} onSaved={refreshLoan} />
       <AddInsuranceDialog open={addInsOpen} loanId={loanId} onClose={() => setAddInsOpen(false)} onSaved={refreshLoan} />
+      <AddFineDialog open={addFineOpen} loanId={loanId} onClose={() => setAddFineOpen(false)} onSaved={refreshLoan} />
       <RecordFinePaymentDialog open={recordFineOpen} loanId={loanId} unpaidFines={unpaidFines} schedule={schedule} onClose={() => setRecordFineOpen(false)} onSaved={refreshLoan} />
       <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
       <EditFineDialog fine={editFine} onClose={() => setEditFineState(null)} onSaved={refreshLoan} />
