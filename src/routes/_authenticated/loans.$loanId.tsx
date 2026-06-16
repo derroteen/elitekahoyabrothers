@@ -209,6 +209,18 @@ function LoanLedger() {
     [fines],
   );
 
+  // Live reconciliation from loan_repayments (source of truth)
+  const liveTotals = useMemo(() => {
+    const principal = Number(loan?.amount_borrowed ?? 0);
+    const interest = Number(loan?.total_interest_added ?? 0);
+    const subtotal = principal + interest; // excludes insurance
+    const paid = paymentTotals.amount; // SUM(loan_repayments.amount)
+    const outstanding = Math.max(0, subtotal - paid);
+    const outstandingFines = Math.max(0, fineHistoryTotals.amount - fineHistoryTotals.paid);
+    const cleared = subtotal > 0 && outstanding === 0 && outstandingFines === 0;
+    return { principal, interest, subtotal, paid, outstanding, outstandingFines, cleared };
+  }, [loan?.amount_borrowed, loan?.total_interest_added, paymentTotals.amount, fineHistoryTotals.amount, fineHistoryTotals.paid]);
+
   useEffect(() => {
     if (!canEditPayments || !loanId || schedule.length === 0 || finesGeneratedRef.current) return;
     let cancelled = false;
