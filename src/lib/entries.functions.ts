@@ -223,6 +223,7 @@ export const editInsurancePayment = createServerFn({ method: "POST" })
     }).eq("id", data.id);
     if (error) throw new Error(error.message);
     await supabaseAdmin.rpc("recalc_insurance_from_payments", { _loan_id: (before as any).loan_id } as any);
+    await syncInsuranceById(data.id);
     await audit({ actorId: context.userId, action: "edited", tableName: "loan_insurance_payments", recordId: data.id, oldValue: before, newValue: data });
     return { ok: true };
   });
