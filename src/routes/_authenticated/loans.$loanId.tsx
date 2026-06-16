@@ -843,6 +843,7 @@ function AddFineDialog({ open, loanId, onClose, onSaved }: any) {
 
 
 function RecordFinePaymentDialog({ open, loanId, unpaidFines, schedule, onClose, onSaved }: any) {
+  const doPay = useServerFn(recordFinePayment);
   const [form, setForm] = useState({ payment_date: todayISO(), fine_id: "", amount: "", notes: "" });
   const [busy, setBusy] = useState(false);
 
@@ -868,34 +869,7 @@ function RecordFinePaymentDialog({ open, loanId, unpaidFines, schedule, onClose,
 
     setBusy(true);
     try {
-      const newPaid = Number(selectedFine.amount_paid ?? 0) + amt;
-      const fineAmount = Number(selectedFine.amount ?? 0);
-      const status = newPaid >= fineAmount ? "paid" : "partial";
-      const noteSuffix = form.notes ? ` | ${form.notes}` : "";
-      const reason = `${selectedFine.reason ?? ""} [Paid ${fmtLedgerDate(form.payment_date)}${noteSuffix}]`.trim();
-
-      const { error: fineErr } = await (supabase.from("loan_fines" as any) as any).update({
-        amount_paid: newPaid,
-        status,
-        reason,
-      }).eq("id", form.fine_id);
-      if (fineErr) throw fineErr;
-
-      if (selectedFine.schedule_id) {
-        await (supabase.from("loan_schedule" as any) as any).update({
-          fine_paid: newPaid,
-        }).eq("id", selectedFine.schedule_id);
-      }
-
-      const { data: allFines } = await (supabase.from("loan_fines" as any) as any).select("amount, amount_paid").eq("loan_id", loanId);
-      const totalCharged = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount ?? 0), 0);
-      const totalPaid = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0);
-
-      await supabase.from("loans").update({
-        total_fines_paid: totalPaid,
-        outstanding_fines: Math.max(0, totalCharged - totalPaid),
-      } as any).eq("id", loanId);
-
+      await doPay({ data: { fine_id: form.fine_id, amount: amt, payment_date: form.payment_date, notes: form.notes || null } });
       toast.success("Fine payment recorded");
       onClose();
       onSaved();
