@@ -357,11 +357,15 @@ function LoanLedger() {
                 <th className="px-3 py-2 text-right">Balance</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Remarks</th>
+                {canEditPayments && <th className="px-3 py-2 text-right">Action</th>}
               </tr>
             </thead>
             <tbody>
-              {ledgerRows.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
-              {ledgerRows.map((s: any) => (
+              {ledgerRows.length === 0 && <tr><td colSpan={canEditPayments ? 11 : 10} className="p-6 text-center text-muted-foreground">No schedule</td></tr>}
+              {ledgerRows.map((s: any) => {
+                const outstandingRow = Math.max(0, Number(s.expected_amount ?? 0) - Number(s.amount_paid ?? 0));
+                const rowDone = s.status === "paid" || s.status === "prepaid" || outstandingRow <= 0;
+                return (
                 <tr key={s.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-mono">{s.period_number}</td>
                   <td className="px-3 py-2">{fmtLedgerDate(s.due_date)}</td>
@@ -373,8 +377,28 @@ function LoanLedger() {
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.balance_remaining)}</td>
                   <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status}</span></td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
+                  {canEditPayments && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {!rowDone && !liveTotals.cleared && (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 bg-navy text-white hover:bg-navy-2"
+                          onClick={() => {
+                            setAddPaymentPrefill({
+                              amount: String(outstandingRow),
+                              notes: `Week ${s.period_number} payment`,
+                            });
+                            setAddPaymentOpen(true);
+                          }}
+                        >
+                          Pay
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
-              ))}
+                );
+              })}
               {ledgerRows.length > 0 && (
                 <tr className="bg-muted/40 font-semibold border-t-2 border-border">
                   <td className="px-3 py-2" colSpan={2}>TOTALS</td>
@@ -383,8 +407,8 @@ function LoanLedger() {
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.fineCharged)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.finePaid)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.outstandingFine)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.currentBalance)}</td>
-                  <td className="px-3 py-2" colSpan={2} />
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(liveTotals.outstanding)}</td>
+                  <td className="px-3 py-2" colSpan={canEditPayments ? 3 : 2} />
                 </tr>
               )}
             </tbody>
