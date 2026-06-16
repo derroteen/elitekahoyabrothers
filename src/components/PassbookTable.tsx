@@ -14,6 +14,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   special_contribution: "Special Contribution",
   dividend: "Dividend Payment",
   savings: "Savings",
+  loan_payment: "Loan Repayment",
+  insurance_payment: "Insurance Payment",
+  fine_payment: "Fine Payment",
   other: "Other",
 };
 
