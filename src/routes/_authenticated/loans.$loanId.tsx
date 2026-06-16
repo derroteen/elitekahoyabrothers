@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtKES } from "@/lib/format";
 import { addLoanPayment, deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
-import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment } from "@/lib/entries.functions";
+import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
