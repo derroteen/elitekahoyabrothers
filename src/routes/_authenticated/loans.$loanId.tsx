@@ -732,6 +732,7 @@ function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any
 }
 
 function AddInsuranceDialog({ open, loanId, onClose, onSaved }: any) {
+  const doAdd = useServerFn(addInsurancePayment);
   const [form, setForm] = useState({ payment_date: todayISO(), amount: "", notes: "" });
   const [busy, setBusy] = useState(false);
 
@@ -745,13 +746,7 @@ function AddInsuranceDialog({ open, loanId, onClose, onSaved }: any) {
     if (form.amount === "" || Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
     setBusy(true);
     try {
-      const { error } = await (supabase as any).rpc("record_insurance_payment", {
-        _loan_id: loanId,
-        _amount: amt,
-        _payment_date: form.payment_date,
-        _notes: form.notes || null,
-      });
-      if (error) throw error;
+      await doAdd({ data: { loan_id: loanId, amount: amt, payment_date: form.payment_date, notes: form.notes || null } });
       toast.success("Insurance payment recorded");
       onClose();
       onSaved();
@@ -789,6 +784,63 @@ function AddInsuranceDialog({ open, loanId, onClose, onSaved }: any) {
     </Dialog>
   );
 }
+
+function AddFineDialog({ open, loanId, onClose, onSaved }: any) {
+  const doAdd = useServerFn(addLoanFine);
+  const [form, setForm] = useState({ fine_date: todayISO(), amount: "200", reason: "" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setForm({ fine_date: todayISO(), amount: "200", reason: "" });
+  }, [open]);
+
+  const submit = async () => {
+    const amt = Number(form.amount);
+    if (!form.fine_date) { toast.error("Fine date required"); return; }
+    if (!form.reason.trim()) { toast.error("Reason required"); return; }
+    if (Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    setBusy(true);
+    try {
+      await doAdd({ data: { loan_id: loanId, amount: amt, fine_date: form.fine_date, reason: form.reason.trim() } });
+      toast.success("Fine added");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to add fine");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Add Fine</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Fine Date</Label>
+            <Input type="date" value={form.fine_date} onChange={(e) => setForm({ ...form, fine_date: e.target.value })} />
+            {form.fine_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.fine_date)}</p>}
+          </div>
+          <div>
+            <Label>Amount (KES)</Label>
+            <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Reason</Label>
+            <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Late payment, manual penalty" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save Fine"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 
 function RecordFinePaymentDialog({ open, loanId, unpaidFines, schedule, onClose, onSaved }: any) {
   const [form, setForm] = useState({ payment_date: todayISO(), fine_id: "", amount: "", notes: "" });
