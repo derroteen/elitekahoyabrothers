@@ -278,3 +278,186 @@ export const deleteLoanScheduleRow = createServerFn({ method: "POST" })
     await audit({ actorId: context.userId, action: "deleted", tableName: "loan_schedule", recordId: data.id, oldValue: before });
     return { ok: true };
   });
+
+// ===== Passbook sync helpers (separate categories: insurance_payment, fine_payment) =====
+
+async function syncPassbookInsurance(payment: any) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
+  if (!loan) return;
+  const marker = `Insurance payment ID: ${payment.id}`;
+  const row = {
+    member_id: (loan as any).member_id,
+    entry_date: payment.payment_date,
+    savings: 0, bonus: 0, withdrawal: 0, loan_payment: 0,
+    total: 0, balance: 0, loan_balance: 0,
+    remarks: `${marker}${payment.notes ? ` | ${payment.notes}` : ""}`,
+    description: "Insurance Payment",
+    category: "insurance_payment",
+    source: "manual",
+    created_by: payment.created_by ?? null,
+  };
+  const { data: existing } = await supabaseAdmin.from("passbook_entries").select("id").eq("member_id", (loan as any).member_id).ilike("remarks", `${marker}%`).maybeSingle();
+  if (existing) await supabaseAdmin.from("passbook_entries").update(row as any).eq("id", (existing as any).id);
+  else await supabaseAdmin.from("passbook_entries").insert(row as any);
+  await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+}
+
+async function deletePassbookInsurance(payment: any) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
+  if (!loan) return;
+  await supabaseAdmin.from("passbook_entries").delete().eq("member_id", (loan as any).member_id).ilike("remarks", `Insurance payment ID: ${payment.id}%`);
+  await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+}
+
+async function syncPassbookFine(fine: any, paymentDate: string, notes: string | null) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", fine.loan_id).single();
+  if (!loan) return;
+  const marker = `Fine payment ID: ${fine.id}`;
+  const paid = Number(fine.amount_paid ?? 0);
+  if (paid <= 0) {
+    await supabaseAdmin.from("passbook_entries").delete().eq("member_id", (loan as any).member_id).ilike("remarks", `${marker}%`);
+    await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+    return;
+  }
+  const row = {
+    member_id: (loan as any).member_id,
+    entry_date: paymentDate,
+    savings: 0, bonus: 0, withdrawal: paid, loan_payment: 0,
+    total: 0, balance: 0, loan_balance: 0,
+    remarks: `${marker}${notes ? ` | ${notes}` : ""}`,
+    description: "Fine Payment",
+    category: "fine_payment",
+    source: "manual",
+  };
+  const { data: existing } = await supabaseAdmin.from("passbook_entries").select("id").eq("member_id", (loan as any).member_id).ilike("remarks", `${marker}%`).maybeSingle();
+  if (existing) await supabaseAdmin.from("passbook_entries").update(row as any).eq("id", (existing as any).id);
+  else await supabaseAdmin.from("passbook_entries").insert(row as any);
+  await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+}
+
+async function deletePassbookFine(fine: any) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", fine.loan_id).single();
+  if (!loan) return;
+  await supabaseAdmin.from("passbook_entries").delete().eq("member_id", (loan as any).member_id).ilike("remarks", `Fine payment ID: ${fine.id}%`);
+  await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+}
+
+// ===== Add Insurance Payment (with passbook sync) =====
+const InsAdd = z.object({
+  loan_id: z.string().uuid(),
+  amount: z.number().positive(),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const addInsurancePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => InsAdd.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await (context.supabase as any).rpc("record_insurance_payment", {
+      _loan_id: data.loan_id, _amount: data.amount, _payment_date: data.payment_date, _notes: data.notes ?? null,
+    });
+    if (error) throw new Error(error.message);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: payment } = await (supabaseAdmin.from("loan_insurance_payments" as any) as any)
+      .select("*").eq("loan_id", data.loan_id).eq("amount", data.amount).eq("payment_date", data.payment_date)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (payment) await syncPassbookInsurance(payment);
+    await audit({ actorId: context.userId, action: "added", tableName: "loan_insurance_payments", recordId: (payment as any)?.id ?? data.loan_id, newValue: data });
+    return { ok: true };
+  });
+
+// Patch the existing edit/delete to also sync passbook
+async function syncInsuranceById(id: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: payment } = await (supabaseAdmin.from("loan_insurance_payments" as any) as any).select("*").eq("id", id).maybeSingle();
+  if (payment) await syncPassbookInsurance(payment);
+}
+
+// ===== Add Loan Fine (manual) =====
+const FineAdd = z.object({
+  loan_id: z.string().uuid(),
+  amount: z.number().positive(),
+  fine_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reason: z.string().min(1).max(500),
+});
+export const addLoanFine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => FineAdd.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await (supabaseAdmin.from("loan_fines" as any) as any).insert({
+      loan_id: data.loan_id, amount: data.amount, fine_date: data.fine_date,
+      reason: data.reason, status: "unpaid", amount_paid: 0,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    const { data: loan } = await supabaseAdmin.from("loans").select("total_fines_charged, outstanding_fines").eq("id", data.loan_id).single();
+    if (loan) {
+      await supabaseAdmin.from("loans").update({
+        total_fines_charged: Number((loan as any).total_fines_charged ?? 0) + data.amount,
+        outstanding_fines: Number((loan as any).outstanding_fines ?? 0) + data.amount,
+      } as any).eq("id", data.loan_id);
+    }
+    await audit({ actorId: context.userId, action: "added", tableName: "loan_fines", recordId: (row as any).id, newValue: data });
+    return { ok: true, id: (row as any).id };
+  });
+
+// ===== Record Fine Payment (with passbook sync) =====
+const FinePayInput = z.object({
+  fine_id: z.string().uuid(),
+  amount: z.number().positive(),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export const recordFinePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => FinePayInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: fine } = await (supabaseAdmin.from("loan_fines" as any) as any).select("*").eq("id", data.fine_id).maybeSingle();
+    if (!fine) throw new Error("Fine not found");
+    const newPaid = Number((fine as any).amount_paid ?? 0) + data.amount;
+    const fineAmount = Number((fine as any).amount ?? 0);
+    if (newPaid > fineAmount) throw new Error("Payment exceeds outstanding fine amount");
+    const status = newPaid >= fineAmount ? "paid" : "partial";
+    const noteSuffix = data.notes ? ` | ${data.notes}` : "";
+    const reason = `${(fine as any).reason ?? ""} [Paid ${data.payment_date}${noteSuffix}]`.trim();
+    await (supabaseAdmin.from("loan_fines" as any) as any).update({ amount_paid: newPaid, status, reason }).eq("id", data.fine_id);
+    if ((fine as any).schedule_id) {
+      await (supabaseAdmin.from("loan_schedule" as any) as any).update({ fine_paid: newPaid }).eq("id", (fine as any).schedule_id);
+    }
+    const { data: allFines } = await (supabaseAdmin.from("loan_fines" as any) as any).select("amount, amount_paid").eq("loan_id", (fine as any).loan_id);
+    const totalCharged = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount ?? 0), 0);
+    const totalPaid = (allFines ?? []).reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0);
+    await supabaseAdmin.from("loans").update({
+      total_fines_paid: totalPaid,
+      outstanding_fines: Math.max(0, totalCharged - totalPaid),
+    } as any).eq("id", (fine as any).loan_id);
+    const { data: updated } = await (supabaseAdmin.from("loan_fines" as any) as any).select("*").eq("id", data.fine_id).maybeSingle();
+    if (updated) await syncPassbookFine(updated, data.payment_date, data.notes ?? null);
+    await audit({ actorId: context.userId, action: "fine_payment", tableName: "loan_fines", recordId: data.fine_id, newValue: data });
+    return { ok: true };
+  });
+
+// ===== Remove Applied Fines (bulk, super admin) =====
+export const removeAppliedFines = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ loan_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: fines = [] } = await (supabaseAdmin.from("loan_fines" as any) as any).select("*").eq("loan_id", data.loan_id);
+    for (const f of fines as any[]) await deletePassbookFine(f);
+    const { error } = await (supabaseAdmin.from("loan_fines" as any) as any).delete().eq("loan_id", data.loan_id);
+    if (error) throw new Error(error.message);
+    await (supabaseAdmin.from("loan_schedule" as any) as any).update({ fine_amount: 0, fine_paid: 0 }).eq("loan_id", data.loan_id);
+    await supabaseAdmin.from("loans").update({ total_fines_charged: 0, total_fines_paid: 0, outstanding_fines: 0 } as any).eq("id", data.loan_id);
+    await audit({ actorId: context.userId, action: "bulk_remove_fines", tableName: "loan_fines", recordId: data.loan_id, oldValue: { count: (fines as any[]).length } });
+    return { ok: true, removed: (fines as any[]).length };
+  });
