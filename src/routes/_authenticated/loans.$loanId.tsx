@@ -417,7 +417,33 @@ function LoanLedger() {
       </Card>
 
       <Card className="mb-4">
-        <div className="p-4 border-b border-border font-serif text-lg">Fine History</div>
+        <div className="p-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
+          <span className="font-serif text-lg">Fine History</span>
+          <div className="flex items-center gap-2">
+            {canEditPayments && (
+              <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setAddFineOpen(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Fine
+              </Button>
+            )}
+            {canDelete && fines.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={async () => {
+                  if (!confirm(`Remove ALL ${fines.length} applied fine(s) for this loan? This will also delete their passbook fine payments and recalc loan totals. This action cannot be undone.`)) return;
+                  try {
+                    const res = await doRemoveAllFines({ data: { loan_id: loanId } });
+                    toast.success(`Removed ${(res as any)?.removed ?? 0} fine(s)`);
+                    refreshLoan();
+                  } catch (err: any) { toast.error(err?.message ?? "Failed to remove fines"); }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Remove Applied Fines
+              </Button>
+            )}
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
