@@ -303,29 +303,45 @@ function LoanLedger() {
       </Link>
       <PageHeader title={`Loan Ledger — ${loan.profile?.full_name ?? ""}`} subtitle={loan.profile?.membership_no ?? ""} />
 
-      <Card className="mb-4">
+      <Card className="mb-4 relative">
+        {liveTotals.cleared && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div className="rotate-[-18deg] border-4 border-emerald-600/40 text-emerald-700/40 font-serif text-6xl md:text-8xl tracking-widest px-8 py-3 rounded-md select-none">
+              CLEARED
+            </div>
+          </div>
+        )}
         <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <Stat label="Loan Amount" value={fmtKES(loan.amount_borrowed)} />
+          <Stat label="Principal" value={fmtKES(liveTotals.principal)} />
+          <Stat label="Interest" value={fmtKES(liveTotals.interest)} />
+          <Stat label="Subtotal Repayment" value={fmtKES(liveTotals.subtotal)} />
+          <Stat label="Amount Paid" value={fmtKES(liveTotals.paid)} />
+          <Stat label="Outstanding Balance" value={fmtKES(liveTotals.outstanding)} highlight />
           <Stat label="Interest Rate" value={`${Number(loan.interest_rate).toFixed(1)}%`} />
           <Stat label="Payment Frequency" value={loan.payment_frequency} />
           <Stat label="Term" value={`${loan.loan_term_months} months`} />
           <Stat label="Loan Date" value={fmtLedgerDate(loan.loan_date)} />
-          <Stat label="Total Repayable" value={fmtKES(loan.total_repayable)} />
-          <Stat label="Total Paid" value={fmtKES(loan.amount_paid)} />
-          <Stat label="Outstanding Balance" value={fmtKES(loan.balance)} highlight />
-          <Stat label="Total Interest Added" value={fmtKES(loan.total_interest_added ?? 0)} />
-          <Stat label="Total Fines Charged" value={fmtKES(loan.total_fines_charged ?? 0)} />
-          <Stat label="Total Fines Paid" value={fmtKES(loan.total_fines_paid ?? 0)} />
-          <Stat label="Outstanding Fines" value={fmtKES(loan.outstanding_fines ?? 0)} highlight={Number(loan.outstanding_fines) > 0} />
+          <Stat label="Total Fines Charged" value={fmtKES(fineHistoryTotals.amount)} />
+          <Stat label="Total Fines Paid" value={fmtKES(fineHistoryTotals.paid)} />
+          <Stat label="Outstanding Fines" value={fmtKES(liveTotals.outstandingFines)} highlight={liveTotals.outstandingFines > 0} />
+          <Stat label="Insurance Paid" value={fmtKES(insuranceTotals.amount)} />
           <Stat label="Next Payment Due" value={nextDue ? fmtLedgerDate(nextDue.due_date) : "—"} />
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Status</div>
             <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[loan.status] ?? "bg-gray-100 text-gray-700"}`}>{loan.status.replace(/_/g, " ")}</span>
+            {liveTotals.cleared && <div className="mt-1 text-xs text-emerald-700 font-semibold">LOAN CLEARED</div>}
           </div>
         </div>
       </Card>
 
-      <Card className="mb-4">
+      <Card className="mb-4 relative">
+        {liveTotals.cleared && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div className="rotate-[-18deg] border-4 border-emerald-600/40 text-emerald-700/40 font-serif text-6xl md:text-8xl tracking-widest px-8 py-3 rounded-md select-none">
+              CLEARED
+            </div>
+          </div>
+        )}
         <div className="p-4 border-b border-border font-serif text-lg">Running Loan Ledger</div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
