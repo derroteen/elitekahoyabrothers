@@ -77,11 +77,14 @@ function LoanLedger() {
   const doDeletePayment = useServerFn(deleteLoanPayment);
   const doDeleteFine = useServerFn(deleteLoanFine);
   const doDeleteIns = useServerFn(deleteInsurancePayment);
+  const doRemoveAllFines = useServerFn(removeAppliedFines);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editFine, setEditFineState] = useState<any>(null);
   const [editIns, setEditInsState] = useState<any>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [addPaymentPrefill, setAddPaymentPrefill] = useState<{ amount?: string; notes?: string } | null>(null);
   const [addInsOpen, setAddInsOpen] = useState(false);
+  const [addFineOpen, setAddFineOpen] = useState(false);
   const [recordFineOpen, setRecordFineOpen] = useState(false);
   const finesGeneratedRef = useRef(false);
 
