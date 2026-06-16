@@ -183,6 +183,7 @@ export const deleteLoanFine = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await (supabaseAdmin.from("loan_fines" as any) as any).select("*").eq("id", data.id).maybeSingle();
     if (!before) throw new Error("Fine not found");
+    await deletePassbookFine(before);
     const { error } = await (supabaseAdmin.from("loan_fines" as any) as any).delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     // Reduce loan totals
