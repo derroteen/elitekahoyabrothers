@@ -21,7 +21,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function descriptionFor(e: any): string {
-  if ((e as any).__brought_forward) return "Brought Forward Balance";
+  if ((e as any).__brought_forward) return e.description ?? "Brought Forward Balance";
   if (e.description) return e.description;
   if (e.category && CATEGORY_LABELS[e.category]) return CATEGORY_LABELS[e.category];
   if (e.remarks) return e.remarks;

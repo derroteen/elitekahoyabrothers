@@ -23,6 +23,7 @@ export function LoanActions({ loan, role }: Props) {
   const qc = useQueryClient();
   const isAdmin = role === "admin" || role === "super_admin";
   const isSuperAdmin = role === "super_admin";
+  const isCleared = Number(loan?.balance ?? 0) <= 0 || loan?.status === "cleared";
   const [payOpen, setPayOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
 
@@ -33,12 +34,21 @@ export function LoanActions({ loan, role }: Props) {
     navigate({ to: "/loans/$loanId", params: { loanId: String(loan.id) } });
   };
 
+  const refreshLoanViews = () => {
+    qc.invalidateQueries({ queryKey: ["loans-all"] });
+    qc.invalidateQueries({ queryKey: ["opening-loans"] });
+    qc.invalidateQueries({ queryKey: ["my-loans"] });
+    qc.invalidateQueries({ queryKey: ["loan", loan?.id] });
+    qc.invalidateQueries({ queryKey: ["loan-repayments", loan?.id] });
+    if (loan?.member_id) qc.invalidateQueries({ queryKey: ["passbook", loan.member_id] });
+  };
+
   return (
     <div className="flex flex-wrap justify-end gap-1">
       <Button size="sm" type="button" className="bg-navy text-white hover:bg-navy-2" onClick={goLedger}>
         View Ledger
       </Button>
-      {isAdmin && loan.status !== "rejected" && loan.status !== "pending" && (
+      {isAdmin && !isCleared && loan.status !== "rejected" && loan.status !== "pending" && (
         <Button size="sm" type="button" variant="outline"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPayOpen(true); }}>
           Record Payment
@@ -50,8 +60,8 @@ export function LoanActions({ loan, role }: Props) {
           Delete
         </Button>
       )}
-      <RecordPaymentDialog loan={loan} open={payOpen} onClose={() => setPayOpen(false)} onSaved={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />
-      <DeleteLoanDialog loan={loan} open={delOpen} onClose={() => setDelOpen(false)} onDeleted={() => qc.invalidateQueries({ queryKey: ["loans-all"] })} />
+      <RecordPaymentDialog loan={loan} open={payOpen} onClose={() => setPayOpen(false)} onSaved={refreshLoanViews} />
+      <DeleteLoanDialog loan={loan} open={delOpen} onClose={() => setDelOpen(false)} onDeleted={refreshLoanViews} />
     </div>
   );
 }

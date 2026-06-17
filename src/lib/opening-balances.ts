@@ -13,21 +13,31 @@ export interface OpeningBalance {
 }
 
 export async function fetchOpeningBalance(memberId: string): Promise<OpeningBalance | null> {
-  const { data } = await supabase
-    .from("member_opening_balances")
-    .select("*")
-    .eq("member_id", memberId)
-    .maybeSingle();
-  if (!data) return null;
+  const [{ data }, { data: openingLoans }] = await Promise.all([
+    supabase
+      .from("member_opening_balances")
+      .select("*")
+      .eq("member_id", memberId)
+      .maybeSingle(),
+    (supabase as any)
+      .from("loan_opening_balances")
+      .select("loan_date, total_repayable")
+      .eq("member_id", memberId),
+  ]);
+  const openingLoanTotal = (openingLoans ?? []).reduce(
+    (sum: number, row: any) => sum + Number(row.total_repayable ?? 0),
+    0,
+  );
+  if (!data && openingLoanTotal <= 0) return null;
   return {
-    member_id: data.member_id,
-    effective_date: data.effective_date as unknown as string,
-    opening_savings: Number(data.opening_savings ?? 0),
-    opening_loan: Number(data.opening_loan ?? 0),
-    opening_fine: Number(data.opening_fine ?? 0),
-    opening_insurance: Number(data.opening_insurance ?? 0),
-    opening_benevolent: Number(data.opening_benevolent ?? 0),
-    notes: (data as any).notes ?? null,
+    member_id: data?.member_id ?? memberId,
+    effective_date: (data?.effective_date as unknown as string) ?? "2026-01-01",
+    opening_savings: Number(data?.opening_savings ?? 0),
+    opening_loan: Number(data?.opening_loan ?? 0) + openingLoanTotal,
+    opening_fine: Number(data?.opening_fine ?? 0),
+    opening_insurance: Number(data?.opening_insurance ?? 0),
+    opening_benevolent: Number(data?.opening_benevolent ?? 0),
+    notes: (data as any)?.notes ?? null,
   };
 }
 
@@ -79,7 +89,8 @@ export function broughtForwardRow(ob: OpeningBalance | null): any | null {
     fine_balance: ob.opening_fine,
     insurance_balance: ob.opening_insurance,
     benevolent_balance: ob.opening_benevolent,
-    remarks: "Brought Forward Balance",
+    description: ob.opening_loan > 0 && ob.opening_savings <= 0 ? "Balance Brought Forward - Loan" : "Brought Forward Balance",
+    remarks: ob.opening_loan > 0 && ob.opening_savings <= 0 ? "Balance Brought Forward - Loan" : "Brought Forward Balance",
     treasurer_sign: "B/F",
     __brought_forward: true,
   };
@@ -88,5 +99,19 @@ export function broughtForwardRow(ob: OpeningBalance | null): any | null {
 /** Prepend the B/F row to a sorted-ascending list of passbook entries. */
 export function withBroughtForward(entries: any[], ob: OpeningBalance | null): any[] {
   const bf = broughtForwardRow(ob);
-  return bf ? [bf, ...entries] : entries;
+  if (!bf) return entries;
+  let savingsBalance = Number(bf.balance ?? 0);
+  let loanBalance = Number(bf.loan_balance ?? 0);
+  const adjusted = entries.map((entry) => {
+    const total = Number(entry.savings ?? 0) + Number(entry.bonus ?? 0);
+    savingsBalance += total - Number(entry.withdrawal ?? 0);
+    loanBalance = Math.max(0, loanBalance - Number(entry.loan_payment ?? 0));
+    return {
+      ...entry,
+      total,
+      balance: savingsBalance,
+      loan_balance: loanBalance,
+    };
+  });
+  return [bf, ...adjusted];
 }

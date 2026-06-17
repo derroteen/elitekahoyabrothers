@@ -29,6 +29,38 @@ async function writeLoanAudit(actorId: string, action: string, loanId: string, a
   } as any);
 }
 
+function isOpeningLoanId(loanId: string) {
+  return loanId.startsWith("opening-");
+}
+
+function normalizeLoanId(loanId: string) {
+  return isOpeningLoanId(loanId) ? loanId.replace(/^opening-/, "") : loanId;
+}
+
+async function recalculateOpeningLoan(openingLoanId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan, error: loanErr } = await (supabaseAdmin as any)
+    .from("loan_opening_balances")
+    .select("*")
+    .eq("id", openingLoanId)
+    .single();
+  if (loanErr || !loan) throw new Error("Opening loan not found");
+
+  const { data: payments = [] } = await supabaseAdmin
+    .from("loan_repayments")
+    .select("amount")
+    .eq("opening_loan_id" as any, openingLoanId);
+  const paid = (payments as any[]).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const base = Number(loan.total_repayable ?? loan.balance ?? loan.principal ?? 0);
+  const balance = Math.max(0, base - paid);
+  const status = balance <= 0 ? "cleared" : "active";
+
+  await (supabaseAdmin as any)
+    .from("loan_opening_balances")
+    .update({ amount_paid: paid, balance, status })
+    .eq("id", openingLoanId);
+}
+
 async function recalculateLoan(loanId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: loan, error: loanErr } = await supabaseAdmin.from("loans").select("*").eq("id", loanId).single();
@@ -107,9 +139,16 @@ async function recalculateLoan(loanId: string) {
 
 async function syncPassbookPayment(payment: any) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
+  const openingLoanId = payment.opening_loan_id as string | null | undefined;
+  const { data: loan } = openingLoanId
+    ? await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("member_id")
+        .eq("id", openingLoanId)
+        .single()
+    : await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
   if (!loan) return;
-  const marker = `Loan repayment ID: ${payment.id}`;
+  const marker = `${openingLoanId ? "Opening loan repayment" : "Loan repayment"} ID: ${payment.id}`;
   const row = {
     member_id: loan.member_id,
     entry_date: payment.payment_date,
@@ -124,7 +163,7 @@ async function syncPassbookPayment(payment: any) {
     created_by: payment.created_by ?? null,
     source: "manual",
     category: "loan_payment",
-    description: "Loan Repayment",
+    description: openingLoanId ? "Opening Loan Repayment" : "Loan Repayment",
   };
   const { data: existing } = await supabaseAdmin.from("passbook_entries").select("id").eq("member_id", loan.member_id).ilike("remarks", `${marker}%`).maybeSingle();
   if (existing) await supabaseAdmin.from("passbook_entries").update(row as any).eq("id", existing.id);
@@ -134,9 +173,17 @@ async function syncPassbookPayment(payment: any) {
 
 async function deletePassbookPayment(payment: any) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: loan } = await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
+  const openingLoanId = payment.opening_loan_id as string | null | undefined;
+  const { data: loan } = openingLoanId
+    ? await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("member_id")
+        .eq("id", openingLoanId)
+        .single()
+    : await supabaseAdmin.from("loans").select("member_id").eq("id", payment.loan_id).single();
   if (!loan) return;
-  await supabaseAdmin.from("passbook_entries").delete().eq("member_id", loan.member_id).ilike("remarks", `Loan repayment ID: ${payment.id}%`);
+  const marker = openingLoanId ? "Opening loan repayment" : "Loan repayment";
+  await supabaseAdmin.from("passbook_entries").delete().eq("member_id", loan.member_id).ilike("remarks", `${marker} ID: ${payment.id}%`);
   await supabaseAdmin.rpc("recompute_passbook_balances", { _member: loan.member_id } as any);
 }
 
@@ -154,6 +201,32 @@ export const addLoanPayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => PaymentInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertLoanEditor(context.userId);
+    const normalizedLoanId = normalizeLoanId(data.loan_id);
+    if (isOpeningLoanId(data.loan_id)) {
+      const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: payment, error } = await supabaseAdmin
+        .from("loan_repayments")
+        .insert({
+          loan_id: null,
+          opening_loan_id: normalizedLoanId,
+          amount: data.amount,
+          payment_date: data.payment_date,
+          notes,
+          payment_method: data.payment_method ?? null,
+          principal_paid: data.amount,
+          fine_paid: 0,
+          source: "manual",
+          created_by: context.userId,
+        } as any)
+        .select("*")
+        .single();
+      if (error || !payment) throw new Error(error?.message ?? "Failed to record payment");
+      await recalculateOpeningLoan(normalizedLoanId);
+      await syncPassbookPayment(payment);
+      await writeLoanAudit(context.userId, "Opening Loan Payment Added", data.loan_id, data.amount, null, data);
+      return { ok: true, opening: true };
+    }
     const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
     const { data: result, error } = await (context.supabase as any).rpc("record_loan_repayment", {
       _loan_id: data.loan_id,
@@ -177,16 +250,18 @@ export const editLoanPayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => PaymentInput.extend({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await assertLoanEditor(context.userId);
+    const normalizedLoanId = normalizeLoanId(data.loan_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
     if (!before) throw new Error("Payment not found");
     const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
     const { error } = await supabaseAdmin.from("loan_repayments").update({ amount: data.amount, payment_date: data.payment_date, payment_method: data.payment_method ?? null, notes } as any).eq("id", data.id);
     if (error) throw new Error(error.message);
-    await recalculateLoan(data.loan_id);
+    if (isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id) await recalculateOpeningLoan(normalizedLoanId);
+    else await recalculateLoan(data.loan_id);
     const { data: after } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
     if (after) await syncPassbookPayment(after);
-    await writeLoanAudit(context.userId, "Payment Edited", data.loan_id, data.amount, before, data);
+    await writeLoanAudit(context.userId, isOpeningLoanId(data.loan_id) ? "Opening Loan Payment Edited" : "Payment Edited", data.loan_id, data.amount, before, data);
     return { ok: true };
   });
 
@@ -195,28 +270,62 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), loan_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await assertLoanEditor(context.userId);
+    const normalizedLoanId = normalizeLoanId(data.loan_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
     if (!before) throw new Error("Payment not found");
-    const { data: loan } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).single();
-    const status = (loan as any)?.status;
-    if (status === "completed" || status === "completed_with_fine" || status === "closed" || status === "rejected") {
-      throw new Error(`Cannot delete payment: loan is ${status}. Reopen the loan first if a correction is needed.`);
+    if (!isOpeningLoanId(data.loan_id) && !(before as any).opening_loan_id) {
+      const { data: loan } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).single();
+      const status = (loan as any)?.status;
+      if (status === "completed" || status === "completed_with_fine" || status === "closed" || status === "rejected") {
+        throw new Error(`Cannot delete payment: loan is ${status}. Reopen the loan first if a correction is needed.`);
+      }
     }
     const { error } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     await deletePassbookPayment(before);
-    await recalculateLoan(data.loan_id);
-    await writeLoanAudit(context.userId, "Payment Deleted", data.loan_id, Number(before.amount || 0), before, null);
+    if (isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id) await recalculateOpeningLoan(normalizedLoanId);
+    else await recalculateLoan(data.loan_id);
+    await writeLoanAudit(context.userId, isOpeningLoanId(data.loan_id) ? "Opening Loan Payment Deleted" : "Payment Deleted", data.loan_id, Number(before.amount || 0), before, null);
     return { ok: true };
   });
 
 export const deleteLoan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), reason: z.string().min(1).max(500) }).parse(i))
+  .inputValidator((i: unknown) => z.object({ id: z.string().min(1), reason: z.string().min(1).max(500) }).parse(i))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (isOpeningLoanId(data.id)) {
+      const openingLoanId = normalizeLoanId(data.id);
+      const { data: before } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("*")
+        .eq("id", openingLoanId)
+        .single();
+      if (!before) throw new Error("Opening loan not found");
+      const { data: payments = [] } = await supabaseAdmin
+        .from("loan_repayments")
+        .select("*")
+        .eq("opening_loan_id" as any, openingLoanId);
+      for (const payment of payments as any[]) await deletePassbookPayment(payment);
+      await supabaseAdmin.from("loan_repayments").delete().eq("opening_loan_id" as any, openingLoanId);
+      const { error } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .delete()
+        .eq("id", openingLoanId);
+      if (error) throw new Error(error.message);
+      await supabaseAdmin.from("audit_logs").insert({
+        actor_id: context.userId,
+        action: "Opening Loan Deleted",
+        table_name: "loan_opening_balances",
+        record_id: openingLoanId,
+        old_value: before as any,
+        new_value: { reason: data.reason, member_id: (before as any).member_id } as any,
+        reason: data.reason,
+      } as any);
+      return { ok: true };
+    }
     const { data: before } = await supabaseAdmin.from("loans").select("*").eq("id", data.id).single();
     if (!before) throw new Error("Loan not found");
     const { data: payments = [] } = await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", data.id);

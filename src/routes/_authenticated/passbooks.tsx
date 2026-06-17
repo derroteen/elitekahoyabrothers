@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
-import { createManualPassbookEntry, updatePassbookEntry } from "@/lib/passbook.functions";
+import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry } from "@/lib/passbook.functions";
+import { forceDeletePassbookEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/passbooks")({
   component: PassbookAdmin,
@@ -75,6 +76,25 @@ function PassbookAdmin() {
 
   const selectedMember = members.find((m: any) => m.id === memberId);
   const canEdit = role === "super_admin" || role === "admin";
+  const canDelete = role === "super_admin";
+  const doForceDelete = useServerFn(forceDeletePassbookEntry);
+  const doDelete = useServerFn(deletePassbookEntry);
+  const onDeleteEntry = async (entry: any) => {
+    if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
+    try {
+      if (entry.source === "weekly") {
+        await doForceDelete({ data: { id: entry.id } });
+      } else {
+        const reason = prompt("Reason for deletion (required, min 3 chars):") ?? "";
+        if (reason.trim().length < 3) { toast.error("Reason required"); return; }
+        await doDelete({ data: { id: entry.id, reason } });
+      }
+      toast.success("Entry deleted and balances recalculated");
+      qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete");
+    }
+  };
 
   return (
     <div>

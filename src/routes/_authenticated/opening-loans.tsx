@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
+import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
+import { LoanActions } from "@/components/LoanActions";
 
 export const Route = createFileRoute("/_authenticated/opening-loans")({
   component: OpeningLoansPage,
@@ -50,6 +52,7 @@ type OpeningLoan = {
   total_repayable: number;
   amount_paid: number;
   balance: number;
+  status?: string;
   notes: string | null;
   profile?: { full_name: string; membership_no: string | null };
 };
@@ -102,26 +105,42 @@ function OpeningLoansPage() {
     queryKey: ["opening-loans"],
     enabled: canEdit,
     queryFn: async (): Promise<OpeningLoan[]> => {
-      const { data, error } = await (supabase as any)
-        .from("loan_opening_balances")
-        .select("*")
-        .order("loan_date", { ascending: false });
+      const [{ data, error }, { data: repayments }] = await Promise.all([
+        (supabase as any)
+          .from("loan_opening_balances")
+          .select("*")
+          .order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_repayments").select("opening_loan_id, amount"),
+      ]);
       if (error) throw error;
+      const repaymentsByOpeningLoan = new Map<string, any[]>();
+      for (const r of repayments ?? []) {
+        const row = r as any;
+        if (!row.opening_loan_id) continue;
+        const list = repaymentsByOpeningLoan.get(row.opening_loan_id) ?? [];
+        list.push(row);
+        repaymentsByOpeningLoan.set(row.opening_loan_id, list);
+      }
       const profMap = new Map(
         (members as any[]).map((m) => [m.id, { full_name: m.full_name, membership_no: m.membership_no }]),
       );
-      return (data ?? []).map((r: any) => ({
-        id: r.id,
-        member_id: r.member_id,
-        loan_date: r.loan_date,
-        principal: Number(r.principal ?? 0),
-        interest_rate: Number(r.interest_rate ?? 0),
-        total_repayable: Number(r.total_repayable ?? 0),
-        amount_paid: Number(r.amount_paid ?? 0),
-        balance: Number(r.balance ?? 0),
-        notes: r.notes,
-        profile: profMap.get(r.member_id),
-      }));
+      return (data ?? []).map((r: any) => {
+        const loanRepayments = repaymentsByOpeningLoan.get(r.id) ?? [];
+        const balance = calculateOutstandingBalanceFromData({ ...r, __opening: true }, loanRepayments);
+        return {
+          id: r.id,
+          member_id: r.member_id,
+          loan_date: r.loan_date,
+          principal: Number(r.principal ?? 0),
+          interest_rate: Number(r.interest_rate ?? 0),
+          total_repayable: Number(r.total_repayable ?? 0),
+          amount_paid: loanRepayments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0),
+          balance,
+          status: balance <= 0 ? "cleared" : (r.status ?? "active"),
+          notes: r.notes,
+          profile: profMap.get(r.member_id),
+        };
+      });
     },
   });
 
@@ -245,20 +264,21 @@ function OpeningLoansPage() {
                 <th className="px-3 py-2 text-right">Total Repayable</th>
                 <th className="px-3 py-2 text-right">Amount Paid</th>
                 <th className="px-3 py-2 text-right">Balance</th>
+                <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
                     Loading…
                   </td>
                 </tr>
               )}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
                     No opening loan records yet.
                   </td>
                 </tr>
@@ -275,7 +295,23 @@ function OpeningLoansPage() {
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.total_repayable)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount_paid)}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold text-navy">{fmtKES(r.balance)}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.balance <= 0 ? "bg-emerald-100 text-emerald-700 font-bold" : "bg-amber-100 text-amber-800 font-semibold"}`}>
+                      {r.balance <= 0 ? "CLEARED" : "OPENING B/F"}
+                    </span>
+                    {r.balance <= 0 && <div className="mt-1 text-[11px] text-emerald-700 font-semibold">Loan Fully Cleared</div>}
+                  </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <LoanActions
+                      loan={{
+                        ...r,
+                        id: `opening-${r.id}`,
+                        __opening: true,
+                        amount_borrowed: r.total_repayable,
+                        outstanding_fines: 0,
+                      }}
+                      role={role}
+                    />
                     <Button size="sm" variant="ghost" onClick={() => openEdit(r)} className="text-blue-600 hover:text-blue-800">
                       Edit
                     </Button>
@@ -293,13 +329,13 @@ function OpeningLoansPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif">
               {form.id ? "Edit Opening Loan" : "Add Opening Loan"}
             </DialogTitle>
             <DialogDescription>
-              Record a loan that existed before the system started. This appears as a read-only opening row in the member's loan list.
+              Record a loan that existed before the system started and is still being repaid.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
