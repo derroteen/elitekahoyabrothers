@@ -99,7 +99,7 @@ function OpeningLoansPage() {
     }
   }, [form.total_repayable, form.amount_paid]);
 
-  const { data: members = [] } = useQuery({
+  const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["members-lite-for-opening-loans"],
     enabled: canEdit,
     queryFn: async () => {
@@ -116,9 +116,9 @@ function OpeningLoansPage() {
     },
   });
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["opening-loans"],
-    enabled: canEdit,
+  const { data: rows = [], isLoading: loansLoading } = useQuery({
+    queryKey: ["opening-loans", members],
+    enabled: canEdit && members.length > 0,
     queryFn: async (): Promise<OpeningLoan[]> => {
       const [{ data, error }, { data: repayments }] = await Promise.all([
         (supabase as any)
@@ -158,6 +158,8 @@ function OpeningLoansPage() {
       });
     },
   });
+  
+  const isLoading = membersLoading || loansLoading;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
