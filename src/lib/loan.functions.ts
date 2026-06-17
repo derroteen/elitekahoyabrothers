@@ -39,26 +39,10 @@ function normalizeLoanId(loanId: string) {
 
 async function recalculateOpeningLoan(openingLoanId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: loan, error: loanErr } = await (supabaseAdmin as any)
-    .from("loan_opening_balances")
-    .select("*")
-    .eq("id", openingLoanId)
-    .single();
-  if (loanErr || !loan) throw new Error("Opening loan not found");
-
-  const { data: payments = [] } = await supabaseAdmin
-    .from("loan_repayments")
-    .select("amount")
-    .eq("opening_loan_id" as any, openingLoanId);
-  const paid = (payments as any[]).reduce((sum, p) => sum + Number(p.amount || 0), 0);
-  const base = Number(loan.total_repayable ?? loan.balance ?? loan.principal ?? 0);
-  const balance = Math.max(0, base - paid);
-  const status = balance <= 0 ? "cleared" : "active";
-
-  await (supabaseAdmin as any)
-    .from("loan_opening_balances")
-    .update({ amount_paid: paid, balance, status })
-    .eq("id", openingLoanId);
+  const { error } = await (supabaseAdmin as any).rpc("recalculate_opening_loan_balance", {
+    _opening_loan_id: openingLoanId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 async function recalculateLoan(loanId: string) {
@@ -188,7 +172,13 @@ async function deletePassbookPayment(payment: any) {
 }
 
 const PaymentInput = z.object({
-  loan_id: z.string().uuid(),
+  loan_id: z.string().refine((val) => {
+    if (val.startsWith("opening-")) {
+      const uuidPart = val.slice(8);
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidPart);
+    }
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+  }, "Invalid loan ID"),
   amount: z.number().nonnegative(),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   payment_method: z.string().optional().nullable(),
