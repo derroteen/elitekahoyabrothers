@@ -42,14 +42,29 @@ function LoansAdmin() {
     queryKey: ["loans-all"],
     enabled: !!role && role !== "member",
     queryFn: async () => {
-      const [{ data: ls }, { data: profs }] = await Promise.all([
+      const [{ data: ls }, { data: profs }, { data: openings }] = await Promise.all([
         supabase.from("loans").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, full_name, membership_no"),
+        (supabase as any).from("loan_opening_balances").select("*").order("loan_date", { ascending: false }),
       ]);
       const pmap = new Map((profs ?? []).map((p: any) => [p.id, p]));
-      return (ls ?? []).map((l: any) => ({ ...l, profile: pmap.get(l.member_id) }));
+      const real = (ls ?? []).map((l: any) => ({ ...l, profile: pmap.get(l.member_id) }));
+      const opening = (openings ?? []).map((o: any) => ({
+        id: `opening-${o.id}`,
+        __opening: true,
+        member_id: o.member_id,
+        loan_date: o.loan_date,
+        amount_borrowed: o.principal,
+        amount_paid: o.amount_paid,
+        balance: o.balance,
+        outstanding_fines: 0,
+        status: "opening",
+        profile: pmap.get(o.member_id),
+      }));
+      return [...opening, ...real];
     },
   });
+
 
   const applyFines = useMutation({
     mutationFn: async () => {
