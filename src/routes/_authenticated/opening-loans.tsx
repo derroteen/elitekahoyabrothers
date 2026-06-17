@@ -190,13 +190,21 @@ function OpeningLoansPage() {
   };
 
   const submit = async () => {
+    console.log("=== Opening Loan Submit ===");
+    console.log("Form state:", form);
     if (!form.member_id) return toast.error("Member is required");
     const amountPaid = Number(form.amount_paid || 0);
     const totalRepayable = Number(form.total_repayable || 0);
+    console.log("Parsed values:", { amountPaid, totalRepayable });
     
     try {
+      let openingLoanId: string | null = null;
+      
       if (form.id) {
         // Update existing opening loan
+        openingLoanId = form.id;
+        console.log("Updating existing opening loan with id:", openingLoanId);
+        
         const { error } = await (supabase as any)
           .from("loan_opening_balances")
           .update({
@@ -207,20 +215,23 @@ function OpeningLoansPage() {
             total_repayable: totalRepayable,
             notes: form.notes || null,
           })
-          .eq("id", form.id);
+          .eq("id", openingLoanId);
         if (error) throw error;
 
         // Update or create the opening balance repayment
         const { data: existingRepayments } = await (supabase as any)
           .from("loan_repayments")
           .select("*")
-          .eq("opening_loan_id", form.id)
+          .eq("opening_loan_id", openingLoanId)
           .eq("source", "opening_balance")
           .limit(1);
+        
+        console.log("Found existing opening_balance repayments:", existingRepayments);
         
         if (existingRepayments && existingRepayments.length > 0) {
           // Update existing opening balance repayment
           if (amountPaid > 0) {
+            console.log("Updating existing repayment to amount:", amountPaid);
             await (supabase as any)
               .from("loan_repayments")
               .update({
@@ -230,6 +241,7 @@ function OpeningLoansPage() {
               })
               .eq("id", existingRepayments[0].id);
           } else {
+            console.log("Deleting existing repayment (amountPaid is 0)");
             // Delete if amountPaid is 0
             await (supabase as any)
               .from("loan_repayments")
@@ -237,11 +249,12 @@ function OpeningLoansPage() {
               .eq("id", existingRepayments[0].id);
           }
         } else if (amountPaid > 0) {
+          console.log("Creating new repayment with amount:", amountPaid);
           // Create new opening balance repayment
           await (supabase as any)
             .from("loan_repayments")
             .insert({
-              opening_loan_id: form.id,
+              opening_loan_id: openingLoanId,
               amount: amountPaid,
               payment_date: form.loan_date,
               notes: "Opening balance brought forward",
@@ -251,12 +264,9 @@ function OpeningLoansPage() {
               fine_paid: 0,
             });
         }
-
-        // Recalculate balance after updating repayments
-        await (supabase as any).rpc("recalculate_opening_loan_balance", { _opening_loan_id: form.id });
-        toast.success("Opening loan updated");
       } else {
         // Insert new opening loan
+        console.log("Inserting new opening loan");
         const { data: insertedLoan, error: insertErr } = await (supabase as any)
           .from("loan_opening_balances")
           .insert({
@@ -270,13 +280,16 @@ function OpeningLoansPage() {
           .select("*")
           .single();
         if (insertErr || !insertedLoan) throw insertErr;
+        openingLoanId = insertedLoan.id;
+        console.log("New opening loan created with id:", openingLoanId);
 
         // If user entered an amount_paid, create a corresponding loan_repayment entry
         if (amountPaid > 0) {
+          console.log("Creating repayment for new loan with amount:", amountPaid);
           const { error: repErr } = await (supabase as any)
             .from("loan_repayments")
             .insert({
-              opening_loan_id: insertedLoan.id,
+              opening_loan_id: openingLoanId,
               amount: amountPaid,
               payment_date: form.loan_date,
               notes: "Opening balance brought forward",
@@ -287,15 +300,20 @@ function OpeningLoansPage() {
             });
           if (repErr) throw repErr;
         }
-
-        toast.success("Opening loan added");
       }
+      
+      // Always recalculate balance (for both new and updated loans)
+      console.log("Calling recalculate_opening_loan_balance with id:", openingLoanId);
+      await (supabase as any).rpc("recalculate_opening_loan_balance", { _opening_loan_id: openingLoanId });
+      
+      toast.success(form.id ? "Opening loan updated" : "Opening loan added");
 
       setDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["opening-loans"] });
       qc.invalidateQueries({ queryKey: ["loans-all"] });
       qc.invalidateQueries({ queryKey: ["my-loans"] });
     } catch (e: any) {
+      console.error("Error submitting opening loan:", e);
       toast.error(e.message ?? "Failed");
     }
   };
