@@ -28,6 +28,13 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
 
+// Helper to safely calculate balance
+const calculateBalance = (totalRepayable: string, amountPaid: string) => {
+  const tr = Number(totalRepayable || 0);
+  const ap = Number(amountPaid || 0);
+  return Math.max(0, tr - ap).toString();
+};
+
 export const Route = createFileRoute("/_authenticated/opening-loans")({
   component: OpeningLoansPage,
   head: () => ({
@@ -83,6 +90,14 @@ function OpeningLoansPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+
+  // Auto-calculate balance whenever total_repayable or amount_paid changes
+  useEffect(() => {
+    const newBalance = calculateBalance(form.total_repayable, form.amount_paid);
+    if (form.balance !== newBalance) {
+      setForm(prev => ({ ...prev, balance: newBalance }));
+    }
+  }, [form.total_repayable, form.amount_paid]);
 
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite-for-opening-loans"],
@@ -176,31 +191,106 @@ function OpeningLoansPage() {
 
   const submit = async () => {
     if (!form.member_id) return toast.error("Member is required");
-    const payload = {
-      member_id: form.member_id,
-      loan_date: form.loan_date,
-      principal: Number(form.principal || 0),
-      interest_rate: Number(form.interest_rate || 0),
-      total_repayable: Number(form.total_repayable || 0),
-      amount_paid: Number(form.amount_paid || 0),
-      balance: Number(form.balance || 0),
-      notes: form.notes || null,
-    };
+    const amountPaid = Number(form.amount_paid || 0);
+    const totalRepayable = Number(form.total_repayable || 0);
+    
     try {
       if (form.id) {
+        // Update existing opening loan
         const { error } = await (supabase as any)
           .from("loan_opening_balances")
-          .update(payload)
+          .update({
+            member_id: form.member_id,
+            loan_date: form.loan_date,
+            principal: Number(form.principal || 0),
+            interest_rate: Number(form.interest_rate || 0),
+            total_repayable: totalRepayable,
+            notes: form.notes || null,
+          })
           .eq("id", form.id);
         if (error) throw error;
+
+        // Update or create the opening balance repayment
+        const { data: existingRepayments } = await (supabase as any)
+          .from("loan_repayments")
+          .select("*")
+          .eq("opening_loan_id", form.id)
+          .eq("source", "opening_balance")
+          .limit(1);
+        
+        if (existingRepayments && existingRepayments.length > 0) {
+          // Update existing opening balance repayment
+          if (amountPaid > 0) {
+            await (supabase as any)
+              .from("loan_repayments")
+              .update({
+                amount: amountPaid,
+                payment_date: form.loan_date,
+                principal_paid: amountPaid,
+              })
+              .eq("id", existingRepayments[0].id);
+          } else {
+            // Delete if amountPaid is 0
+            await (supabase as any)
+              .from("loan_repayments")
+              .delete()
+              .eq("id", existingRepayments[0].id);
+          }
+        } else if (amountPaid > 0) {
+          // Create new opening balance repayment
+          await (supabase as any)
+            .from("loan_repayments")
+            .insert({
+              opening_loan_id: form.id,
+              amount: amountPaid,
+              payment_date: form.loan_date,
+              notes: "Opening balance brought forward",
+              payment_method: "manual",
+              source: "opening_balance",
+              principal_paid: amountPaid,
+              fine_paid: 0,
+            });
+        }
+
+        // Recalculate balance after updating repayments
+        await (supabase as any).rpc("recalculate_opening_loan_balance", { _opening_loan_id: form.id });
         toast.success("Opening loan updated");
       } else {
-        const { error } = await (supabase as any)
+        // Insert new opening loan
+        const { data: insertedLoan, error: insertErr } = await (supabase as any)
           .from("loan_opening_balances")
-          .insert(payload);
-        if (error) throw error;
+          .insert({
+            member_id: form.member_id,
+            loan_date: form.loan_date,
+            principal: Number(form.principal || 0),
+            interest_rate: Number(form.interest_rate || 0),
+            total_repayable: totalRepayable,
+            notes: form.notes || null,
+          })
+          .select("*")
+          .single();
+        if (insertErr || !insertedLoan) throw insertErr;
+
+        // If user entered an amount_paid, create a corresponding loan_repayment entry
+        if (amountPaid > 0) {
+          const { error: repErr } = await (supabase as any)
+            .from("loan_repayments")
+            .insert({
+              opening_loan_id: insertedLoan.id,
+              amount: amountPaid,
+              payment_date: form.loan_date,
+              notes: "Opening balance brought forward",
+              payment_method: "manual",
+              source: "opening_balance",
+              principal_paid: amountPaid,
+              fine_paid: 0,
+            });
+          if (repErr) throw repErr;
+        }
+
         toast.success("Opening loan added");
       }
+
       setDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["opening-loans"] });
       qc.invalidateQueries({ queryKey: ["loans-all"] });
@@ -446,7 +536,14 @@ function OpeningLoansPage() {
             </div>
             <div className="col-span-2">
               <Label>Balance (KSh)</Label>
-              <Input type="number" min="0" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+              <Input 
+                type="number" 
+                min="0" 
+                step="0.01" 
+                value={form.balance} 
+                readOnly 
+                className="bg-muted cursor-not-allowed"
+              />
             </div>
             <div className="col-span-2">
               <Label>Notes / Remarks</Label>
