@@ -55,15 +55,21 @@ function MyLoans() {
               {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && loans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => (
-                <tr key={l.id} className="border-b border-border last:border-0">
+                <tr key={l.id} className={`border-b border-border last:border-0 ${l.__opening ? "bg-amber-50/40" : ""}`}>
                   <td className="px-4 py-3">{fmtDate(l.loan_date)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_borrowed)}</td>
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(l.amount_paid)}</td>
                   <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                   <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
-                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{(l.status ?? "").replace(/_/g, " ")}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider">
+                    {l.__opening ? <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Opening B/F</span> : (l.status ?? "").replace(/_/g, " ")}
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
+                    {l.__opening ? (
+                      <span className="text-xs text-muted-foreground italic">Brought forward</span>
+                    ) : (
+                      <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
+                    )}
                   </td>
                 </tr>
               ))}
