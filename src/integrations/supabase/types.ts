@@ -318,6 +318,62 @@ export type Database = {
           },
         ]
       }
+      loan_opening_balances: {
+        Row: {
+          amount_paid: number
+          balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          interest_rate: number
+          loan_date: string
+          member_id: string
+          notes: string | null
+          principal: number
+          total_repayable: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interest_rate?: number
+          loan_date: string
+          member_id: string
+          notes?: string | null
+          principal?: number
+          total_repayable?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interest_rate?: number
+          loan_date?: string
+          member_id?: string
+          notes?: string | null
+          principal?: number
+          total_repayable?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_opening_balances_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_repayments: {
         Row: {
           amount: number
