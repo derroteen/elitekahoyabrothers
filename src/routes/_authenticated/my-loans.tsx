@@ -15,7 +15,23 @@ function MyLoans() {
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ["my-loans", user?.id],
     enabled: !!user,
-    queryFn: async () => (await supabase.from("loans").select("*").eq("member_id", user!.id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const [real, opening] = await Promise.all([
+        supabase.from("loans").select("*").eq("member_id", user!.id).order("created_at", { ascending: false }),
+        (supabase as any).from("loan_opening_balances").select("*").eq("member_id", user!.id).order("loan_date", { ascending: false }),
+      ]);
+      const openingRows = (opening.data ?? []).map((o: any) => ({
+        id: `opening-${o.id}`,
+        __opening: true,
+        loan_date: o.loan_date,
+        amount_borrowed: o.principal,
+        amount_paid: o.amount_paid,
+        balance: o.balance,
+        outstanding_fines: 0,
+        status: "opening b/f",
+      }));
+      return [...openingRows, ...(real.data ?? [])];
+    },
   });
 
   return (
