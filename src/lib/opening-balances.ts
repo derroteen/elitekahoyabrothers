@@ -21,11 +21,11 @@ export async function fetchOpeningBalance(memberId: string): Promise<OpeningBala
       .maybeSingle(),
     (supabase as any)
       .from("loan_opening_balances")
-      .select("loan_date, total_repayable")
+      .select("balance")
       .eq("member_id", memberId),
   ]);
   const openingLoanTotal = (openingLoans ?? []).reduce(
-    (sum: number, row: any) => sum + Number(row.total_repayable ?? 0),
+    (sum: number, row: any) => sum + Number(row.balance ?? 0),
     0,
   );
   if (!data && openingLoanTotal <= 0) return null;
