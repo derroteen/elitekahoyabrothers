@@ -351,14 +351,24 @@ export const editLoanPayment = createServerFn({ method: "POST" })
 
 export const deleteLoanPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), loan_id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({ 
+    id: z.string().uuid(), 
+    loan_id: z.string().refine((val) => {
+      if (val.startsWith("opening-")) {
+        const uuidPart = val.slice(8);
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidPart);
+      }
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    }, "Invalid loan ID")
+  }).parse(i))
   .handler(async ({ data, context }) => {
     await assertLoanEditor(context.userId);
     const normalizedLoanId = normalizeLoanId(data.loan_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: before } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
     if (!before) throw new Error("Payment not found");
-    if (!isOpeningLoanId(data.loan_id) && !(before as any).opening_loan_id) {
+    const isOpening = isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id;
+    if (!isOpening) {
       const { data: loan } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).single();
       const status = (loan as any)?.status;
       if (status === "completed" || status === "completed_with_fine" || status === "closed" || status === "rejected") {
@@ -368,9 +378,13 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     await deletePassbookPayment(before);
-    if (isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id) await recalculateOpeningLoan(normalizedLoanId);
-    else await recalculateLoan(data.loan_id);
-    await writeLoanAudit(context.userId, isOpeningLoanId(data.loan_id) ? "Opening Loan Payment Deleted" : "Payment Deleted", data.loan_id, Number(before.amount || 0), before, null);
+    if (isOpening) {
+      const openingLoanId = (before as any).opening_loan_id || normalizedLoanId;
+      await recalculateOpeningLoan(openingLoanId);
+    } else {
+      await recalculateLoan(data.loan_id);
+    }
+    await writeLoanAudit(context.userId, isOpening ? "Opening Loan Payment Deleted" : "Payment Deleted", data.loan_id, Number(before.amount || 0), before, null);
     return { ok: true };
   });
 
