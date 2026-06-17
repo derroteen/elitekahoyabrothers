@@ -86,7 +86,7 @@ function CollectionsPage() {
       </Card>
 
       <NewSheetDialog open={openNew} onOpenChange={setOpenNew} lastSheet={sheets[0]} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
-      {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} canDelete={canDelete} />}
+      {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} canDelete={canDelete} sheets={sheets} setActiveId={setActiveId} />}
       {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
   );
@@ -135,7 +135,7 @@ function NewSheetDialog({ open, onOpenChange, lastSheet, onCreated }: any) {
   );
 }
 
-function SheetEditor({ id, onClose, canEdit, canDelete }: { id: string; onClose: () => void; canEdit: boolean; canDelete: boolean }) {
+function SheetEditor({ id, onClose, canEdit, canDelete, sheets, setActiveId }: { id: string; onClose: () => void; canEdit: boolean; canDelete: boolean; sheets: any[]; setActiveId: (id: string) => void }) {
   const qc = useQueryClient();
   const doDeleteEntry = useServerFn(deleteWeeklyCollectionEntry);
   const { data: sheet } = useQuery({
@@ -245,13 +245,37 @@ function SheetEditor({ id, onClose, canEdit, canDelete }: { id: string; onClose:
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Find current sheet index
+  const currentIndex = sheets.findIndex((s: any) => s.id === id);
+  // Since sheets are sorted descending (newest first), previous is index+1, next is index-1
+  const prevSheet = sheets[currentIndex + 1];
+  const nextSheet = sheets[currentIndex - 1];
+
   if (!sheet) return null;
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="font-serif">Weekly Collection Sheet · Week {sheet.week_number}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!prevSheet}
+              onClick={() => setActiveId(prevSheet.id)}
+            >
+              ← Previous
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!nextSheet}
+              onClick={() => setActiveId(nextSheet.id)}
+            >
+              Next →
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
