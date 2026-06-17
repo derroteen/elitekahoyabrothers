@@ -314,6 +314,7 @@ function OpeningLoansPage() {
       qc.invalidateQueries({ queryKey: ["opening-loans"] });
       qc.invalidateQueries({ queryKey: ["loans-all"] });
       qc.invalidateQueries({ queryKey: ["my-loans"] });
+      qc.invalidateQueries({ queryKey: ["passbook", form.member_id] });
     } catch (e: any) {
       console.error("Error submitting opening loan:", e);
       toast.error(e.message ?? "Failed");
@@ -332,6 +333,7 @@ function OpeningLoansPage() {
       qc.invalidateQueries({ queryKey: ["opening-loans"] });
       qc.invalidateQueries({ queryKey: ["loans-all"] });
       qc.invalidateQueries({ queryKey: ["my-loans"] });
+      qc.invalidateQueries({ queryKey: ["passbook", r.member_id] });
     } catch (e: any) {
       toast.error(e.message ?? "Failed");
     }

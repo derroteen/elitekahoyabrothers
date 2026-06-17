@@ -23,17 +23,25 @@ export const Route = createFileRoute("/_authenticated/attendance")({
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-type Status = "present" | "late" | "absent";
+type Status = "present" | "late" | "absent" | "apology";
 
 type Member = { id: string; full_name: string; membership_no: string | null; sort_order: number | null };
 type Sheet = { id: string; year: number; month: number; week_dates: string[]; notes: string | null };
 type Entry = { id: string; sheet_id: string; member_id: string; week_number: number; status: Status; arrival_time: string | null; fine_amount: number };
 
-function statusLabel(s: Status) { return s === "present" ? "✓" : s === "late" ? "L" : "✗"; }
+function statusLabel(s: Status) { 
+  if (s === "present") return "✓";
+  if (s === "late") return "L";
+  if (s === "absent") return "✗";
+  if (s === "apology") return "A";
+  return "";
+}
 function statusColor(s: Status) {
-  return s === "present" ? "bg-green-500/20 text-green-700 dark:text-green-300" :
-         s === "late" ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300" :
-         "bg-red-500/20 text-red-700 dark:text-red-300";
+  if (s === "present") return "bg-green-500/20 text-green-700 dark:text-green-300";
+  if (s === "late") return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300";
+  if (s === "absent") return "bg-red-500/20 text-red-700 dark:text-red-300";
+  if (s === "apology") return "bg-blue-500/20 text-blue-700 dark:text-blue-300";
+  return "";
 }
 
 function AttendancePage() {
@@ -77,6 +85,36 @@ function AttendancePage() {
       return (data ?? []) as Entry[];
     },
   });
+
+  // Get all entries for current year/month (all sheets) to check for used apologies
+  const { data: allMonthlyEntries = [] } = useQuery({
+    queryKey: ["all-monthly-entries", year, month],
+    enabled: true,
+    queryFn: async () => {
+      const { data: sheets } = await supabase
+        .from("attendance_sheets")
+        .select("id")
+        .eq("year", year)
+        .eq("month", month);
+      if (!sheets || sheets.length === 0) return [];
+      const { data: entries } = await supabase
+        .from("attendance_entries")
+        .select("*")
+        .in("sheet_id", sheets.map(s => s.id));
+      return (entries ?? []) as Entry[];
+    },
+  });
+
+  // Memoized set of member IDs that have used apology this month
+  const membersWithUsedApology = useMemo(() => {
+    const used = new Set<string>();
+    allMonthlyEntries.forEach(entry => {
+      if (entry.status === "apology") {
+        used.add(entry.member_id);
+      }
+    });
+    return used;
+  }, [allMonthlyEntries]);
 
   const createSheet = useMutation({
     mutationFn: async () => {
@@ -138,7 +176,7 @@ function AttendancePage() {
     const row: any = { no: i + 1, name: m.full_name };
     for (let w = 1; w <= weekCount; w++) {
       const e = entryMap.get(`${m.id}:${w}`);
-      row[`week_${w}`] = e ? (e.status === "present" ? "P" : e.status === "late" ? `L${e.arrival_time ? " "+e.arrival_time : ""}` : "A") : "";
+      row[`week_${w}`] = e ? (e.status === "present" ? "P" : e.status === "late" ? `L${e.arrival_time ? " "+e.arrival_time : ""}` : e.status === "apology" ? "AP" : "A") : "";
     }
     row.total = fmtKES(memberTotal(m.id));
     return row;
@@ -236,6 +274,7 @@ function AttendancePage() {
                       const e = entryMap.get(`${m.id}:${w}`);
                       const status: Status = e?.status ?? "present";
                       const arrival = e?.arrival_time ?? "";
+                      const hasUsedApology = membersWithUsedApology.has(m.id) && status !== "apology";
                       return (
                         <td key={wi} className="px-2 py-2">
                           <div className="flex flex-col gap-1 items-stretch">
@@ -247,6 +286,9 @@ function AttendancePage() {
                                     <SelectItem value="present">Present</SelectItem>
                                     <SelectItem value="late">Late (KES 20)</SelectItem>
                                     <SelectItem value="absent">Absent (KES 200)</SelectItem>
+                                    <SelectItem value="apology" disabled={hasUsedApology}>
+                                      {hasUsedApology ? "Apology (used this month)" : "Apology"}
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {status === "late" && e && (
