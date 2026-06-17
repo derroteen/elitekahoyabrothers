@@ -191,7 +191,168 @@ export const addLoanPayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => PaymentInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertLoanEditor(context.userId);
+    
+    // David's confirmed member_id
+    const DAVID_MEMBER_ID = "b06d7bd0-2fbe-4d5c-a875-e0901ff37900";
+    const SPLIT_START_DATE = new Date("2026-03-19");
+    const OPENING_LOAN_ID = "ee120e49-0e13-4706-889f-99484ed93034";
+    
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    
+    // Check if this is a loan for David Omari Kianga
+    let memberId: string | null = null;
+    if (isOpeningLoanId(data.loan_id)) {
+      const { data: openingLoan } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("member_id")
+        .eq("id", normalizeLoanId(data.loan_id))
+        .single();
+      memberId = openingLoan?.member_id;
+    } else {
+      const { data: loan } = await supabaseAdmin
+        .from("loans")
+        .select("member_id")
+        .eq("id", data.loan_id)
+        .single();
+      memberId = loan?.member_id;
+    }
+    
+    // Check if member is David using his member_id
+    if (memberId === DAVID_MEMBER_ID) {
+      const paymentDate = new Date(data.payment_date);
+      // Get David's loans and their balances
+      const { data: regularLoan } = await supabaseAdmin
+        .from("loans")
+        .select("id, balance")
+        .eq("member_id", memberId)
+        .in("status", ["approved", "active", "overdue", "completed_with_fine"])
+        .gt("balance", 0)
+        .order("loan_date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+        
+      const { data: openingLoan } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("id, balance")
+        .eq("id", OPENING_LOAN_ID)
+        .gt("balance", 0)
+        .maybeSingle();
+        
+      const regularBalance = Number(regularLoan?.balance || 0);
+      const openingBalance = Number(openingLoan?.balance || 0);
+      
+      // Check auto-stop conditions
+      if (!regularLoan || !openingLoan || regularBalance === 0 || openingBalance === 0) {
+        if (regularLoan && regularBalance > 0) {
+          const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
+          const { data: result, error } = await (context.supabase as any).rpc("record_loan_repayment", {
+            _loan_id: regularLoan.id,
+            _amount: data.amount,
+            _payment_date: data.payment_date,
+            _notes: notes,
+            _payment_method: data.payment_method ?? null,
+            _source: "manual",
+            _weekly_entry_id: null,
+          });
+          if (error) throw new Error(error.message);
+          const { data: payment } = await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", regularLoan.id).eq("amount", data.amount).eq("payment_date", data.payment_date).order("created_at", { ascending: false }).limit(1).maybeSingle();
+          if (payment) await syncPassbookPayment(payment);
+          await writeLoanAudit(context.userId, "Payment Added", data.loan_id, data.amount, null, data);
+          return result;
+        } else if (openingLoan && openingBalance > 0) {
+          const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
+          const { data: payment, error } = await supabaseAdmin
+            .from("loan_repayments")
+            .insert({
+              loan_id: null,
+              opening_loan_id: openingLoan.id,
+              amount: data.amount,
+              payment_date: data.payment_date,
+              notes,
+              payment_method: data.payment_method ?? null,
+              principal_paid: data.amount,
+              fine_paid: 0,
+              source: "manual",
+              created_by: context.userId,
+            } as any)
+            .select("*")
+            .single();
+          if (error || !payment) throw new Error(error?.message ?? "Failed to record opening loan payment");
+          await recalculateOpeningLoan(openingLoan.id);
+          await syncPassbookPayment(payment);
+          await writeLoanAudit(context.userId, "Opening Loan Payment Added", data.loan_id, data.amount, null, data);
+          return { ok: true, opening: true };
+        }
+        throw new Error("Both of David's loans are cleared");
+      }
+      
+      // Check if payment date is before split start date
+      if (paymentDate < SPLIT_START_DATE) {
+        const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
+        const { data: result, error } = await (context.supabase as any).rpc("record_loan_repayment", {
+          _loan_id: regularLoan.id,
+          _amount: data.amount,
+          _payment_date: data.payment_date,
+          _notes: notes,
+          _payment_method: data.payment_method ?? null,
+          _source: "manual",
+          _weekly_entry_id: null,
+        });
+        if (error) throw new Error(error.message);
+        const { data: payment } = await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", regularLoan.id).eq("amount", data.amount).eq("payment_date", data.payment_date).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (payment) await syncPassbookPayment(payment);
+        await writeLoanAudit(context.userId, "Payment Added", data.loan_id, data.amount, null, data);
+        return result;
+      }
+      
+      // Calculate split amounts for dates on or after split start
+      const regularAmount = Math.min(data.amount, 1000);
+      const openingAmount = Math.max(0, data.amount - 1000);
+      const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
+      
+      // Record regular loan payment if applicable
+      if (regularAmount > 0) {
+        const { error: regularErr } = await (context.supabase as any).rpc("record_loan_repayment", {
+          _loan_id: regularLoan.id,
+          _amount: regularAmount,
+          _payment_date: data.payment_date,
+          _notes: notes,
+          _payment_method: data.payment_method ?? null,
+          _source: "manual",
+          _weekly_entry_id: null,
+        });
+        if (regularErr) throw new Error(regularErr.message);
+      }
+      
+      // Record opening loan payment if applicable
+      if (openingAmount > 0) {
+        const { data: payment, error: openingErr } = await supabaseAdmin
+          .from("loan_repayments")
+          .insert({
+            loan_id: null,
+            opening_loan_id: openingLoan.id,
+            amount: openingAmount,
+            payment_date: data.payment_date,
+            notes,
+            payment_method: data.payment_method ?? null,
+            principal_paid: openingAmount,
+            fine_paid: 0,
+            source: "manual",
+            created_by: context.userId,
+          } as any)
+          .select("*")
+          .single();
+        if (openingErr || !payment) throw new Error(openingErr?.message ?? "Failed to record opening loan payment");
+        await recalculateOpeningLoan(openingLoan.id);
+        await syncPassbookPayment(payment);
+      }
+      
+      await writeLoanAudit(context.userId, "Split Payment Added (David)", data.loan_id, data.amount, null, data);
+      return { ok: true, split: true };
+    }
+    
+    // Original logic for all other members
     const normalizedLoanId = normalizeLoanId(data.loan_id);
     if (isOpeningLoanId(data.loan_id)) {
       const notes = [data.reference ? `Reference: ${data.reference}` : null, data.notes || null].filter(Boolean).join(" | ") || null;
@@ -270,18 +431,21 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
     await assertLoanEditor(context.userId);
     const normalizedLoanId = normalizeLoanId(data.loan_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: before } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
+    console.log("deleteLoanPayment called with data.id =", data.id);
+    const { data: before, error: fetchError } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).maybeSingle();
+    if (fetchError) throw new Error(fetchError.message);
     if (!before) throw new Error("Payment not found");
     const isOpening = isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id;
     if (!isOpening) {
-      const { data: loan } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).single();
+      const { data: loan, error: loanErr } = await supabaseAdmin.from("loans").select("status").eq("id", data.loan_id).maybeSingle();
+      if (loanErr) throw new Error(loanErr.message);
       const status = (loan as any)?.status;
       if (status === "completed" || status === "completed_with_fine" || status === "closed" || status === "rejected") {
         throw new Error(`Cannot delete payment: loan is ${status}. Reopen the loan first if a correction is needed.`);
       }
     }
-    const { error } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    const { error: deleteErr } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
+    if (deleteErr) throw new Error(deleteErr.message);
     await deletePassbookPayment(before);
     if (isOpening) {
       const openingLoanId = (before as any).opening_loan_id || normalizedLoanId;

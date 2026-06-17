@@ -26,6 +26,7 @@ function CollectionsPage() {
   const [openNew, setOpenNew] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
 
   const { data: sheets = [], isLoading } = useQuery({
     queryKey: ["collections-list"],
@@ -44,10 +45,42 @@ function CollectionsPage() {
   const canEdit = role === "super_admin" || role === "admin";
   const canDelete = role === "super_admin";
 
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("backfill_missing_loan_repayments");
+      if (error) throw error;
+      if (data > 0) {
+        toast.success(`Successfully posted ${data} missing repayments`);
+      } else {
+        toast.success("All repayments are already up to date");
+      }
+      qc.invalidateQueries({ queryKey: ["collections-list"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to backfill repayments");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Weekly Collection Sheet" subtitle={`${sheets.length} sheets on file`}
-        actions={canEdit ? <Button onClick={() => setOpenNew(true)} className="bg-navy text-white hover:bg-navy-2">+ New Week</Button> : undefined} />
+        actions={
+          canEdit ? (
+            <div className="flex gap-2">
+              <Button
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="bg-green-700 text-white hover:bg-green-800"
+              >
+                {backfilling ? "Backfilling…" : "Post Missing Repayments"}
+              </Button>
+              <Button onClick={() => setOpenNew(true)} className="bg-navy text-white hover:bg-navy-2">+ New Week</Button>
+            </div>
+          ) : undefined
+        }
+      />
 
       <Card>
         <div className="overflow-x-auto">
