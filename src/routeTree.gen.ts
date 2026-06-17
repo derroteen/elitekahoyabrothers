@@ -23,6 +23,7 @@ import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPassbooksRouteImport } from './routes/_authenticated/passbooks'
 import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
+import { Route as AuthenticatedOpeningLoansRouteImport } from './routes/_authenticated/opening-loans'
 import { Route as AuthenticatedOpeningBalancesRouteImport } from './routes/_authenticated/opening-balances'
 import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticated/my-weekly'
 import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
@@ -111,6 +112,12 @@ const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
   path: '/passbook',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOpeningLoansRoute =
+  AuthenticatedOpeningLoansRouteImport.update({
+    id: '/opening-loans',
+    path: '/opening-loans',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOpeningBalancesRoute =
   AuthenticatedOpeningBalancesRouteImport.update({
     id: '/opening-balances',
@@ -219,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/my-savings': typeof AuthenticatedMySavingsRoute
   '/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
+  '/opening-loans': typeof AuthenticatedOpeningLoansRoute
   '/passbook': typeof AuthenticatedPassbookRoute
   '/passbooks': typeof AuthenticatedPassbooksRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -250,6 +258,7 @@ export interface FileRoutesByTo {
   '/my-savings': typeof AuthenticatedMySavingsRoute
   '/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/opening-balances': typeof AuthenticatedOpeningBalancesRoute
+  '/opening-loans': typeof AuthenticatedOpeningLoansRoute
   '/passbook': typeof AuthenticatedPassbookRoute
   '/passbooks': typeof AuthenticatedPassbooksRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -283,6 +292,7 @@ export interface FileRoutesById {
   '/_authenticated/my-savings': typeof AuthenticatedMySavingsRoute
   '/_authenticated/my-weekly': typeof AuthenticatedMyWeeklyRoute
   '/_authenticated/opening-balances': typeof AuthenticatedOpeningBalancesRoute
+  '/_authenticated/opening-loans': typeof AuthenticatedOpeningLoansRoute
   '/_authenticated/passbook': typeof AuthenticatedPassbookRoute
   '/_authenticated/passbooks': typeof AuthenticatedPassbooksRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/my-savings'
     | '/my-weekly'
     | '/opening-balances'
+    | '/opening-loans'
     | '/passbook'
     | '/passbooks'
     | '/reports'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/my-savings'
     | '/my-weekly'
     | '/opening-balances'
+    | '/opening-loans'
     | '/passbook'
     | '/passbooks'
     | '/reports'
@@ -379,6 +391,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-savings'
     | '/_authenticated/my-weekly'
     | '/_authenticated/opening-balances'
+    | '/_authenticated/opening-loans'
     | '/_authenticated/passbook'
     | '/_authenticated/passbooks'
     | '/_authenticated/reports'
@@ -498,6 +511,13 @@ declare module '@tanstack/react-router' {
       path: '/passbook'
       fullPath: '/passbook'
       preLoaderRoute: typeof AuthenticatedPassbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/opening-loans': {
+      id: '/_authenticated/opening-loans'
+      path: '/opening-loans'
+      fullPath: '/opening-loans'
+      preLoaderRoute: typeof AuthenticatedOpeningLoansRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/opening-balances': {
@@ -630,6 +650,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMySavingsRoute: typeof AuthenticatedMySavingsRoute
   AuthenticatedMyWeeklyRoute: typeof AuthenticatedMyWeeklyRoute
   AuthenticatedOpeningBalancesRoute: typeof AuthenticatedOpeningBalancesRoute
+  AuthenticatedOpeningLoansRoute: typeof AuthenticatedOpeningLoansRoute
   AuthenticatedPassbookRoute: typeof AuthenticatedPassbookRoute
   AuthenticatedPassbooksRoute: typeof AuthenticatedPassbooksRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -656,6 +677,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMySavingsRoute: AuthenticatedMySavingsRoute,
   AuthenticatedMyWeeklyRoute: AuthenticatedMyWeeklyRoute,
   AuthenticatedOpeningBalancesRoute: AuthenticatedOpeningBalancesRoute,
+  AuthenticatedOpeningLoansRoute: AuthenticatedOpeningLoansRoute,
   AuthenticatedPassbookRoute: AuthenticatedPassbookRoute,
   AuthenticatedPassbooksRoute: AuthenticatedPassbooksRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,

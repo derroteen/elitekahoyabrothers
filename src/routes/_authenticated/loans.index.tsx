@@ -42,14 +42,29 @@ function LoansAdmin() {
     queryKey: ["loans-all"],
     enabled: !!role && role !== "member",
     queryFn: async () => {
-      const [{ data: ls }, { data: profs }] = await Promise.all([
+      const [{ data: ls }, { data: profs }, { data: openings }] = await Promise.all([
         supabase.from("loans").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, full_name, membership_no"),
+        (supabase as any).from("loan_opening_balances").select("*").order("loan_date", { ascending: false }),
       ]);
       const pmap = new Map((profs ?? []).map((p: any) => [p.id, p]));
-      return (ls ?? []).map((l: any) => ({ ...l, profile: pmap.get(l.member_id) }));
+      const real = (ls ?? []).map((l: any) => ({ ...l, profile: pmap.get(l.member_id) }));
+      const opening = (openings ?? []).map((o: any) => ({
+        id: `opening-${o.id}`,
+        __opening: true,
+        member_id: o.member_id,
+        loan_date: o.loan_date,
+        amount_borrowed: o.principal,
+        amount_paid: o.amount_paid,
+        balance: o.balance,
+        outstanding_fines: 0,
+        status: "opening",
+        profile: pmap.get(o.member_id),
+      }));
+      return [...opening, ...real];
     },
   });
+
 
   const applyFines = useMutation({
     mutationFn: async () => {
@@ -172,42 +187,49 @@ function LoansAdmin() {
               {isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
               {!isLoading && loans.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => {
-                const cleared = Number(l.balance || 0) < 5;
+                const isOpening = !!l.__opening;
+                const cleared = !isOpening && Number(l.balance || 0) < 5;
                 const hasFines = Number(l.outstanding_fines || 0) > 0;
                 return (
-                  <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-muted/30 ${isOpening ? "bg-amber-50/40" : ""}`}>
                     <td className="px-3 py-3">
                       <div className="font-medium text-navy">{l.profile?.full_name ?? l.member_id.slice(0, 8)}</div>
                       <div className="text-xs text-muted-foreground font-mono">{l.profile?.membership_no}</div>
                     </td>
                     <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(l.loan_date)}</td>
                     <td className="px-3 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${cleared ? "bg-emerald-100 text-emerald-700 font-bold" : (STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700")}`}>
-                        {cleared ? "CLEARED" : l.status.replace(/_/g, " ")}
+                      <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${isOpening ? "bg-amber-100 text-amber-800 font-semibold" : cleared ? "bg-emerald-100 text-emerald-700 font-bold" : (STATUS_COLORS[l.status] ?? "bg-gray-100 text-gray-700")}`}>
+                        {isOpening ? "OPENING B/F" : cleared ? "CLEARED" : l.status.replace(/_/g, " ")}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                     <td className={`px-3 py-3 text-right font-mono ${hasFines ? "text-red-600 font-bold" : "text-muted-foreground"}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
                       <div className="flex flex-wrap justify-end items-center gap-1">
-                        <LoanActions loan={l} role={role} />
-                        {canEdit && l.status === "pending" && (
+                        {isOpening ? (
+                          <span className="text-xs text-muted-foreground italic px-2">Read-only · manage in Opening Loans</span>
+                        ) : (
                           <>
-                            <Button size="sm" type="button" className="bg-emerald-600 text-white hover:bg-emerald-700"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveLoan.mutate(l); }} disabled={approveLoan.isPending}>
-                              Approve
-                            </Button>
-                            <Button size="sm" type="button" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRejectFor(l); setRejectReason(""); }}>
-                              Reject
-                            </Button>
+                            <LoanActions loan={l} role={role} />
+                            {canEdit && l.status === "pending" && (
+                              <>
+                                <Button size="sm" type="button" className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveLoan.mutate(l); }} disabled={approveLoan.isPending}>
+                                  Approve
+                                </Button>
+                                <Button size="sm" type="button" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRejectFor(l); setRejectReason(""); }}>
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            {canEdit && hasFines && (
+                              <Button size="sm" type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRemoveFinesFor(l); }}>
+                                Remove Fines
+                              </Button>
+                            )}
                           </>
-                        )}
-                        {canEdit && hasFines && (
-                          <Button size="sm" type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRemoveFinesFor(l); }}>
-                            Remove Fines
-                          </Button>
                         )}
                       </div>
                     </td>
