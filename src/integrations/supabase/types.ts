@@ -618,6 +618,36 @@ export type Database = {
         }
         Relationships: []
       }
+      opening_loan_fines: {
+        Row: {
+          amount: number
+          created_at: string | null
+          fine_date: string
+          id: string
+          opening_loan_id: string
+          reason: string | null
+          removed: boolean | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          fine_date?: string
+          id?: string
+          opening_loan_id: string
+          reason?: string | null
+          removed?: boolean | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          fine_date?: string
+          id?: string
+          opening_loan_id?: string
+          reason?: string | null
+          removed?: boolean | null
+        }
+        Relationships: []
+      }
       passbook_entries: {
         Row: {
           balance: number
