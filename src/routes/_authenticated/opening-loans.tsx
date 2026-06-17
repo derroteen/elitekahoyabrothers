@@ -252,6 +252,72 @@ function OpeningLoansPage() {
         />
       </Card>
 
+      {/* Summary Table (Admin/Super Admin Only) */}
+      <Card className="mb-4">
+        <div className="p-4 border-b border-border font-serif text-lg">
+          Opening Loan Balances Summary
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead>
+              <tr className="bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 text-left">No</th>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-right">Balance</th>
+                <th className="px-3 py-2 text-right">Amount Paid</th>
+                {filtered.length > 0 && (
+                  <th className="px-3 py-2 text-right">
+                    Loan Bal. As At {filtered.length > 0 ? fmtDate(filtered[0].loan_date) : ""}
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={filtered.length > 0 ? 5 : 4} className="p-6 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                    No opening loan records yet.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((r, index) => (
+                <tr key={r.id} className="border-t border-border">
+                  <td className="px-3 py-2 font-mono">{index + 1}</td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{r.profile?.full_name ?? r.member_id.slice(0, 8)}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.total_repayable)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(r.amount_paid)}</td>
+                  <td className="px-3 py-2 text-right font-mono font-bold text-navy">{fmtKES(r.balance)}</td>
+                </tr>
+              ))}
+              {filtered.length > 0 && (
+                <tr className="bg-muted/40 font-semibold border-t-2 border-border">
+                  <td className="px-3 py-2 col-span-2">TOTAL</td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {fmtKES(filtered.reduce((sum, r) => sum + r.total_repayable, 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {fmtKES(filtered.reduce((sum, r) => sum + r.amount_paid, 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {fmtKES(filtered.reduce((sum, r) => sum + r.balance, 0))}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Main Table */}
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[820px]">

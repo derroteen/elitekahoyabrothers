@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
 import { fmtKES, fmtDate } from "@/lib/format";
+import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 
 export const Route = createFileRoute("/_authenticated/my-loans")({
   component: MyLoans,
@@ -16,21 +17,51 @@ function MyLoans() {
     queryKey: ["my-loans", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [real, opening] = await Promise.all([
+      const [real, opening, repayments] = await Promise.all([
         supabase.from("loans").select("*").eq("member_id", user!.id).order("created_at", { ascending: false }),
         (supabase as any).from("loan_opening_balances").select("*").eq("member_id", user!.id).order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
       ]);
-      const openingRows = (opening.data ?? []).map((o: any) => ({
-        id: `opening-${o.id}`,
-        __opening: true,
-        loan_date: o.loan_date,
-        amount_borrowed: o.principal,
-        amount_paid: o.amount_paid,
-        balance: o.balance,
-        outstanding_fines: 0,
-        status: "opening b/f",
-      }));
-      return [...openingRows, ...(real.data ?? [])];
+      
+      const repaymentsByLoan = new Map<string, any[]>();
+      const repaymentsByOpeningLoan = new Map<string, any[]>();
+      for (const r of repayments.data ?? []) {
+        const row = r as any;
+        if (row.opening_loan_id) {
+          const list = repaymentsByOpeningLoan.get(row.opening_loan_id) ?? [];
+          list.push(row);
+          repaymentsByOpeningLoan.set(row.opening_loan_id, list);
+        } else if (row.loan_id) {
+          const list = repaymentsByLoan.get(row.loan_id) ?? [];
+          list.push(row);
+          repaymentsByLoan.set(row.loan_id, list);
+        }
+      }
+
+      const openingRows = (opening.data ?? []).map((o: any) => {
+        const loanRepayments = repaymentsByOpeningLoan.get(o.id) ?? [];
+        return {
+          id: `opening-${o.id}`,
+          __opening: true,
+          loan_date: o.loan_date,
+          amount_borrowed: o.principal,
+          amount_paid: loanRepayments.reduce((sum, r) => sum + Number(r.amount ?? 0), 0),
+          balance: calculateOutstandingBalanceFromData({ ...o, __opening: true }, loanRepayments),
+          outstanding_fines: 0,
+          status: "opening b/f",
+        };
+      });
+      
+      const realRows = (real.data ?? []).map((l: any) => {
+        const loanRepayments = repaymentsByLoan.get(l.id) ?? [];
+        return {
+          ...l,
+          balance: calculateOutstandingBalanceFromData(l, loanRepayments),
+          amount_paid: loanRepayments.reduce((sum, r) => sum + Number(r.amount ?? 0), 0),
+        };
+      });
+
+      return [...openingRows, ...realRows];
     },
   });
 
