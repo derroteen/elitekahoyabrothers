@@ -408,7 +408,8 @@ function OpeningLoansPage() {
               ))}
               {filtered.length > 0 && (
                 <tr className="bg-muted/40 font-semibold border-t-2 border-border">
-                  <td className="px-3 py-2 col-span-2">TOTAL</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2">TOTAL</td>
                   <td className="px-3 py-2 text-right font-mono">
                     {fmtKES(filtered.reduce((sum, r) => sum + r.total_repayable, 0))}
                   </td>
