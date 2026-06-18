@@ -97,26 +97,34 @@ function LoanLedger() {
     queryKey: ["loan", loanId],
     enabled: !!user,
     queryFn: async () => {
+      let l: any;
       if (isOpening) {
-        const { data: l } = await (supabase as any)
+        const { data } = await (supabase as any)
           .from("loan_opening_balances")
           .select("*")
           .eq("id", normalizedId)
           .maybeSingle();
-        if (!l) return null;
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id, full_name, membership_no, email, phone")
-          .eq("id", l.member_id)
-          .maybeSingle();
-        return { ...l, profile, __opening: true };
+        l = data;
+      } else {
+        const { data } = await supabase.from("loans").select("*").eq("id", loanId).maybeSingle();
+        l = data;
       }
-      const { data: l } = await supabase.from("loans").select("*").eq("id", loanId).maybeSingle();
       if (!l) return null;
-      const { data: profile } = await supabase.from("profiles").select("id, full_name, membership_no, email, phone").eq("id", l.member_id).maybeSingle();
-      return { ...l, profile };
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, full_name, membership_no, email, phone")
+        .eq("id", l.member_id)
+        .maybeSingle();
+      return { ...l, profile, __opening: isOpening };
     },
   });
+
+  useEffect(() => {
+    if (!loanLoading && !isStaff && loan && loan.member_id !== user.id) {
+      // Redirect to my loans if not staff and trying to view someone else's loan
+      navigate({ to: "/my-loans" });
+    }
+  }, [loanLoading, isStaff, loan, user, navigate);
 
   const { data: schedule = [] } = useQuery({
     queryKey: ["loan-schedule", loanId],

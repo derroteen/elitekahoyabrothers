@@ -39,16 +39,16 @@ function MyLoans() {
       }
 
       const openingRows = (opening.data ?? []).map((o: any) => {
-        const loanRepayments = repaymentsByOpeningLoan.get(o.id) ?? [];
         return {
           id: `opening-${o.id}`,
           __opening: true,
+          openingId: o.id,
           loan_date: o.loan_date,
-          amount_borrowed: o.principal,
-          amount_paid: loanRepayments.reduce((sum, r) => sum + Number(r.amount ?? 0), 0),
-          balance: calculateOutstandingBalanceFromData({ ...o, __opening: true }, loanRepayments),
+          amount_borrowed: o.total_repayable,
+          amount_paid: o.amount_paid,
+          balance: o.balance,
           outstanding_fines: 0,
-          status: "opening b/f",
+          status: o.balance > 0 ? "opening b/f" : "cleared",
         };
       });
       
@@ -93,14 +93,16 @@ function MyLoans() {
                   <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                   <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                   <td className="px-4 py-3 text-xs uppercase tracking-wider">
-                    {l.__opening ? <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Opening B/F</span> : (l.status ?? "").replace(/_/g, " ")}
+                    {l.__opening ? <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Opening B/F</span> : l.status === "cleared" ? <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">Cleared</span> : (l.status ?? "").replace(/_/g, " ")}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {l.__opening ? (
-                      <span className="text-xs text-muted-foreground italic">Brought forward</span>
-                    ) : (
-                      <Link to="/loans/$loanId" params={{ loanId: l.id }} className="text-navy hover:underline text-sm">View Ledger →</Link>
-                    )}
+                    <Link 
+                      to="/loans/$loanId" 
+                      params={{ loanId: l.__opening ? `opening-${l.openingId}` : l.id }} 
+                      className="text-navy hover:underline text-sm"
+                    >
+                      View Ledger →
+                    </Link>
                   </td>
                 </tr>
               ))}
