@@ -95,7 +95,16 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
   const adjusted = entries.map((entry) => {
     const total = Number(entry.savings ?? 0) + Number(entry.bonus ?? 0);
     savingsBalance += total - Number(entry.withdrawal ?? 0);
-    loanBalance = Math.max(0, loanBalance - Number(entry.loan_payment ?? 0));
+
+    // Handle loan balance
+    if (entry.description?.toLowerCase() === "loan issued") {
+      // Reset loan balance to the new loan amount
+      loanBalance = Number(entry.loan_payment ?? 0);
+    } else {
+      // Subtract loan payment, but never below 0
+      loanBalance = Math.max(0, loanBalance - Number(entry.loan_payment ?? 0));
+    }
+
     return {
       ...entry,
       total,
