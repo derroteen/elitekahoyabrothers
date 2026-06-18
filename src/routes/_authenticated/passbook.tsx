@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
-import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry } from "@/lib/passbook.functions";
+import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry, updateOpeningBalance, deleteOpeningBalance } from "@/lib/passbook.functions";
 import { forceDeletePassbookEntry } from "@/lib/entries.functions";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
@@ -39,6 +39,7 @@ function PassbookAdmin() {
   const [memberId, setMemberId] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<any>(null);
+  const [editOpening, setEditOpening] = useState<boolean>(false);
 
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
 
@@ -80,10 +81,24 @@ function PassbookAdmin() {
 
   const doForceDelete = useServerFn(forceDeletePassbookEntry);
   const doDelete = useServerFn(deletePassbookEntry);
+  const doDeleteOpening = useServerFn(deleteOpeningBalance);
+
+  const handleEditEntry = (entry: any) => {
+    if (entry.__brought_forward) {
+      setEditOpening(true);
+    } else {
+      setEditEntry(entry);
+    }
+  };
+
   const onDeleteEntry = async (entry: any) => {
     if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
     try {
-      if (entry.source === "weekly") {
+      if (entry.__brought_forward) {
+        const reason = prompt("Reason for deletion (required, min 3 chars):") ?? "";
+        if (reason.trim().length < 3) { toast.error("Reason required"); return; }
+        await doDeleteOpening({ data: { member_id: memberId, reason } });
+      } else if (entry.source === "weekly") {
         await doForceDelete({ data: { id: entry.id } });
       } else {
         const reason = prompt("Reason for deletion (required, min 3 chars):") ?? "";
@@ -115,12 +130,130 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} canDelete={canDelete} onEdit={setEditEntry} onDelete={onDeleteEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} canDelete={canDelete} onEdit={handleEditEntry} onDelete={onDeleteEntry} />
       )}
 
       <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
       <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <EditOpeningBalanceDialog
+        open={editOpening}
+        onClose={() => setEditOpening(false)}
+        memberId={memberId}
+        entries={entries}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })}
+      />
     </div>
+  );
+}
+
+function EditOpeningBalanceDialog({ open, onClose, memberId, entries, onSaved }: { open: boolean; onClose: () => void; memberId: string; entries: any[]; onSaved: () => void }) {
+  const doUpdate = useServerFn(updateOpeningBalance);
+  const [form, setForm] = useState({
+    effective_date: "2026-01-01",
+    opening_savings: "0",
+    opening_loan: "0",
+    opening_fine: "0",
+    opening_insurance: "0",
+    opening_benevolent: "0",
+    notes: "",
+    reason: "",
+  });
+
+  useEffect(() => {
+    if (open) {
+      // Find the bf entry to get current values
+      const bfEntry = entries.find((e: any) => e.__brought_forward);
+      if (bfEntry) {
+        setForm({
+          effective_date: bfEntry.entry_date ?? "2026-01-01",
+          opening_savings: String(bfEntry.balance ?? 0),
+          opening_loan: String(bfEntry.loan_balance ?? 0),
+          opening_fine: String(bfEntry.fine_balance ?? 0),
+          opening_insurance: String(bfEntry.insurance_balance ?? 0),
+          opening_benevolent: String(bfEntry.benevolent_balance ?? 0),
+          notes: "",
+          reason: "",
+        });
+      }
+    }
+  }, [open, entries]);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (form.reason.trim().length < 3) {
+      toast.error("Reason for change is required (min 3 chars)");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await doUpdate({
+        data: {
+          member_id: memberId,
+          effective_date: form.effective_date,
+          opening_savings: Number(form.opening_savings),
+          opening_loan: Number(form.opening_loan),
+          opening_fine: Number(form.opening_fine),
+          opening_insurance: Number(form.opening_insurance),
+          opening_benevolent: Number(form.opening_benevolent),
+          notes: form.notes.trim() || null,
+          reason: form.reason.trim(),
+        },
+      });
+      toast.success("Opening balance updated and passbook recalculated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to update opening balance");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+        <DialogHeader><DialogTitle className="font-serif">Edit Opening Balance</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Label>Effective Date</Label>
+            <Input type="date" value={form.effective_date} onChange={(e) => setForm({ ...form, effective_date: e.target.value })} />
+          </div>
+          <div>
+            <Label>Opening Savings</Label>
+            <Input type="number" step="0.01" min="0" value={form.opening_savings} onChange={(e) => setForm({ ...form, opening_savings: e.target.value })} />
+          </div>
+          <div>
+            <Label>Opening Loan Balance</Label>
+            <Input type="number" step="0.01" min="0" value={form.opening_loan} onChange={(e) => setForm({ ...form, opening_loan: e.target.value })} />
+          </div>
+          <div>
+            <Label>Opening Fine Balance</Label>
+            <Input type="number" step="0.01" min="0" value={form.opening_fine} onChange={(e) => setForm({ ...form, opening_fine: e.target.value })} />
+          </div>
+          <div>
+            <Label>Opening Insurance Balance</Label>
+            <Input type="number" step="0.01" min="0" value={form.opening_insurance} onChange={(e) => setForm({ ...form, opening_insurance: e.target.value })} />
+          </div>
+          <div>
+            <Label>Opening Benevolent Balance</Label>
+            <Input type="number" step="0.01" min="0" value={form.opening_benevolent} onChange={(e) => setForm({ ...form, opening_benevolent: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes (optional)</Label>
+            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Reason for change <span className="text-red-600">*</span></Label>
+            <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Why are you updating the opening balance?" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

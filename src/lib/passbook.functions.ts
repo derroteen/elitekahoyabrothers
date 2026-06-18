@@ -200,3 +200,94 @@ export const deletePassbookEntry = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+const UpdateOpeningInput = z.object({
+  member_id: z.string().uuid(),
+  effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  opening_savings: z.number().min(0).default(0),
+  opening_loan: z.number().min(0).default(0),
+  opening_fine: z.number().min(0).default(0),
+  opening_insurance: z.number().min(0).default(0),
+  opening_benevolent: z.number().min(0).default(0),
+  notes: z.string().max(500).nullable().optional(),
+  reason: z.string().min(3, "Reason is required for edits").max(500),
+});
+
+export const updateOpeningBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => UpdateOpeningInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: before } = await supabaseAdmin
+      .from("member_opening_balances")
+      .select("*")
+      .eq("member_id", data.member_id)
+      .maybeSingle();
+
+    const { error } = await supabaseAdmin
+      .from("member_opening_balances")
+      .upsert({
+        member_id: data.member_id,
+        effective_date: data.effective_date,
+        opening_savings: data.opening_savings,
+        opening_loan: data.opening_loan,
+        opening_fine: data.opening_fine,
+        opening_insurance: data.opening_insurance,
+        opening_benevolent: data.opening_benevolent,
+        notes: data.notes ?? null,
+        updated_by: context.userId,
+      }, { onConflict: "member_id" });
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.rpc("recompute_passbook_balances", { _member: data.member_id } as any);
+
+    await writeAudit({
+      actorId: context.userId,
+      action: "OPENING_BALANCE_EDIT",
+      recordId: data.member_id,
+      oldValue: before,
+      newValue: data,
+      reason: data.reason,
+    });
+
+    return { ok: true };
+  });
+
+const DeleteOpeningInput = z.object({
+  member_id: z.string().uuid(),
+  reason: z.string().min(3, "Reason is required for deletion").max(500),
+});
+
+export const deleteOpeningBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => DeleteOpeningInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: before } = await supabaseAdmin
+      .from("member_opening_balances")
+      .select("*")
+      .eq("member_id", data.member_id)
+      .maybeSingle();
+
+    const { error } = await supabaseAdmin
+      .from("member_opening_balances")
+      .delete()
+      .eq("member_id", data.member_id);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.rpc("recompute_passbook_balances", { _member: data.member_id } as any);
+
+    await writeAudit({
+      actorId: context.userId,
+      action: "OPENING_BALANCE_DELETE",
+      recordId: data.member_id,
+      oldValue: before,
+      reason: data.reason,
+    });
+
+    return { ok: true };
+  });
