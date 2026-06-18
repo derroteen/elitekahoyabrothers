@@ -207,14 +207,14 @@ export const addLoanPayment = createServerFn({ method: "POST" })
         .select("member_id")
         .eq("id", normalizeLoanId(data.loan_id))
         .single();
-      memberId = openingLoan?.member_id;
+      memberId = openingLoan?.member_id ?? null;
     } else {
       const { data: loan } = await supabaseAdmin
         .from("loans")
         .select("member_id")
         .eq("id", data.loan_id)
         .single();
-      memberId = loan?.member_id;
+      memberId = loan?.member_id ?? null;
     }
     
     // Check if member is David using his member_id

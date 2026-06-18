@@ -15,8 +15,7 @@ export function loanBaseAmount(loan: any) {
   }
   return Number(
     loan.total_repayable ??
-      (Number(loan.amount_borrowed ?? 0) + Number(loan.total_interest_added ?? 0)) ??
-      0,
+      Number(loan.amount_borrowed ?? 0) + Number(loan.total_interest_added ?? 0),
   );
 }
 
