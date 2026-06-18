@@ -13,30 +13,20 @@ export interface OpeningBalance {
 }
 
 export async function fetchOpeningBalance(memberId: string): Promise<OpeningBalance | null> {
-  const [{ data }, { data: openingLoans }] = await Promise.all([
-    supabase
-      .from("member_opening_balances")
-      .select("*")
-      .eq("member_id", memberId)
-      .maybeSingle(),
-    (supabase as any)
-      .from("loan_opening_balances")
-      .select("balance")
-      .eq("member_id", memberId),
-  ]);
-  const openingLoanTotal = (openingLoans ?? []).reduce(
-    (sum: number, row: any) => sum + Number(row.balance ?? 0),
-    0,
-  );
-  if (!data && openingLoanTotal <= 0) return null;
+  const { data } = await supabase
+    .from("member_opening_balances")
+    .select("*")
+    .eq("member_id", memberId)
+    .maybeSingle();
+  if (!data) return null;
   return {
-    member_id: data?.member_id ?? memberId,
-    effective_date: (data?.effective_date as unknown as string) ?? "2026-01-01",
-    opening_savings: Number(data?.opening_savings ?? 0),
-    opening_loan: Number(data?.opening_loan ?? 0) + openingLoanTotal,
-    opening_fine: Number(data?.opening_fine ?? 0),
-    opening_insurance: Number(data?.opening_insurance ?? 0),
-    opening_benevolent: Number(data?.opening_benevolent ?? 0),
+    member_id: data.member_id,
+    effective_date: (data.effective_date as unknown as string) ?? "2026-01-01",
+    opening_savings: Number(data.opening_savings ?? 0),
+    opening_loan: Number(data.opening_loan ?? 0),
+    opening_fine: Number(data.opening_fine ?? 0),
+    opening_insurance: Number(data.opening_insurance ?? 0),
+    opening_benevolent: Number(data.opening_benevolent ?? 0),
     notes: (data as any)?.notes ?? null,
   };
 }
