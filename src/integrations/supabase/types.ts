@@ -330,6 +330,7 @@ export type Database = {
           member_id: string
           notes: string | null
           principal: number
+          status: string
           total_repayable: number
           updated_at: string
           updated_by: string | null
@@ -345,6 +346,7 @@ export type Database = {
           member_id: string
           notes?: string | null
           principal?: number
+          status?: string
           total_repayable?: number
           updated_at?: string
           updated_by?: string | null
@@ -360,6 +362,7 @@ export type Database = {
           member_id?: string
           notes?: string | null
           principal?: number
+          status?: string
           total_repayable?: number
           updated_at?: string
           updated_by?: string | null
@@ -381,8 +384,9 @@ export type Database = {
           created_by: string | null
           fine_paid: number
           id: string
-          loan_id: string
+          loan_id: string | null
           notes: string | null
+          opening_loan_id: string | null
           payment_date: string
           payment_method: string | null
           penalty: number
@@ -396,8 +400,9 @@ export type Database = {
           created_by?: string | null
           fine_paid?: number
           id?: string
-          loan_id: string
+          loan_id?: string | null
           notes?: string | null
+          opening_loan_id?: string | null
           payment_date?: string
           payment_method?: string | null
           penalty?: number
@@ -411,8 +416,9 @@ export type Database = {
           created_by?: string | null
           fine_paid?: number
           id?: string
-          loan_id?: string
+          loan_id?: string | null
           notes?: string | null
+          opening_loan_id?: string | null
           payment_date?: string
           payment_method?: string | null
           penalty?: number
@@ -426,6 +432,13 @@ export type Database = {
             columns: ["loan_id"]
             isOneToOne: false
             referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_opening_loan_id_fkey"
+            columns: ["opening_loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_opening_balances"
             referencedColumns: ["id"]
           },
           {
@@ -1099,6 +1112,10 @@ export type Database = {
       }
       recalc_loan_from_payments: {
         Args: { _loan_id: string }
+        Returns: undefined
+      }
+      recalculate_opening_loan_balance: {
+        Args: { _opening_loan_id: string }
         Returns: undefined
       }
       recompute_benevolent_balances: {
