@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -119,12 +119,15 @@ function LoanLedger() {
     },
   });
 
+  const navigate = useNavigate();
+  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
+
   useEffect(() => {
     if (!loanLoading && !isStaff && loan && loan.member_id !== user.id) {
       // Redirect to my loans if not staff and trying to view someone else's loan
       navigate({ to: "/my-loans" });
     }
-  }, [loanLoading, isStaff, loan, user, navigate);
+  }, [loanLoading, isStaff, loan, user, navigate]);
 
   const { data: schedule = [] } = useQuery({
     queryKey: ["loan-schedule", loanId],
@@ -164,7 +167,6 @@ function LoanLedger() {
     queryFn: async () => (await (supabase.from("loan_insurance_payments" as any) as any).select("*").eq("loan_id", loanId).order("payment_date")).data ?? [],
   });
 
-  const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEditPayments = role === "super_admin" || role === "admin";
   const canDelete = role === "super_admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
