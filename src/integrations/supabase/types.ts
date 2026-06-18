@@ -1092,6 +1092,7 @@ export type Database = {
     Functions: {
       apply_annual_interest: { Args: { _loan_id?: string }; Returns: number }
       apply_loan_fines: { Args: { _loan_id?: string }; Returns: number }
+      backfill_missing_loan_repayments: { Args: never; Returns: number }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       email_for_membership_no: {
         Args: { _membership_no: string }
