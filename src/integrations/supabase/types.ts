@@ -728,8 +728,11 @@ export type Database = {
           entry_date: string
           id: string
           loan_balance: number
+          loan_debit: number
+          loan_id: string | null
           loan_payment: number
           member_id: string
+          opening_loan_id: string | null
           reason: string | null
           remarks: string | null
           savings: number
@@ -750,8 +753,11 @@ export type Database = {
           entry_date: string
           id?: string
           loan_balance?: number
+          loan_debit?: number
+          loan_id?: string | null
           loan_payment?: number
           member_id: string
+          opening_loan_id?: string | null
           reason?: string | null
           remarks?: string | null
           savings?: number
@@ -772,8 +778,11 @@ export type Database = {
           entry_date?: string
           id?: string
           loan_balance?: number
+          loan_debit?: number
+          loan_id?: string | null
           loan_payment?: number
           member_id?: string
+          opening_loan_id?: string | null
           reason?: string | null
           remarks?: string | null
           savings?: number
@@ -786,10 +795,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "passbook_entries_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "passbook_entries_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passbook_entries_opening_loan_id_fkey"
+            columns: ["opening_loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_opening_balances"
             referencedColumns: ["id"]
           },
           {
@@ -1162,6 +1185,7 @@ export type Database = {
             }
             Returns: Json
           }
+      repair_loan_passbook_entries: { Args: never; Returns: Json }
       reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {
