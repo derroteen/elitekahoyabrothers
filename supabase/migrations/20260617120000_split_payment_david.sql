@@ -1,4 +1,4 @@
-﻿
+﻿﻿﻿﻿
 -- Migration for David Omari Kianga's split payment logic
 
 -- Create a function to handle split payments for David
