@@ -27,7 +27,7 @@ function CollectionsPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [backfillingRepayments, setBackfillingRepayments] = useState(false);
-  const [backfillingSavingsBenevolent, setBackfillingSavingsBenevolent] = useState(false);
+  
 
   const { data: sheets = [], isLoading } = useQuery({
     queryKey: ["collections-list"],
