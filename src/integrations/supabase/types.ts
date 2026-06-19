@@ -1186,6 +1186,7 @@ export type Database = {
             Returns: Json
           }
       repair_loan_passbook_entries: { Args: never; Returns: Json }
+      repair_missing_loan_issued_entries: { Args: never; Returns: number }
       reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {
