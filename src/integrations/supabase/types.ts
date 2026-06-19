@@ -1116,6 +1116,7 @@ export type Database = {
       apply_annual_interest: { Args: { _loan_id?: string }; Returns: number }
       apply_loan_fines: { Args: { _loan_id?: string }; Returns: number }
       backfill_missing_loan_repayments: { Args: never; Returns: number }
+      backfill_missing_savings_benevolent: { Args: never; Returns: number }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       email_for_membership_no: {
         Args: { _membership_no: string }
@@ -1186,6 +1187,7 @@ export type Database = {
             Returns: Json
           }
       repair_loan_passbook_entries: { Args: never; Returns: Json }
+      repair_missing_loan_issued_entries: { Args: never; Returns: number }
       reset_membership_seq: { Args: never; Returns: undefined }
     }
     Enums: {
