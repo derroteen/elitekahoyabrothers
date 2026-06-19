@@ -64,23 +64,6 @@ function CollectionsPage() {
     }
   };
 
-  const handleBackfillSavingsBenevolent = async () => {
-    setBackfillingSavingsBenevolent(true);
-    try {
-      const { data, error } = await (supabase as any).rpc("backfill_missing_savings_benevolent");
-      if (error) throw error;
-      if (data > 0) {
-        toast.success(`Successfully posted ${data} missing savings/benevolent entries`);
-      } else {
-        toast.success("All savings/benevolent entries are already up to date");
-      }
-      qc.invalidateQueries({ queryKey: ["collections-list"] });
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to backfill savings/benevolent");
-    } finally {
-      setBackfillingSavingsBenevolent(false);
-    }
-  };
 
   return (
     <div>
