@@ -78,13 +78,6 @@ function CollectionsPage() {
               >
                 {backfillingRepayments ? "Backfilling…" : "Post Missing Repayments"}
               </Button>
-              <Button
-                onClick={handleBackfillSavingsBenevolent}
-                disabled={backfillingSavingsBenevolent}
-                className="bg-blue-700 text-white hover:bg-blue-800"
-              >
-                {backfillingSavingsBenevolent ? "Backfilling…" : "Post Missing Savings & Benevolent"}
-              </Button>
               <Button onClick={() => setOpenNew(true)} className="bg-navy text-white hover:bg-navy-2">+ New Week</Button>
             </div>
           ) : undefined
