@@ -42,9 +42,9 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
 
   return (
     <Card className="overflow-hidden relative">
-      {cleared && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="rotate-[-18deg] border-4 border-emerald-600/40 text-emerald-700/40 font-serif text-6xl md:text-8xl tracking-widest px-8 py-3 rounded-md select-none">
+     {cleared && (
+        <div className="pointer-events-none absolute top-16 inset-x-0 z-10 flex justify-center">
+          <div className="rotate-[-18deg] border-4 border-emerald-600/40 text-emerald-700/40 font-serif text-5xl md:text-7xl tracking-widest px-8 py-3 rounded-md select-none">
             CLEARED
           </div>
         </div>

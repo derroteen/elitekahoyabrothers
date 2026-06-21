@@ -114,7 +114,7 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} onEdit={setEditEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} canDelete={canDelete} onEdit={setEditEntry} onDelete={onDeleteEntry} />
       )}
 
       <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
