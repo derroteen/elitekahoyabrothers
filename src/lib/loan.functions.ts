@@ -213,7 +213,6 @@ export const addLoanPayment = createServerFn({ method: "POST" })
         .single();
       if (error || !payment) throw new Error(error?.message ?? "Failed to record payment");
       await recalculateOpeningLoan(normalizedLoanId);
-      await syncPassbookPayment(payment);
       await writeLoanAudit(context.userId, "Opening Loan Payment Added", data.loan_id, data.amount, null, data);
       return { ok: true, opening: true };
     }
@@ -228,8 +227,7 @@ export const addLoanPayment = createServerFn({ method: "POST" })
       _weekly_entry_id: null,
     });
     if (error) throw new Error(error.message);
-    const { data: payment } = await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", data.loan_id).eq("amount", data.amount).eq("payment_date", data.payment_date).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (payment) await syncPassbookPayment(payment);
+    await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", data.loan_id).eq("amount", data.amount).eq("payment_date", data.payment_date).order("created_at", { ascending: false }).limit(1).maybeSingle();
     await writeLoanAudit(context.userId, "Payment Added", data.loan_id, data.amount, null, data);
     return result;
   });
@@ -248,8 +246,6 @@ export const editLoanPayment = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (isOpeningLoanId(data.loan_id) || (before as any).opening_loan_id) await recalculateOpeningLoan(normalizedLoanId);
     else await recalculateLoan(data.loan_id);
-    const { data: after } = await supabaseAdmin.from("loan_repayments").select("*").eq("id", data.id).single();
-    if (after) await syncPassbookPayment(after);
     await writeLoanAudit(context.userId, isOpeningLoanId(data.loan_id) ? "Opening Loan Payment Edited" : "Payment Edited", data.loan_id, data.amount, before, data);
     return { ok: true };
   });
@@ -285,7 +281,6 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
     }
     const { error: deleteErr } = await supabaseAdmin.from("loan_repayments").delete().eq("id", data.id);
     if (deleteErr) throw new Error(deleteErr.message);
-    await deletePassbookPayment(before);
     if (isOpening) {
       const openingLoanId = (before as any).opening_loan_id || normalizedLoanId;
       await recalculateOpeningLoan(openingLoanId);
