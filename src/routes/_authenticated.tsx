@@ -87,9 +87,6 @@ function AuthLayout() {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   }
   if (!user) { navigate({ to: "/login" }); return null; }
-  if (profile?.must_change_password && pathname !== "/change-password") {
-    navigate({ to: "/change-password" }); return null;
-  }
   if (!role) return <div className="min-h-screen flex items-center justify-center">No role assigned.</div>;
 
   const items: NavItem[] = [...(NAV[role] ?? [])];

@@ -64,17 +64,8 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const doExcel = () => exportPassbookExcel(entries, { memberName, membershipNo });
   const doPdf = () => exportPassbookPdf(entries, { memberName, membershipNo });
 
-  const cleared = hasEntries && Number(loanBal) === 0 && entries.some((e) => Number(e.loan_payment ?? 0) > 0 || (e.category === "loan_payment"));
-
   return (
     <Card className="overflow-hidden relative">
-     {cleared && (
-        <div className="pointer-events-none absolute top-16 inset-x-0 z-10 flex justify-center">
-          <div className="rotate-[-18deg] border-4 border-emerald-600/40 text-emerald-700/40 font-serif text-5xl md:text-7xl tracking-widest px-8 py-3 rounded-md select-none">
-            CLEARED
-          </div>
-        </div>
-      )}
       <div className="bg-navy text-white px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="font-serif text-lg text-gold">{memberName ?? "Member"}</div>
@@ -84,7 +75,6 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
           <div className="text-right text-xs text-white/60">
             <div>Balance: <span className="text-gold font-mono">{fmtKES(currentBal)}</span></div>
             <div>Loan: <span className="text-gold font-mono">{fmtKES(loanBal)}</span></div>
-            {cleared && <div className="mt-0.5 inline-block text-[10px] text-emerald-300 font-semibold tracking-wider">LOAN CLEARED</div>}
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={doExcel} disabled={!hasEntries} className="h-8">

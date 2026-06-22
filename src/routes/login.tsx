@@ -45,9 +45,8 @@ function LoginPage() {
 
   useEffect(() => {
     if (loading || !user) return;
-    if (profile?.must_change_password) navigate({ to: "/change-password" });
-    else navigate({ to: "/dashboard" });
-  }, [user, profile, loading, navigate]);
+    navigate({ to: "/dashboard" });
+  }, [user, loading, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
