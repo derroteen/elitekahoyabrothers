@@ -29,6 +29,25 @@ async function writeLoanAudit(actorId: string, action: string, loanId: string, a
   } as any);
 }
 
+async function writeLoanFieldAudit(opts: {
+  actorId: string;
+  action: string;
+  tableName: "loans" | "loan_opening_balances";
+  recordId: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+}) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin.from("audit_logs").insert({
+    actor_id: opts.actorId,
+    action: opts.action,
+    table_name: opts.tableName,
+    record_id: opts.recordId,
+    old_value: opts.oldValue ?? null,
+    new_value: opts.newValue ?? null,
+  } as any);
+}
+
 function isOpeningLoanId(loanId: string) {
   return loanId.startsWith("opening-");
 }
@@ -288,6 +307,72 @@ export const deleteLoanPayment = createServerFn({ method: "POST" })
       await recalculateLoan(data.loan_id);
     }
     await writeLoanAudit(context.userId, isOpening ? "Opening Loan Payment Deleted" : "Payment Deleted", data.loan_id, Number(before.amount || 0), before, null);
+    return { ok: true };
+  });
+
+export const updateLoanPassbookOpeningBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    loan_id: z.string().refine((val) => {
+      if (val.startsWith("opening-")) {
+        const uuidPart = val.slice(8);
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidPart);
+      }
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    }, "Invalid loan ID"),
+    passbook_opening_balance: z.number().min(0).nullable(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertLoanEditor(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const normalizedLoanId = normalizeLoanId(data.loan_id);
+
+    if (isOpeningLoanId(data.loan_id)) {
+      const { data: before, error: beforeErr } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .select("id, passbook_opening_balance")
+        .eq("id", normalizedLoanId)
+        .single();
+      if (beforeErr || !before) throw new Error("Opening loan not found");
+
+      const { error } = await (supabaseAdmin as any)
+        .from("loan_opening_balances")
+        .update({ passbook_opening_balance: data.passbook_opening_balance } as any)
+        .eq("id", normalizedLoanId);
+      if (error) throw new Error(error.message);
+
+      await writeLoanFieldAudit({
+        actorId: context.userId,
+        action: "Opening Loan Passbook Starting Balance Updated",
+        tableName: "loan_opening_balances",
+        recordId: normalizedLoanId,
+        oldValue: before,
+        newValue: { id: normalizedLoanId, passbook_opening_balance: data.passbook_opening_balance },
+      });
+      return { ok: true };
+    }
+
+    const { data: before, error: beforeErr } = await supabaseAdmin
+      .from("loans")
+      .select("id, passbook_opening_balance")
+      .eq("id", data.loan_id)
+      .single();
+    if (beforeErr || !before) throw new Error("Loan not found");
+
+    const { error } = await supabaseAdmin
+      .from("loans")
+      .update({ passbook_opening_balance: data.passbook_opening_balance } as any)
+      .eq("id", data.loan_id);
+    if (error) throw new Error(error.message);
+
+    await writeLoanFieldAudit({
+      actorId: context.userId,
+      action: "Loan Passbook Starting Balance Updated",
+      tableName: "loans",
+      recordId: data.loan_id,
+      oldValue: before,
+      newValue: { id: data.loan_id, passbook_opening_balance: data.passbook_opening_balance },
+    });
     return { ok: true };
   });
 

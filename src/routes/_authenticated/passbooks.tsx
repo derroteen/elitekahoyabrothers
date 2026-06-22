@@ -37,8 +37,11 @@ type MemberLoanOption = {
   type: "loan" | "opening";
   label: string;
   total_repayable: number;
+  passbook_opening_balance?: number | null;
   sort_date?: string | null;
 };
+
+const UNASSIGNED_LOAN_TARGET = "__unassigned__";
 
 function PassbookAdmin() {
   const { role, loading } = useAuth();
@@ -84,12 +87,12 @@ function PassbookAdmin() {
       const [loansRes, openingRes] = await Promise.all([
         supabase
           .from("loans")
-          .select("id, loan_date, balance, total_repayable, status")
+          .select("id, loan_date, balance, total_repayable, passbook_opening_balance, status")
           .eq("member_id", memberId)
           .order("loan_date", { ascending: true }),
         (supabase as any)
           .from("loan_opening_balances")
-          .select("id, loan_date, balance, total_repayable")
+          .select("id, loan_date, balance, total_repayable, passbook_opening_balance")
           .eq("member_id", memberId)
           .order("loan_date", { ascending: true }),
       ]);
@@ -103,6 +106,7 @@ function PassbookAdmin() {
           type: "loan" as const,
           label: `Loan from ${fmtDate(loan.loan_date)} — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
           total_repayable: Number(loan.total_repayable ?? 0),
+          passbook_opening_balance: loan.passbook_opening_balance == null ? null : Number(loan.passbook_opening_balance),
           sort_date: loan.loan_date ?? null,
         }));
 
@@ -113,6 +117,7 @@ function PassbookAdmin() {
           type: "opening" as const,
           label: `Opening Loan — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
           total_repayable: Number(loan.total_repayable ?? 0),
+          passbook_opening_balance: loan.passbook_opening_balance == null ? null : Number(loan.passbook_opening_balance),
           sort_date: loan.loan_date ?? null,
         }));
 
@@ -169,7 +174,7 @@ function PassbookAdmin() {
       )}
 
       <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
-      <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <EditEntryDialog entry={editEntry} memberLoans={memberLoans} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
     </div>
   );
 }
@@ -349,7 +354,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
   );
 }
 
-function EditEntryDialog({ entry, onClose, onSaved }: any) {
+function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
   const doUpdate = useServerFn(updatePassbookEntry);
   const open = !!entry;
 
@@ -364,6 +369,7 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
     treasurer_sign: "",
     reason: "",
   });
+  const [selectedLoanTarget, setSelectedLoanTarget] = useState(UNASSIGNED_LOAN_TARGET);
 
   useEffect(() => {
     if (entry) {
@@ -378,16 +384,27 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
         treasurer_sign: entry.treasurer_sign ?? "",
         reason: "",
       });
+      if (entry.entry_loan_id) setSelectedLoanTarget(`loan:${entry.entry_loan_id}`);
+      else if (entry.entry_opening_loan_id) setSelectedLoanTarget(`opening:${entry.entry_opening_loan_id}`);
+      else setSelectedLoanTarget(UNASSIGNED_LOAN_TARGET);
     }
   }, [entry?.id]);
 
   const [submitting, setSubmitting] = useState(false);
+  const showLoanSelection = memberLoans.length > 1;
 
   const submit = async () => {
     if (!entry) return;
     if (form.reason.trim().length < 3) {
       toast.error("Reason for change is required (min 3 chars)");
       return;
+    }
+    let entry_loan_id: string | null = null;
+    let entry_opening_loan_id: string | null = null;
+    if (selectedLoanTarget !== UNASSIGNED_LOAN_TARGET) {
+      const [type, id] = selectedLoanTarget.split(":");
+      if (type === "loan") entry_loan_id = id;
+      if (type === "opening") entry_opening_loan_id = id;
     }
     setSubmitting(true);
     try {
@@ -403,6 +420,8 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
           remarks: form.remarks || null,
           treasurer_sign: form.treasurer_sign || null,
           reason: form.reason.trim(),
+          entry_loan_id,
+          entry_opening_loan_id,
         },
       });
       toast.success("Entry updated and balances recalculated");
@@ -433,6 +452,24 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
           <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
           <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
           <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
+          {showLoanSelection && (
+            <div className="col-span-2">
+              <Label>Which loan is this payment for?</Label>
+              <Select value={selectedLoanTarget} onValueChange={setSelectedLoanTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED_LOAN_TARGET}>Unassigned</SelectItem>
+                  {memberLoans.map((loan: MemberLoanOption) => (
+                    <SelectItem key={`${loan.type}-${loan.id}`} value={`${loan.type}:${loan.id}`}>
+                      {loan.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="col-span-2"><Label>Remarks</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
           <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
           <div className="col-span-2">

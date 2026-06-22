@@ -9,6 +9,7 @@ type MemberLoanColumn = {
   type: "loan" | "opening";
   label: string;
   total_repayable: number;
+  passbook_opening_balance?: number | null;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -41,12 +42,13 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const currentBal = entries.at(-1)?.balance ?? 0;
   const loanBal = entries.at(-1)?.loan_balance ?? 0;
   const perLoanColumns = (memberLoans?.length ?? 0) >= 2 ? (memberLoans ?? []) : [];
-  const tableColSpan = 8 + perLoanColumns.length + (canEdit ? 1 : 0);
-  const trailingFooterColSpan = (canEdit ? 4 : 3) + perLoanColumns.length;
+  const showCombinedLoanColumns = perLoanColumns.length === 0;
+  const trailingFooterColSpan = (showCombinedLoanColumns ? 2 : 0) + perLoanColumns.length + 1 + (canEdit ? 1 : 0);
+  const tableColSpan = 5 + trailingFooterColSpan;
 
   const perLoanBalancesByRow = (() => {
     if (perLoanColumns.length === 0) return [];
-    const runningBalances = perLoanColumns.map((loan) => Number(loan.total_repayable ?? 0));
+    const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? loan.total_repayable ?? 0));
     return entries.map((entry) => {
       perLoanColumns.forEach((loan, index) => {
         const matchesLoan =
@@ -95,8 +97,8 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
               <th className="px-3 py-2 text-right">Credit</th>
               <th className="px-3 py-2 text-right">Debit</th>
               <th className="px-3 py-2 text-right">Balance</th>
-              <th className="px-3 py-2 text-right">Loan Pmt</th>
-              <th className="px-3 py-2 text-right">Loan Bal</th>
+              {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Pmt</th>}
+              {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Bal</th>}
               {perLoanColumns.map((loan, index) => (
                 <th key={`${loan.type}-${loan.id}`} className="px-3 py-2 text-right" title={loan.label}>
                   Loan {index + 1} Bal
@@ -126,11 +128,11 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
                   <td className="px-3 py-2 text-right text-emerald-700">{credit > 0 ? credit.toFixed(2) : ""}</td>
                   <td className="px-3 py-2 text-right text-red-700">{debit > 0 ? debit.toFixed(2) : ""}</td>
                   <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>
+                  {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>}
+                  {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>}
                   {perLoanColumns.map((loan, loanIndex) => (
                     <td key={`${e.id}-${loan.type}-${loan.id}`} className="px-3 py-2 text-right">
-                      {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.total_repayable ?? 0).toFixed(2)}
+                      {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.passbook_opening_balance ?? loan.total_repayable ?? 0).toFixed(2)}
                     </td>
                   ))}
                   <td className="px-3 py-2 text-left text-[10px] uppercase tracking-wider">

@@ -121,6 +121,8 @@ const UpdateInput = z.object({
   remarks: z.string().max(2000).nullable().optional(),
   treasurer_sign: z.string().max(200).nullable().optional(),
   reason: z.string().min(3, "Reason is required for edits").max(500),
+  entry_loan_id: z.string().uuid().nullable().optional(),
+  entry_opening_loan_id: z.string().uuid().nullable().optional(),
 });
 
 export const updatePassbookEntry = createServerFn({ method: "POST" })
@@ -146,6 +148,8 @@ export const updatePassbookEntry = createServerFn({ method: "POST" })
       remarks: data.remarks ?? null,
       treasurer_sign: data.treasurer_sign ?? null,
       reason: data.reason,
+      entry_loan_id: data.entry_loan_id ?? null,
+      entry_opening_loan_id: data.entry_opening_loan_id ?? null,
     };
     if (data.category) patch.category = data.category;
     if (data.description) patch.description = data.description;

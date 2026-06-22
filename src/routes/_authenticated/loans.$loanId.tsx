@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtKES } from "@/lib/format";
-import { addLoanPayment, deleteLoanPayment, editLoanPayment } from "@/lib/loan.functions";
+import { addLoanPayment, deleteLoanPayment, editLoanPayment, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -80,6 +80,7 @@ function LoanLedger() {
   const doDeleteFine = useServerFn(deleteLoanFine);
   const doDeleteIns = useServerFn(deleteInsurancePayment);
   const doRemoveAllFines = useServerFn(removeAppliedFines);
+  const doUpdatePassbookStart = useServerFn(updateLoanPassbookOpeningBalance);
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editFine, setEditFineState] = useState<any>(null);
   const [editIns, setEditInsState] = useState<any>(null);
@@ -89,6 +90,8 @@ function LoanLedger() {
   const [addFineOpen, setAddFineOpen] = useState(false);
   const [recordFineOpen, setRecordFineOpen] = useState(false);
   const finesGeneratedRef = useRef(false);
+  const [passbookStartValue, setPassbookStartValue] = useState("");
+  const [savingPassbookStart, setSavingPassbookStart] = useState(false);
 
   const isOpening = isOpeningLoanId(loanId);
   const normalizedId = normalizeLoanId(loanId);
@@ -180,6 +183,10 @@ function LoanLedger() {
     qc.invalidateQueries({ queryKey: ["opening-loans"] });
     qc.invalidateQueries({ queryKey: ["loans-all"] });
   };
+
+  useEffect(() => {
+    setPassbookStartValue(loan?.passbook_opening_balance == null ? "" : String(loan.passbook_opening_balance));
+  }, [loanId, loan?.passbook_opening_balance]);
 
   const ledgerRows = useMemo(() => {
     if (!isOpening && schedule.length > 0) return schedule;
@@ -344,6 +351,32 @@ function LoanLedger() {
     catch (err: any) { toast.error(err?.message ?? "Failed"); }
   };
 
+  const onSavePassbookStart = async () => {
+    const trimmed = passbookStartValue.trim();
+    if (trimmed !== "") {
+      const parsed = Number(trimmed);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        toast.error("Enter a valid starting balance or leave it blank");
+        return;
+      }
+    }
+    setSavingPassbookStart(true);
+    try {
+      await doUpdatePassbookStart({
+        data: {
+          loan_id: loanId,
+          passbook_opening_balance: trimmed === "" ? null : Number(trimmed),
+        },
+      });
+      toast.success("Passbook starting balance updated");
+      refreshLoan();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to update passbook starting balance");
+    } finally {
+      setSavingPassbookStart(false);
+    }
+  };
+
   return (
     <div>
       <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-navy mb-3">
@@ -381,6 +414,30 @@ function LoanLedger() {
           </div>
         </div>
       </Card>
+
+      {canEditPayments && (
+        <Card className="mb-4">
+          <div className="p-4">
+            <div className="max-w-md space-y-2">
+              <Label>Passbook Starting Balance</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={passbookStartValue}
+                onChange={(e) => setPassbookStartValue(e.target.value)}
+                placeholder={String(Number(loan?.total_repayable ?? 0))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used as the starting balance in the member&apos;s passbook. Leave blank to use the full loan amount.
+              </p>
+              <Button onClick={onSavePassbookStart} disabled={savingPassbookStart} className="bg-navy text-white hover:bg-navy-2">
+                {savingPassbookStart ? "Saving..." : "Save Starting Balance"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="mb-4 relative">
         {liveTotals.cleared && !isOpening && (
