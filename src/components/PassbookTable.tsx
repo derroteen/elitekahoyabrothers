@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
 
+type MemberLoanColumn = {
+  id: string;
+  type: "loan" | "opening";
+  label: string;
+  total_repayable: number;
+};
+
 const CATEGORY_LABELS: Record<string, string> = {
   weekly_collection: "Weekly Collection",
   bonus: "Bonus Allocation",
@@ -28,11 +35,30 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
-export function PassbookTable({ entries, loading, memberName, membershipNo, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, memberLoans, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; memberLoans?: MemberLoanColumn[]; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
   const loanBal = entries.at(-1)?.loan_balance ?? 0;
+  const perLoanColumns = (memberLoans?.length ?? 0) >= 2 ? (memberLoans ?? []) : [];
+  const tableColSpan = 8 + perLoanColumns.length + (canEdit ? 1 : 0);
+  const trailingFooterColSpan = (canEdit ? 4 : 3) + perLoanColumns.length;
+
+  const perLoanBalancesByRow = (() => {
+    if (perLoanColumns.length === 0) return [];
+    const runningBalances = perLoanColumns.map((loan) => Number(loan.total_repayable ?? 0));
+    return entries.map((entry) => {
+      perLoanColumns.forEach((loan, index) => {
+        const matchesLoan =
+          (loan.type === "loan" && entry.entry_loan_id === loan.id) ||
+          (loan.type === "opening" && entry.entry_opening_loan_id === loan.id);
+        if (matchesLoan) {
+          runningBalances[index] = Math.max(0, runningBalances[index] - Number(entry.loan_payment ?? 0));
+        }
+      });
+      return [...runningBalances];
+    });
+  })();
 
   const hasEntries = entries.length > 0;
   const doExcel = () => exportPassbookExcel(entries, { memberName, membershipNo });
@@ -81,14 +107,19 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
               <th className="px-3 py-2 text-right">Balance</th>
               <th className="px-3 py-2 text-right">Loan Pmt</th>
               <th className="px-3 py-2 text-right">Loan Bal</th>
+              {perLoanColumns.map((loan, index) => (
+                <th key={`${loan.type}-${loan.id}`} className="px-3 py-2 text-right" title={loan.label}>
+                  Loan {index + 1} Bal
+                </th>
+              ))}
               <th className="px-3 py-2 text-left">Source</th>
               {canEdit && <th className="px-3 py-2 text-left">Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={canEdit ? 9 : 8} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
-            {!loading && entries.length === 0 && <tr><td colSpan={canEdit ? 9 : 8} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
-            {entries.map((e) => {
+            {loading && <tr><td colSpan={tableColSpan} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {!loading && entries.length === 0 && <tr><td colSpan={tableColSpan} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
+            {entries.map((e, rowIndex) => {
               const bf = (e as any).__brought_forward;
               const credit = Number(e.savings ?? 0) + Number(e.bonus ?? 0);
               const debit = Number(e.withdrawal ?? 0);
@@ -107,6 +138,11 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
                   <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
                   <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>
                   <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>
+                  {perLoanColumns.map((loan, loanIndex) => (
+                    <td key={`${e.id}-${loan.type}-${loan.id}`} className="px-3 py-2 text-right">
+                      {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.total_repayable ?? 0).toFixed(2)}
+                    </td>
+                  ))}
                   <td className="px-3 py-2 text-left text-[10px] uppercase tracking-wider">
                     {bf ? <span className="text-gold-3 font-semibold">Opening</span> : isWeekly ? <span className="text-navy">Weekly Sheet</span> : <span className="text-muted-foreground">Manual</span>}
                   </td>
@@ -129,7 +165,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, canE
                 <td className="px-3 py-2 text-right text-emerald-700">{fmtKES(totalSavings)}</td>
                 <td className="px-3 py-2 text-right text-red-700">{fmtKES(totalWithdrawn)}</td>
                 <td className="px-3 py-2 text-right text-navy">{fmtKES(currentBal)}</td>
-                <td colSpan={canEdit ? 4 : 3}></td>
+                <td colSpan={trailingFooterColSpan}></td>
               </tr>
             </tfoot>
           )}

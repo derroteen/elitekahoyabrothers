@@ -59,6 +59,8 @@ const CreateInput = z.object({
   remarks: z.string().max(2000).nullable().optional(),
   treasurer_sign: z.string().max(200).nullable().optional(),
   reason: z.string().max(500).nullable().optional(),
+  entry_loan_id: z.string().uuid().nullable().optional(),
+  entry_opening_loan_id: z.string().uuid().nullable().optional(),
 });
 
 export const createManualPassbookEntry = createServerFn({ method: "POST" })
@@ -86,6 +88,8 @@ export const createManualPassbookEntry = createServerFn({ method: "POST" })
         remarks: data.remarks ?? data.description,
         treasurer_sign: data.treasurer_sign ?? null,
         reason: data.reason ?? null,
+        entry_loan_id: data.entry_loan_id ?? null,
+        entry_opening_loan_id: data.entry_opening_loan_id ?? null,
         created_by: context.userId,
       } as any)
       .select("id")

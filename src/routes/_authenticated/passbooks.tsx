@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fmtKES } from "@/lib/format";
+import { fmtDate, fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
 import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry } from "@/lib/passbook.functions";
 import { forceDeletePassbookEntry } from "@/lib/entries.functions";
@@ -31,6 +31,14 @@ const MANUAL_CATEGORIES: { value: string; label: string; defaultDesc: string; fi
   { value: "adjustment", label: "Adjustment / Correction", defaultDesc: "Adjustment Entry", field: null },
   { value: "other", label: "Other", defaultDesc: "Other Entry", field: null },
 ];
+
+type MemberLoanOption = {
+  id: string;
+  type: "loan" | "opening";
+  label: string;
+  total_repayable: number;
+  sort_date?: string | null;
+};
 
 function PassbookAdmin() {
   const { role, loading } = useAuth();
@@ -66,6 +74,49 @@ function PassbookAdmin() {
       ]);
       if (entriesRes.error) throw entriesRes.error;
       return withBroughtForward(entriesRes.data ?? [], opening);
+    },
+  });
+
+  const { data: memberLoans = [] } = useQuery({
+    queryKey: ["passbook-member-loans", memberId],
+    enabled: !!memberId && isStaff,
+    queryFn: async (): Promise<MemberLoanOption[]> => {
+      const [loansRes, openingRes] = await Promise.all([
+        supabase
+          .from("loans")
+          .select("id, loan_date, balance, total_repayable, status")
+          .eq("member_id", memberId)
+          .order("loan_date", { ascending: true }),
+        (supabase as any)
+          .from("loan_opening_balances")
+          .select("id, loan_date, balance, total_repayable")
+          .eq("member_id", memberId)
+          .order("loan_date", { ascending: true }),
+      ]);
+      if (loansRes.error) throw loansRes.error;
+      if (openingRes.error) throw openingRes.error;
+
+      const regularLoans = (loansRes.data ?? [])
+        .filter((loan: any) => !["completed", "completed_with_fine", "rejected"].includes(String(loan.status ?? "")))
+        .map((loan: any) => ({
+          id: loan.id,
+          type: "loan" as const,
+          label: `Loan from ${fmtDate(loan.loan_date)} — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
+          total_repayable: Number(loan.total_repayable ?? 0),
+          sort_date: loan.loan_date ?? null,
+        }));
+
+      const openingLoans = ((openingRes.data ?? []) as any[])
+        .filter((loan) => Number(loan.balance ?? 0) > 0)
+        .map((loan) => ({
+          id: loan.id,
+          type: "opening" as const,
+          label: `Opening Loan — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
+          total_repayable: Number(loan.total_repayable ?? 0),
+          sort_date: loan.loan_date ?? null,
+        }));
+
+      return [...openingLoans, ...regularLoans].sort((a, b) => String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")));
     },
   });
 
@@ -114,16 +165,16 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} canDelete={canDelete} onEdit={setEditEntry} onDelete={onDeleteEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} canEdit={canEdit} canDelete={canDelete} onEdit={setEditEntry} onDelete={onDeleteEntry} />
       )}
 
-      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
       <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
     </div>
   );
 }
 
-function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }: any) {
+function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans = [], onCreated }: any) {
   const doCreate = useServerFn(createManualPassbookEntry);
   const nextDate = (base?: string) => {
     const d = base ? new Date(base) : new Date();
@@ -139,12 +190,22 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
     remarks: "", treasurer_sign: "",
     reason: "",
   });
+  const [selectedLoanTarget, setSelectedLoanTarget] = useState("");
   useEffect(() => {
     if (open) {
       const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
       setForm((f) => ({ ...f, entry_date: nextDate(latestDate), description: cat?.defaultDesc ?? "" }));
     }
   }, [open, latestDate]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (memberLoans.length === 1) {
+      setSelectedLoanTarget(`${memberLoans[0].type}:${memberLoans[0].id}`);
+      return;
+    }
+    setSelectedLoanTarget("");
+  }, [open, memberId, memberLoans]);
 
   const onCategoryChange = (v: string) => {
     setCategory(v);
@@ -156,6 +217,9 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
 
   const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
   const singleField = cat?.field;
+  const effectiveLoanPayment = singleField === "loan_payment" ? Number(form.amount || 0) : Number(form.loan_payment || 0);
+  const needsLoanSelection = memberLoans.length > 1 && effectiveLoanPayment > 0;
+  const selectedLoan = memberLoans.find((loan: MemberLoanOption) => `${loan.type}:${loan.id}` === selectedLoanTarget) ?? null;
 
   const submit = async () => {
     if (!form.description.trim()) { toast.error("Description is required"); return; }
@@ -174,6 +238,20 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
         loan_payment = singleField === "loan_payment" ? amt : 0;
       }
 
+      let entry_loan_id: string | null = null;
+      let entry_opening_loan_id: string | null = null;
+      const targetLoan = loan_payment > 0
+        ? (memberLoans.length > 1 ? selectedLoan : memberLoans.length === 1 ? memberLoans[0] : null)
+        : null;
+
+      if (loan_payment > 0 && memberLoans.length > 1 && !targetLoan) {
+        toast.error("Select which loan this payment is for");
+        return;
+      }
+
+      if (targetLoan?.type === "loan") entry_loan_id = targetLoan.id;
+      if (targetLoan?.type === "opening") entry_opening_loan_id = targetLoan.id;
+
       await doCreate({
         data: {
           member_id: memberId,
@@ -184,10 +262,13 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
           remarks: form.remarks || form.description,
           treasurer_sign: form.treasurer_sign || null,
           reason: (category === "adjustment" || category === "withdrawal") ? (form.reason || null) : null,
+          entry_loan_id,
+          entry_opening_loan_id,
         },
       });
       toast.success("Entry recorded");
       setForm({ entry_date: nextDate(form.entry_date), description: cat?.defaultDesc ?? "", amount: "", savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "", reason: "" });
+      setSelectedLoanTarget(memberLoans.length === 1 ? `${memberLoans[0].type}:${memberLoans[0].id}` : "");
       onOpenChange(false); onCreated();
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to create entry");
@@ -229,6 +310,24 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
               <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
               <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
             </>
+          )}
+
+          {needsLoanSelection && (
+            <div className="col-span-2">
+              <Label>Which loan is this payment for? <span className="text-red-600">*</span></Label>
+              <Select value={selectedLoanTarget} onValueChange={setSelectedLoanTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select loan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {memberLoans.map((loan: MemberLoanOption) => (
+                    <SelectItem key={`${loan.type}-${loan.id}`} value={`${loan.type}:${loan.id}`}>
+                      {loan.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <div className="col-span-2"><Label>Remarks (optional)</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
