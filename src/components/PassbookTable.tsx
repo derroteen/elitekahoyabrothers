@@ -48,14 +48,21 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
 
   const perLoanBalancesByRow = (() => {
     if (perLoanColumns.length === 0) return [];
-    const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? loan.total_repayable ?? 0));
+    const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0));
     return entries.map((entry) => {
       perLoanColumns.forEach((loan, index) => {
         const matchesLoan =
-          (loan.type === "loan" && entry.entry_loan_id === loan.id) ||
-          (loan.type === "opening" && entry.entry_opening_loan_id === loan.id);
+          (loan.type === "loan" && entry.loan_id === loan.id) ||
+          (loan.type === "opening" && entry.opening_loan_id === loan.id);
         if (matchesLoan) {
-          runningBalances[index] = Math.max(0, runningBalances[index] - Number(entry.loan_payment ?? 0));
+          // If this is the initial loan debit entry, add it to the balance
+          if (entry.loan_debit && Number(entry.loan_debit) > 0) {
+            runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
+          }
+          // Subtract any loan payment
+          if (entry.loan_payment && Number(entry.loan_payment) > 0) {
+            runningBalances[index] = Math.max(0, runningBalances[index] - Number(entry.loan_payment));
+          }
         }
       });
       return [...runningBalances];

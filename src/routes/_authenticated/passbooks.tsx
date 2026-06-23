@@ -243,34 +243,34 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
         loan_payment = singleField === "loan_payment" ? amt : 0;
       }
 
-      let entry_loan_id: string | null = null;
-      let entry_opening_loan_id: string | null = null;
-      const targetLoan = loan_payment > 0
-        ? (memberLoans.length > 1 ? selectedLoan : memberLoans.length === 1 ? memberLoans[0] : null)
-        : null;
+    let loan_id: string | null = null;
+    let opening_loan_id: string | null = null;
+    const targetLoan = loan_payment > 0
+      ? (memberLoans.length > 1 ? selectedLoan : memberLoans.length === 1 ? memberLoans[0] : null)
+      : null;
 
-      if (loan_payment > 0 && memberLoans.length > 1 && !targetLoan) {
-        toast.error("Select which loan this payment is for");
-        return;
-      }
+    if (loan_payment > 0 && memberLoans.length > 1 && !targetLoan) {
+      toast.error("Select which loan this payment is for");
+      return;
+    }
 
-      if (targetLoan?.type === "loan") entry_loan_id = targetLoan.id;
-      if (targetLoan?.type === "opening") entry_opening_loan_id = targetLoan.id;
+    if (targetLoan?.type === "loan") loan_id = targetLoan.id;
+    if (targetLoan?.type === "opening") opening_loan_id = targetLoan.id;
 
-      await doCreate({
-        data: {
-          member_id: memberId,
-          entry_date: form.entry_date,
-          category: category as any,
-          description: form.description.trim(),
-          savings, bonus, withdrawal, loan_payment,
-          remarks: form.remarks || form.description,
-          treasurer_sign: form.treasurer_sign || null,
-          reason: (category === "adjustment" || category === "withdrawal") ? (form.reason || null) : null,
-          entry_loan_id,
-          entry_opening_loan_id,
-        },
-      });
+    await doCreate({
+      data: {
+        member_id: memberId,
+        entry_date: form.entry_date,
+        category: category as any,
+        description: form.description.trim(),
+        savings, bonus, withdrawal, loan_payment,
+        remarks: form.remarks || form.description,
+        treasurer_sign: form.treasurer_sign || null,
+        reason: (category === "adjustment" || category === "withdrawal") ? (form.reason || null) : null,
+        loan_id,
+        opening_loan_id,
+      },
+    });
       toast.success("Entry recorded");
       setForm({ entry_date: nextDate(form.entry_date), description: cat?.defaultDesc ?? "", amount: "", savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "", reason: "" });
       setSelectedLoanTarget(memberLoans.length === 1 ? `${memberLoans[0].type}:${memberLoans[0].id}` : "");
@@ -384,8 +384,8 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
         treasurer_sign: entry.treasurer_sign ?? "",
         reason: "",
       });
-      if (entry.entry_loan_id) setSelectedLoanTarget(`loan:${entry.entry_loan_id}`);
-      else if (entry.entry_opening_loan_id) setSelectedLoanTarget(`opening:${entry.entry_opening_loan_id}`);
+      if (entry.loan_id) setSelectedLoanTarget(`loan:${entry.loan_id}`);
+      else if (entry.opening_loan_id) setSelectedLoanTarget(`opening:${entry.opening_loan_id}`);
       else setSelectedLoanTarget(UNASSIGNED_LOAN_TARGET);
     }
   }, [entry?.id]);
@@ -399,12 +399,12 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
       toast.error("Reason for change is required (min 3 chars)");
       return;
     }
-    let entry_loan_id: string | null = null;
-    let entry_opening_loan_id: string | null = null;
+    let loan_id: string | null = null;
+    let opening_loan_id: string | null = null;
     if (selectedLoanTarget !== UNASSIGNED_LOAN_TARGET) {
       const [type, id] = selectedLoanTarget.split(":");
-      if (type === "loan") entry_loan_id = id;
-      if (type === "opening") entry_opening_loan_id = id;
+      if (type === "loan") loan_id = id;
+      if (type === "opening") opening_loan_id = id;
     }
     setSubmitting(true);
     try {
@@ -420,8 +420,8 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
           remarks: form.remarks || null,
           treasurer_sign: form.treasurer_sign || null,
           reason: form.reason.trim(),
-          entry_loan_id,
-          entry_opening_loan_id,
+          loan_id,
+          opening_loan_id,
         },
       });
       toast.success("Entry updated and balances recalculated");
