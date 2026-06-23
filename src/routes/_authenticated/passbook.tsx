@@ -392,11 +392,13 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
       // Build loan payments array
       const loanPayments: Array<{ loanId?: string; openingLoanId?: string; amount: number }> = [];
       for (const [key, amountStr] of Object.entries(form.loanPayments)) {
-        const [type, id] = key.split('-');
+        const [type, ...idParts] = key.split('-');
+        const id = idParts.join('-'); // in case id has hyphens (though unlikely)
         const amount = Number(amountStr ?? 0);
         if (amount > 0) {
           loanPayments.push({
-            ...(type === "loan" ? { loanId: id } : { openingLoanId: id }),
+            loanId: type === "loan" ? id : null,
+            openingLoanId: type === "opening" ? id : null,
             amount,
           });
         }
@@ -584,11 +586,13 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
       // Build loan payments array
       const loanPayments: Array<{ loanId?: string; openingLoanId?: string; amount: number }> = [];
       for (const [key, amountStr] of Object.entries(form.loanPayments)) {
-        const [type, id] = key.split('-');
+        const [type, ...idParts] = key.split('-');
+        const id = idParts.join('-'); // in case id has hyphens (though unlikely)
         const amount = Number(amountStr ?? 0);
         if (amount > 0) {
           loanPayments.push({
-            ...(type === "loan" ? { loanId: id } : { openingLoanId: id }),
+            loanId: type === "loan" ? id : null,
+            openingLoanId: type === "opening" ? id : null,
             amount,
           });
         }
