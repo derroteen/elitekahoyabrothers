@@ -398,6 +398,7 @@ function LoanLedger() {
           <Stat label={isOpening ? "Total Repayable" : "Subtotal Repayment"} value={fmtKES(liveTotals.subtotal)} />
           <Stat label="Amount Paid" value={fmtKES(liveTotals.paid)} />
           <Stat label="Outstanding Balance" value={fmtKES(liveTotals.outstanding)} highlight />
+          {!isOpening && <Stat label="Expected Payment" value={fmtKES(Number(loan.period_payment ?? 0))} />}
           {!isOpening && <Stat label="Interest Rate" value={`${Number(loan.interest_rate).toFixed(1)}%`} />}
           {!isOpening && <Stat label="Payment Frequency" value={loan.payment_frequency} />}
           {!isOpening && <Stat label="Term" value={`${loan.loan_term_months} months`} />}

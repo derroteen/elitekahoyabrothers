@@ -43,7 +43,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const loanBal = entries.at(-1)?.loan_balance ?? 0;
   const perLoanColumns = (memberLoans?.length ?? 0) >= 2 ? (memberLoans ?? []) : [];
   const showCombinedLoanColumns = perLoanColumns.length === 0;
-  const trailingFooterColSpan = (showCombinedLoanColumns ? 2 : 0) + perLoanColumns.length + 1 + (canEdit ? 1 : 0);
+  const trailingFooterColSpan = (showCombinedLoanColumns ? 2 : perLoanColumns.length * 2) + 1 + (canEdit ? 1 : 0);
   const tableColSpan = 5 + trailingFooterColSpan;
 
   const perLoanBalancesByRow = (() => {
@@ -66,6 +66,18 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
         }
       });
       return [...runningBalances];
+    });
+  })();
+
+  const perLoanPaymentsByRow = (() => {
+    if (perLoanColumns.length === 0) return [];
+    return entries.map((entry) => {
+      return perLoanColumns.map((loan) => {
+        const matchesLoan =
+          (loan.type === "loan" && entry.loan_id === loan.id) ||
+          (loan.type === "opening" && entry.opening_loan_id === loan.id);
+        return matchesLoan ? Number(entry.loan_payment ?? 0) : 0;
+      });
     });
   })();
 
@@ -107,9 +119,14 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
               {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Pmt</th>}
               {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Bal</th>}
               {perLoanColumns.map((loan, index) => (
-                <th key={`${loan.type}-${loan.id}`} className="px-3 py-2 text-right" title={loan.label}>
-                  Loan {index + 1} Bal
-                </th>
+                <>
+                  <th key={`${loan.type}-${loan.id}-pmt`} className="px-3 py-2 text-right" title={loan.label}>
+                    Loan {index + 1} Pmt
+                  </th>
+                  <th key={`${loan.type}-${loan.id}-bal`} className="px-3 py-2 text-right" title={loan.label}>
+                    Loan {index + 1} Bal
+                  </th>
+                </>
               ))}
               <th className="px-3 py-2 text-left">Source</th>
               {canEdit && <th className="px-3 py-2 text-left">Actions</th>}
@@ -138,14 +155,19 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
                   {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>}
                   {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>}
                   {perLoanColumns.map((loan, loanIndex) => (
-                    <td key={`${e.id}-${loan.type}-${loan.id}`} className="px-3 py-2 text-right">
-                      {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.passbook_opening_balance ?? loan.total_repayable ?? 0).toFixed(2)}
-                    </td>
+                    <>
+                      <td key={`${e.id}-${loan.type}-${loan.id}-pmt`} className="px-3 py-2 text-right">
+                        {Number(perLoanPaymentsByRow[rowIndex]?.[loanIndex] ?? 0).toFixed(2)}
+                      </td>
+                      <td key={`${e.id}-${loan.type}-${loan.id}-bal`} className="px-3 py-2 text-right">
+                        {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.passbook_opening_balance ?? loan.total_repayable ?? 0).toFixed(2)}
+                      </td>
+                    </>
                   ))}
                   <td className="px-3 py-2 text-left text-[10px] uppercase tracking-wider">
                     {bf ? <span className="text-gold-3 font-semibold">Opening</span> : isWeekly ? <span className="text-navy">Weekly Sheet</span> : <span className="text-muted-foreground">Manual</span>}
                   </td>
-                  {canEdit && (
+                  {canEdit && !bf && (
                     <td className="px-3 py-2 text-left whitespace-nowrap">
                       <button onClick={() => onEdit?.(e)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="h-4 w-4 inline" /></button>
                       {canDelete && (
@@ -153,6 +175,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
                       )}
                     </td>
                   )}
+                  {canEdit && bf && <td className="px-3 py-2" />}
                 </tr>
               );
             })}

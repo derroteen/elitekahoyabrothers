@@ -135,7 +135,14 @@ function PassbookAdmin() {
   const canDelete = role === "super_admin";
   const doForceDelete = useServerFn(forceDeletePassbookEntry);
   const doDelete = useServerFn(deletePassbookEntry);
+  const onEditEntry = (entry: any) => {
+    if (!entry.__brought_forward) {
+      setEditEntry(entry);
+    }
+  };
+  
   const onDeleteEntry = async (entry: any) => {
+    if (entry.__brought_forward) return;
     if (!confirm("Are you sure you want to delete this entry? This action cannot be undone.")) return;
     try {
       if (entry.source === "weekly") {
@@ -170,7 +177,7 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} canEdit={canEdit} canDelete={canDelete} onEdit={setEditEntry} onDelete={onDeleteEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} canEdit={canEdit} canDelete={canDelete} onEdit={onEditEntry} onDelete={onDeleteEntry} />
       )}
 
       <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
