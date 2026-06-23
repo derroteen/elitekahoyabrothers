@@ -32,6 +32,31 @@ const MANUAL_CATEGORIES: { value: string; label: string; defaultDesc: string; fi
   { value: "other", label: "Other", defaultDesc: "Other Entry", field: null },
 ];
 
+type NewEntryFormState = {
+  entry_date: string;
+  description: string;
+  amount: string;
+  savings: string;
+  bonus: string;
+  withdrawal: string;
+  remarks: string;
+  treasurer_sign: string;
+  reason: string;
+  loanPayments: Record<string, string>;
+};
+
+type EditEntryFormState = {
+  entry_date: string;
+  description: string;
+  savings: string;
+  bonus: string;
+  withdrawal: string;
+  remarks: string;
+  treasurer_sign: string;
+  reason: string;
+  loanPayments: Record<string, string>;
+};
+
 function PassbookAdmin() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
@@ -310,18 +335,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
     return d.toISOString().slice(0, 10);
   };
   const [category, setCategory] = useState<string>("bonus");
-  const [form, setForm] = useState<{
-    entry_date: string;
-    description: string;
-    amount: string;
-    savings: string;
-    bonus: string;
-    withdrawal: string;
-    remarks: string;
-    treasurer_sign: string;
-    reason: string;
-    loanPayments: Record<string, string>;
-  }>({
+  const [form, setForm] = useState<NewEntryFormState>({
     entry_date: nextDate(latestDate),
     description: "Bonus Allocation",
     amount: "",
@@ -508,17 +522,7 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
   const doUpdate = useServerFn(updatePassbookEntry);
   const open = !!entry;
 
-  const [form, setForm] = useState<{
-    entry_date: string;
-    description: string;
-    savings: string;
-    bonus: string;
-    withdrawal: string;
-    remarks: string;
-    treasurer_sign: string;
-    reason: string;
-    loanPayments: Record<string, string>;
-  }>({
+  const [form, setForm] = useState<EditEntryFormState>({
     entry_date: "",
     description: "",
     savings: "",

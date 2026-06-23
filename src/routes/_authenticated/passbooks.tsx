@@ -41,6 +41,31 @@ type MemberLoanOption = {
   sort_date?: string | null;
 };
 
+type NewEntryFormState = {
+  entry_date: string;
+  description: string;
+  amount: string;
+  savings: string;
+  bonus: string;
+  withdrawal: string;
+  remarks: string;
+  treasurer_sign: string;
+  reason: string;
+  loanPayments: Record<string, string>;
+};
+
+type EditEntryFormState = {
+  entry_date: string;
+  description: string;
+  savings: string;
+  bonus: string;
+  withdrawal: string;
+  remarks: string;
+  treasurer_sign: string;
+  reason: string;
+  loanPayments: Record<string, string>;
+};
+
 const UNASSIGNED_LOAN_TARGET = "__unassigned__";
 
 function PassbookAdmin() {
@@ -195,18 +220,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
   };
   const [category, setCategory] = useState<string>("bonus");
   // Initialize form with loan payments as an object where keys are loan identifiers
-  const [form, setForm] = useState<{
-    entry_date: string;
-    description: string;
-    amount: string;
-    savings: string;
-    bonus: string;
-    withdrawal: string;
-    remarks: string;
-    treasurer_sign: string;
-    reason: string;
-    loanPayments: Record<string, string>; // key is `${type}-${id}`, value is amount string
-  }>({
+  const [form, setForm] = useState<NewEntryFormState>({
     entry_date: nextDate(latestDate),
     description: "Bonus Allocation",
     amount: "",
@@ -217,7 +231,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
     treasurer_sign: "",
     reason: "",
     loanPayments: Object.fromEntries(
-      memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, "")
+      memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""])
     )
   });
   useEffect(() => {
@@ -394,17 +408,7 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
   const doUpdate = useServerFn(updatePassbookEntry);
   const open = !!entry;
 
-  const [form, setForm] = useState<{
-    entry_date: string;
-    description: string;
-    savings: string;
-    bonus: string;
-    withdrawal: string;
-    remarks: string;
-    treasurer_sign: string;
-    reason: string;
-    loanPayments: Record<string, string>;
-  }>({
+  const [form, setForm] = useState<EditEntryFormState>({
     entry_date: "",
     description: "",
     savings: "",
