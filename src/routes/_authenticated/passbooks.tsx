@@ -205,7 +205,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
     remarks: string;
     treasurer_sign: string;
     reason: string;
-    loanPayments: Record<string, string>; // key is `${type}-${id}, value is amount string
+    loanPayments: Record<string, string>; // key is `${type}-${id}`, value is amount string
   }>({
     entry_date: nextDate(latestDate),
     description: "Bonus Allocation",
