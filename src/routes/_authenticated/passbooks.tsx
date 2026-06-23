@@ -103,7 +103,34 @@ function PassbookAdmin() {
       if (entriesRes.error) throw entriesRes.error;
       return withBroughtForward(entriesRes.data ?? [], opening);
     },
+    staleTime: 0, // Consider data stale immediately
+    refetchInterval: 5000, // Refetch every 5 seconds
   });
+
+  // Add realtime subscription for passbook_entries for the selected member
+  useEffect(() => {
+    if (!memberId || !isStaff) return;
+
+    const channel = supabase
+      .channel(`passbooks-${memberId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "passbook_entries",
+          filter: `member_id=eq.${memberId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [memberId, isStaff, qc]);
 
   const { data: memberLoans = [] } = useQuery({
     queryKey: ["passbook-member-loans", memberId],
