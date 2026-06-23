@@ -56,13 +56,58 @@ function PassbookAdmin() {
     },
   });
 
+  const { data: memberLoans = [] } = useQuery({
+    queryKey: ["passbook-member-loans", memberId],
+    enabled: !!memberId && isStaff,
+    queryFn: async () => {
+      const [loansRes, openingRes] = await Promise.all([
+        supabase
+          .from("loans")
+          .select("id, loan_date, balance, total_repayable, passbook_opening_balance, status")
+          .eq("member_id", memberId)
+          .order("loan_date", { ascending: true }),
+        (supabase as any)
+          .from("loan_opening_balances")
+          .select("id, loan_date, balance, total_repayable, passbook_opening_balance")
+          .eq("member_id", memberId)
+          .order("loan_date", { ascending: true }),
+      ]);
+      if (loansRes.error) throw loansRes.error;
+      if (openingRes.error) throw openingRes.error;
+
+      const regularLoans = (loansRes.data ?? [])
+        .filter((loan: any) => !["completed", "completed_with_fine", "rejected"].includes(String(loan.status ?? "")))
+        .map((loan: any) => ({
+          id: loan.id,
+          type: "loan" as const,
+          label: `Loan from ${loan.loan_date} — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
+          total_repayable: Number(loan.total_repayable ?? 0),
+          passbook_opening_balance: loan.passbook_opening_balance == null ? null : Number(loan.passbook_opening_balance),
+          sort_date: loan.loan_date ?? null,
+        }));
+
+      const openingLoans = ((openingRes.data ?? []) as any[])
+        .filter((loan) => Number(loan.balance ?? 0) > 0)
+        .map((loan) => ({
+          id: loan.id,
+          type: "opening" as const,
+          label: `Opening Loan — ${fmtKES(Number(loan.balance ?? 0))} remaining`,
+          total_repayable: Number(loan.total_repayable ?? 0),
+          passbook_opening_balance: loan.passbook_opening_balance == null ? null : Number(loan.passbook_opening_balance),
+          sort_date: loan.loan_date ?? null,
+        }));
+
+      return [...openingLoans, ...regularLoans].sort((a, b) => String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")));
+    },
+  });
+
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["passbook", memberId],
     enabled: !!memberId && isStaff,
     queryFn: async () => {
       const { fetchOpeningBalance, withBroughtForward } = await import("@/lib/opening-balances");
       const [entriesRes, opening] = await Promise.all([
-        supabase.from("passbook_entries").select("*").eq("member_id", memberId).order("entry_date", { ascending: true }),
+        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*)").eq("member_id", memberId).order("entry_date", { ascending: true }),
         fetchOpeningBalance(memberId),
       ]);
       if (entriesRes.error) throw entriesRes.error;
@@ -130,11 +175,11 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} canEdit={canEdit} canDelete={canDelete} onEdit={handleEditEntry} onDelete={onDeleteEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} canEdit={canEdit} canDelete={canDelete} onEdit={handleEditEntry} onDelete={onDeleteEntry} />
       )}
 
-      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
-      <EditEntryDialog entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <EditEntryDialog entry={editEntry} memberLoans={memberLoans} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
       <EditOpeningBalanceDialog
         open={editOpening}
         onClose={() => setEditOpening(false)}
@@ -257,7 +302,7 @@ function EditOpeningBalanceDialog({ open, onClose, memberId, entries, onSaved }:
   );
 }
 
-function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }: any) {
+function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans = [], onCreated }: any) {
   const doCreate = useServerFn(createManualPassbookEntry);
   const nextDate = (base?: string) => {
     const d = base ? new Date(base) : new Date();
@@ -265,20 +310,44 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
     return d.toISOString().slice(0, 10);
   };
   const [category, setCategory] = useState<string>("bonus");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    entry_date: string;
+    description: string;
+    amount: string;
+    savings: string;
+    bonus: string;
+    withdrawal: string;
+    remarks: string;
+    treasurer_sign: string;
+    reason: string;
+    loanPayments: Record<string, string>;
+  }>({
     entry_date: nextDate(latestDate),
     description: "Bonus Allocation",
     amount: "",
-    savings: "", bonus: "", withdrawal: "", loan_payment: "",
-    remarks: "", treasurer_sign: "",
+    savings: "",
+    bonus: "",
+    withdrawal: "",
+    remarks: "",
+    treasurer_sign: "",
     reason: "",
+    loanPayments: Object.fromEntries(
+      memberLoans.map((l: any) => [`${l.type}-${l.id}`, ""])
+    ),
   });
   useEffect(() => {
     if (open) {
       const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
-      setForm((f) => ({ ...f, entry_date: nextDate(latestDate), description: cat?.defaultDesc ?? "" }));
+      setForm((f) => ({
+        ...f,
+        entry_date: nextDate(latestDate),
+        description: cat?.defaultDesc ?? "",
+        loanPayments: Object.fromEntries(
+          memberLoans.map((l: any) => [`${l.type}-${l.id}`, ""])
+        ),
+      }));
     }
-  }, [open, latestDate]);
+  }, [open, latestDate, memberLoans]);
 
   const onCategoryChange = (v: string) => {
     setCategory(v);
@@ -298,14 +367,35 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
       let savings = Number(form.savings || 0);
       let bonus = Number(form.bonus || 0);
       let withdrawal = Number(form.withdrawal || 0);
-      let loan_payment = Number(form.loan_payment || 0);
 
       if (singleField) {
         const amt = Number(form.amount || 0);
         savings = singleField === "savings" ? amt : 0;
         bonus = singleField === "bonus" ? amt : 0;
         withdrawal = singleField === "withdrawal" ? amt : 0;
-        loan_payment = singleField === "loan_payment" ? amt : 0;
+      }
+
+      // Build loan payments array
+      const loanPayments: Array<{ loanId?: string; openingLoanId?: string; amount: number }> = [];
+      for (const [key, amountStr] of Object.entries(form.loanPayments)) {
+        const [type, id] = key.split('-');
+        const amount = Number(amountStr ?? 0);
+        if (amount > 0) {
+          loanPayments.push({
+            ...(type === "loan" ? { loanId: id } : { openingLoanId: id }),
+            amount,
+          });
+        }
+      }
+
+      // Handle single field loan_payment for backward compatibility
+      if (singleField === "loan_payment" && Number(form.amount ?? 0) > 0) {
+        if (memberLoans.length === 1) {
+          loanPayments.push({
+            ...(memberLoans[0].type === "loan" ? { loanId: memberLoans[0].id } : { openingLoanId: memberLoans[0].id }),
+            amount: Number(form.amount ?? 0),
+          });
+        }
       }
 
       await doCreate({
@@ -314,15 +404,32 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
           entry_date: form.entry_date,
           category: category as any,
           description: form.description.trim(),
-          savings, bonus, withdrawal, loan_payment,
+          savings,
+          bonus,
+          withdrawal,
           remarks: form.remarks || form.description,
           treasurer_sign: form.treasurer_sign || null,
           reason: (category === "adjustment" || category === "withdrawal") ? (form.reason || null) : null,
+          loanPayments,
         },
       });
       toast.success("Entry recorded");
-      setForm({ entry_date: nextDate(form.entry_date), description: cat?.defaultDesc ?? "", amount: "", savings: "", bonus: "", withdrawal: "", loan_payment: "", remarks: "", treasurer_sign: "", reason: "" });
-      onOpenChange(false); onCreated();
+      setForm({
+        entry_date: nextDate(form.entry_date),
+        description: cat?.defaultDesc ?? "",
+        amount: "",
+        savings: "",
+        bonus: "",
+        withdrawal: "",
+        remarks: "",
+        treasurer_sign: "",
+        reason: "",
+        loanPayments: Object.fromEntries(
+          memberLoans.map((l: any) => [`${l.type}-${l.id}`, ""])
+        ),
+      });
+      onOpenChange(false);
+      onCreated();
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to create entry");
     } finally {
@@ -361,7 +468,20 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
               <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
               <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
               <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
-              <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
+              {/* Per loan payment fields */}
+              {memberLoans.length === 1 ? (
+                <div>
+                  <Label>Loan Payment</Label>
+                  <Input type="number" step="0.01" value={form.loanPayments[`${memberLoans[0].type}-${memberLoans[0].id}`] ?? ""} onChange={(e) => setForm({ ...form, loanPayments: { ...form.loanPayments, [`${memberLoans[0].type}-${memberLoans[0].id}`]: e.target.value } })} />
+                </div>
+              ) : memberLoans.length > 1 ? (
+                memberLoans.map((loan: any) => (
+                  <div key={`${loan.type}-${loan.id}`} className="col-span-2">
+                    <Label>{loan.label} Payment</Label>
+                    <Input type="number" step="0.01" value={form.loanPayments[`${loan.type}-${loan.id}`] ?? ""} onChange={(e) => setForm({ ...form, loanPayments: { ...form.loanPayments, [`${loan.type}-${loan.id}`]: e.target.value } })} />
+                  </div>
+                ))
+              ) : null}
             </>
           )}
 
@@ -384,37 +504,68 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, onCreated }:
   );
 }
 
-function EditEntryDialog({ entry, onClose, onSaved }: any) {
+function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
   const doUpdate = useServerFn(updatePassbookEntry);
   const open = !!entry;
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    entry_date: string;
+    description: string;
+    savings: string;
+    bonus: string;
+    withdrawal: string;
+    remarks: string;
+    treasurer_sign: string;
+    reason: string;
+    loanPayments: Record<string, string>;
+  }>({
     entry_date: "",
     description: "",
     savings: "",
     bonus: "",
     withdrawal: "",
-    loan_payment: "",
     remarks: "",
     treasurer_sign: "",
     reason: "",
+    loanPayments: {},
   });
 
   useEffect(() => {
     if (entry) {
+      // Initialize loan payments from passbook_entry_loan_payments or single loan
+      const initialLoanPayments: Record<string, string> = {};
+      if (entry.passbook_entry_loan_payments) {
+        for (const pmt of entry.passbook_entry_loan_payments) {
+          const key = pmt.loan_id ? `loan-${pmt.loan_id}` : pmt.opening_loan_id ? `opening-${pmt.opening_loan_id}` : null;
+          if (key) {
+            initialLoanPayments[key] = String(pmt.amount ?? "");
+          }
+        }
+      } else if (entry.loan_id || entry.opening_loan_id) {
+        const key = entry.loan_id ? `loan-${entry.loan_id}` : `opening-${entry.opening_loan_id}`;
+        initialLoanPayments[key] = String(entry.loan_payment ?? "");
+      }
+      // Add empty fields for all member loans
+      for (const loan of memberLoans) {
+        const key = `${loan.type}-${loan.id}`;
+        if (!(key in initialLoanPayments)) {
+          initialLoanPayments[key] = "";
+        }
+      }
+
       setForm({
         entry_date: entry.entry_date ?? "",
         description: entry.description ?? entry.remarks ?? "",
         savings: String(entry.savings ?? ""),
         bonus: String(entry.bonus ?? ""),
         withdrawal: String(entry.withdrawal ?? ""),
-        loan_payment: String(entry.loan_payment ?? ""),
         remarks: entry.remarks ?? "",
         treasurer_sign: entry.treasurer_sign ?? "",
         reason: "",
+        loanPayments: initialLoanPayments,
       });
     }
-  }, [entry?.id]);
+  }, [entry?.id, memberLoans]);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -426,6 +577,18 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
     }
     setSubmitting(true);
     try {
+      // Build loan payments array
+      const loanPayments: Array<{ loanId?: string; openingLoanId?: string; amount: number }> = [];
+      for (const [key, amountStr] of Object.entries(form.loanPayments)) {
+        const [type, id] = key.split('-');
+        const amount = Number(amountStr ?? 0);
+        if (amount > 0) {
+          loanPayments.push({
+            ...(type === "loan" ? { loanId: id } : { openingLoanId: id }),
+            amount,
+          });
+        }
+      }
       await doUpdate({
         data: {
           id: entry.id,
@@ -434,10 +597,10 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
           savings: Number(form.savings || 0),
           bonus: Number(form.bonus || 0),
           withdrawal: Number(form.withdrawal || 0),
-          loan_payment: Number(form.loan_payment || 0),
           remarks: form.remarks || null,
           treasurer_sign: form.treasurer_sign || null,
           reason: form.reason.trim(),
+          loanPayments,
         },
       });
       toast.success("Entry updated and balances recalculated");
@@ -467,7 +630,20 @@ function EditEntryDialog({ entry, onClose, onSaved }: any) {
           <div><Label>Savings</Label><Input type="number" step="0.01" value={form.savings} onChange={(e) => setForm({ ...form, savings: e.target.value })} /></div>
           <div><Label>Bonus</Label><Input type="number" step="0.01" value={form.bonus} onChange={(e) => setForm({ ...form, bonus: e.target.value })} /></div>
           <div><Label>Withdrawal</Label><Input type="number" step="0.01" value={form.withdrawal} onChange={(e) => setForm({ ...form, withdrawal: e.target.value })} /></div>
-          <div><Label>Loan Payment</Label><Input type="number" step="0.01" value={form.loan_payment} onChange={(e) => setForm({ ...form, loan_payment: e.target.value })} /></div>
+          {/* Per loan payment fields */}
+          {memberLoans.length === 1 ? (
+            <div>
+              <Label>Loan Payment</Label>
+              <Input type="number" step="0.01" value={form.loanPayments[`${memberLoans[0].type}-${memberLoans[0].id}`] ?? ""} onChange={(e) => setForm({ ...form, loanPayments: { ...form.loanPayments, [`${memberLoans[0].type}-${memberLoans[0].id}`]: e.target.value } })} />
+            </div>
+          ) : memberLoans.length > 1 ? (
+            memberLoans.map((loan: any) => (
+              <div key={`${loan.type}-${loan.id}`} className="col-span-2">
+                <Label>{loan.label} Payment</Label>
+                <Input type="number" step="0.01" value={form.loanPayments[`${loan.type}-${loan.id}`] ?? ""} onChange={(e) => setForm({ ...form, loanPayments: { ...form.loanPayments, [`${loan.type}-${loan.id}`]: e.target.value } })} />
+              </div>
+            ))
+          ) : null}
           <div className="col-span-2"><Label>Remarks</Label><Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} /></div>
           <div className="col-span-2"><Label>Treasurer Sign</Label><Input value={form.treasurer_sign} onChange={(e) => setForm({ ...form, treasurer_sign: e.target.value })} /></div>
           <div className="col-span-2">

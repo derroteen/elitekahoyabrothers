@@ -49,20 +49,19 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const perLoanBalancesByRow = (() => {
     if (perLoanColumns.length === 0) return [];
     const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0));
-    return entries.map((entry) => {
+    return entries.map((entry, rowIndex) => {
       perLoanColumns.forEach((loan, index) => {
+        // First check for initial loan debit
         const matchesLoan =
           (loan.type === "loan" && entry.loan_id === loan.id) ||
           (loan.type === "opening" && entry.opening_loan_id === loan.id);
-        if (matchesLoan) {
-          // If this is the initial loan debit entry, add it to the balance
-          if (entry.loan_debit && Number(entry.loan_debit) > 0) {
-            runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
-          }
-          // Subtract any loan payment
-          if (entry.loan_payment && Number(entry.loan_payment) > 0) {
-            runningBalances[index] = Math.max(0, runningBalances[index] - Number(entry.loan_payment));
-          }
+        if (matchesLoan && entry.loan_debit && Number(entry.loan_debit) > 0) {
+          runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
+        }
+        // Now subtract the per-loan payment from our perLoanPaymentsByRow
+        const payment = perLoanPaymentsByRow[rowIndex]?.[index] ?? 0;
+        if (payment > 0) {
+          runningBalances[index] = Math.max(0, runningBalances[index] - payment);
         }
       });
       return [...runningBalances];
@@ -73,6 +72,14 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
     if (perLoanColumns.length === 0) return [];
     return entries.map((entry) => {
       return perLoanColumns.map((loan) => {
+        // First check the junction table first, then fall back to original single loan
+        const junctionPayment = entry.passbook_entry_loan_payments?.find(
+          (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
+        );
+        if (junctionPayment) {
+          return Number(junctionPayment.amount ?? 0);
+        }
+        // Fall back to original behavior for backward compatibility
         const matchesLoan =
           (loan.type === "loan" && entry.loan_id === loan.id) ||
           (loan.type === "opening" && entry.opening_loan_id === loan.id);
