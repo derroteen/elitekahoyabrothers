@@ -242,7 +242,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
         entry_date: nextDate(latestDate),
         description: cat?.defaultDesc ?? "",
         loanPayments: Object.fromEntries(
-          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""]
+          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""])
         )
       }));
     }
@@ -325,7 +325,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
         treasurer_sign: "",
         reason: "",
         loanPayments: Object.fromEntries(
-          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""]
+          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""])
         )
       });
       onOpenChange(false);
