@@ -46,6 +46,26 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const trailingFooterColSpan = (showCombinedLoanColumns ? 2 : perLoanColumns.length * 2) + 1 + (canEdit ? 1 : 0);
   const tableColSpan = 5 + trailingFooterColSpan;
 
+  const perLoanPaymentsByRow = (() => {
+    if (perLoanColumns.length === 0) return [];
+    return entries.map((entry) => {
+      return perLoanColumns.map((loan) => {
+        // First check the junction table first, then fall back to original single loan
+        const junctionPayment = entry.passbook_entry_loan_payments?.find(
+          (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
+        );
+        if (junctionPayment) {
+          return Number(junctionPayment.amount ?? 0);
+        }
+        // Fall back to original behavior for backward compatibility
+        const matchesLoan =
+          (loan.type === "loan" && entry.loan_id === loan.id) ||
+          (loan.type === "opening" && entry.opening_loan_id === loan.id);
+        return matchesLoan ? Number(entry.loan_payment ?? 0) : 0;
+      });
+    });
+  })();
+
   const perLoanBalancesByRow = (() => {
     if (perLoanColumns.length === 0) return [];
     const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0));
@@ -65,26 +85,6 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
         }
       });
       return [...runningBalances];
-    });
-  })();
-
-  const perLoanPaymentsByRow = (() => {
-    if (perLoanColumns.length === 0) return [];
-    return entries.map((entry) => {
-      return perLoanColumns.map((loan) => {
-        // First check the junction table first, then fall back to original single loan
-        const junctionPayment = entry.passbook_entry_loan_payments?.find(
-          (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
-        );
-        if (junctionPayment) {
-          return Number(junctionPayment.amount ?? 0);
-        }
-        // Fall back to original behavior for backward compatibility
-        const matchesLoan =
-          (loan.type === "loan" && entry.loan_id === loan.id) ||
-          (loan.type === "opening" && entry.opening_loan_id === loan.id);
-        return matchesLoan ? Number(entry.loan_payment ?? 0) : 0;
-      });
     });
   })();
 
