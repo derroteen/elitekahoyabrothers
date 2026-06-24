@@ -309,8 +309,8 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
         const amount = Number(amountStr ?? 0);
         if (amount > 0) {
           loanPayments.push({
-            loanId: type === "loan" ? id : null,
-            openingLoanId: type === "opening" ? id : null,
+            loanId: type === "loan" ? id : undefined,
+            openingLoanId: type === "opening" ? id : undefined,
             amount
           });
         }
@@ -503,8 +503,8 @@ function EditEntryDialog({ entry, memberLoans = [], onClose, onSaved }: any) {
         const amount = Number(amountStr ?? 0);
         if (amount > 0) {
           loanPayments.push({
-            loanId: type === "loan" ? id : null,
-            openingLoanId: type === "opening" ? id : null,
+            loanId: type === "loan" ? id : undefined,
+            openingLoanId: type === "opening" ? id : undefined,
             amount
           });
         }
