@@ -329,6 +329,7 @@ export type Database = {
           loan_date: string
           member_id: string
           notes: string | null
+          passbook_opening_balance: number | null
           principal: number
           status: string
           total_repayable: number
@@ -345,6 +346,7 @@ export type Database = {
           loan_date: string
           member_id: string
           notes?: string | null
+          passbook_opening_balance?: number | null
           principal?: number
           status?: string
           total_repayable?: number
@@ -361,6 +363,7 @@ export type Database = {
           loan_date?: string
           member_id?: string
           notes?: string | null
+          passbook_opening_balance?: number | null
           principal?: number
           status?: string
           total_repayable?: number
@@ -527,6 +530,7 @@ export type Database = {
           member_id: string
           notes: string | null
           outstanding_fines: number
+          passbook_opening_balance: number | null
           payment_frequency: Database["public"]["Enums"]["payment_frequency"]
           payment_start_date: string | null
           period_payment: number
@@ -554,6 +558,7 @@ export type Database = {
           member_id: string
           notes?: string | null
           outstanding_fines?: number
+          passbook_opening_balance?: number | null
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
           payment_start_date?: string | null
           period_payment?: number
@@ -581,6 +586,7 @@ export type Database = {
           member_id?: string
           notes?: string | null
           outstanding_fines?: number
+          passbook_opening_balance?: number | null
           payment_frequency?: Database["public"]["Enums"]["payment_frequency"]
           payment_start_date?: string | null
           period_payment?: number
@@ -726,6 +732,8 @@ export type Database = {
           created_by: string | null
           description: string | null
           entry_date: string
+          entry_loan_id: string | null
+          entry_opening_loan_id: string | null
           id: string
           loan_balance: number
           loan_debit: number
@@ -751,6 +759,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           entry_date: string
+          entry_loan_id?: string | null
+          entry_opening_loan_id?: string | null
           id?: string
           loan_balance?: number
           loan_debit?: number
@@ -776,6 +786,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           entry_date?: string
+          entry_loan_id?: string | null
+          entry_opening_loan_id?: string | null
           id?: string
           loan_balance?: number
           loan_debit?: number
@@ -794,6 +806,20 @@ export type Database = {
           withdrawal?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "passbook_entries_entry_loan_id_fkey"
+            columns: ["entry_loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passbook_entries_entry_opening_loan_id_fkey"
+            columns: ["entry_opening_loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_opening_balances"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "passbook_entries_loan_id_fkey"
             columns: ["loan_id"]
@@ -820,6 +846,52 @@ export type Database = {
             columns: ["weekly_entry_id"]
             isOneToOne: true
             referencedRelation: "weekly_collection_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      passbook_entry_loan_payments: {
+        Row: {
+          amount: number
+          id: string
+          loan_id: string | null
+          opening_loan_id: string | null
+          passbook_entry_id: string
+        }
+        Insert: {
+          amount?: number
+          id?: string
+          loan_id?: string | null
+          opening_loan_id?: string | null
+          passbook_entry_id: string
+        }
+        Update: {
+          amount?: number
+          id?: string
+          loan_id?: string | null
+          opening_loan_id?: string | null
+          passbook_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passbook_entry_loan_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passbook_entry_loan_payments_opening_loan_id_fkey"
+            columns: ["opening_loan_id"]
+            isOneToOne: false
+            referencedRelation: "loan_opening_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passbook_entry_loan_payments_passbook_entry_id_fkey"
+            columns: ["passbook_entry_id"]
+            isOneToOne: false
+            referencedRelation: "passbook_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -1116,6 +1188,7 @@ export type Database = {
       apply_annual_interest: { Args: { _loan_id?: string }; Returns: number }
       apply_loan_fines: { Args: { _loan_id?: string }; Returns: number }
       backfill_missing_loan_repayments: { Args: never; Returns: number }
+      backfill_missing_savings_benevolent: { Args: never; Returns: number }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       email_for_membership_no: {
         Args: { _membership_no: string }
