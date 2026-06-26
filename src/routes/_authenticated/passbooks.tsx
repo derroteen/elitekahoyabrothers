@@ -261,6 +261,10 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
       memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""])
     )
   });
+  // Effect 1: set entry_date and description ONCE when the dialog opens.
+  // Must NOT depend on memberLoans — otherwise a background refetch of loans
+  // (which produces a new array reference, e.g. from the 5-second refetchInterval
+  // on the entries query above) would silently overwrite a date the user has typed.
   useEffect(() => {
     if (open) {
       const cat = MANUAL_CATEGORIES.find((c) => c.value === category);
@@ -268,12 +272,24 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
         ...f,
         entry_date: nextDate(latestDate),
         description: cat?.defaultDesc ?? "",
+      }));
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Effect 2: keep loanPayments fields in sync with the available loans.
+  // Runs whenever the dialog is open or memberLoans changes reference, but
+  // intentionally does NOT touch entry_date.  Existing typed values are
+  // preserved via the f.loanPayments[key] ?? "" fallback.
+  useEffect(() => {
+    if (open) {
+      setForm((f) => ({
+        ...f,
         loanPayments: Object.fromEntries(
-          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, ""])
+          memberLoans.map((l: MemberLoanOption) => [`${l.type}-${l.id}`, f.loanPayments[`${l.type}-${l.id}`] ?? ""])
         )
       }));
     }
-  }, [open, latestDate, memberLoans]);
+  }, [open, memberLoans]);
 
   const onCategoryChange = (v: string) => {
     setCategory(v);
