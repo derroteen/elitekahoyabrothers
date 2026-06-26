@@ -46,8 +46,11 @@ function fmtLedgerDate(d: string | Date | null | undefined) {
   return `${day}/${m}/${y}`;
 }
 
-function repayDate(r: { repayment_date?: string; payment_date?: string } | null | undefined) {
-  return r?.repayment_date ?? r?.payment_date ?? "";
+// payment_date is the user-chosen value. repayment_date exists in the DB
+// but has a DEFAULT of CURRENT_DATE, so Postgres auto-fills it with today
+// on every insert — making it always wrong. Always read payment_date.
+function repayDate(r: { payment_date?: string } | null | undefined) {
+  return r?.payment_date ?? "";
 }
 
 function todayISO() {
@@ -156,10 +159,9 @@ function LoanLedger() {
           .order("payment_date");
         return data ?? [];
       }
-      let res = await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("repayment_date");
-      if (res.error) {
-        res = await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date");
-      }
+      // Order by payment_date — the authoritative user-chosen date column.
+      // repayment_date has a CURRENT_DATE default so must not be used for ordering.
+      const res = await supabase.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date");
       return res.data ?? [];
     },
   });
@@ -768,7 +770,7 @@ function Stat({ label, value, highlight = false }: { label: string; value: strin
 function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any) {
   const doAdd = useServerFn(addLoanPayment);
   const [form, setForm] = useState({
-    repayment_date: todayISO(),
+    payment_date: todayISO(),
     amount: "",
     payment_method: "cash",
     notes: "",
@@ -778,7 +780,7 @@ function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any
   useEffect(() => {
     if (open) {
       setForm({
-        repayment_date: todayISO(),
+        payment_date: todayISO(),
         amount: prefill?.amount ?? "",
         payment_method: "cash",
         notes: prefill?.notes ?? "",
@@ -788,7 +790,7 @@ function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any
 
   const submit = async () => {
     const amt = Number(form.amount);
-    if (!form.repayment_date) { toast.error("Repayment date required"); return; }
+    if (!form.payment_date) { toast.error("Payment date required"); return; }
     if (form.amount === "" || Number.isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
     setBusy(true);
     try {
@@ -796,7 +798,7 @@ function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any
         data: {
           loan_id: loanId,
           amount: amt,
-          payment_date: form.repayment_date,
+          payment_date: form.payment_date,
           payment_method: form.payment_method,
           notes: form.notes || null,
         },
@@ -823,8 +825,8 @@ function AddPaymentDialog({ open, loanId, loan, prefill, onClose, onSaved }: any
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Repayment Date</Label>
-            <Input type="date" value={form.repayment_date} onChange={(e) => setForm({ ...form, repayment_date: e.target.value })} />
-            {form.repayment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.repayment_date)}</p>}
+            <Input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} />
+            {form.payment_date && <p className="text-xs text-muted-foreground mt-1">{fmtLedgerDate(form.payment_date)}</p>}
           </div>
           <div>
             <Label>Amount (KES)</Label>
