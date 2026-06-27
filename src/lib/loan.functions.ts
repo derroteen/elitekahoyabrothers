@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { calcLoan, type Frequency } from "@/lib/loan-calc";
 
 async function getRole(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -431,5 +432,52 @@ export const deleteLoan = createServerFn({ method: "POST" })
       new_value: { reason: data.reason, member_id: (before as any).member_id, amount_borrowed: (before as any).amount_borrowed } as any,
       reason: data.reason,
     } as any);
+    return { ok: true };
+  });
+
+const EditLoanDetailsInput = z.object({
+  id: z.string().uuid(),
+  amount_borrowed: z.number().positive(),
+  interest_rate: z.number().nonnegative(),
+  loan_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  loan_term_months: z.number().int().positive(),
+  payment_frequency: z.enum(["weekly", "monthly"]),
+  notes: z.string().max(2000).optional().nullable(),
+});
+
+export const editLoanDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => EditLoanDetailsInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertLoanEditor(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: before } = await supabaseAdmin.from("loans").select("*").eq("id", data.id).single();
+    if (!before) throw new Error("Loan not found");
+
+    const calc = calcLoan(data.amount_borrowed, data.interest_rate, data.loan_term_months, data.payment_frequency as Frequency);
+
+    const { error } = await supabaseAdmin.from("loans").update({
+      amount_borrowed: calc.principal,
+      interest_rate: calc.interestRate,
+      loan_date: data.loan_date,
+      loan_term_months: calc.termMonths,
+      payment_frequency: data.payment_frequency,
+      total_repayable: calc.totalRepayable,
+      period_payment: calc.periodPayment,
+      notes: data.notes ?? (before as any).notes,
+    } as any).eq("id", data.id);
+
+    if (error) throw new Error(error.message);
+
+    await writeLoanAudit(context.userId, "Loan Details Edited", data.id, calc.principal, before, {
+      amount_borrowed: calc.principal,
+      interest_rate: calc.interestRate,
+      loan_date: data.loan_date,
+      loan_term_months: calc.termMonths,
+      payment_frequency: data.payment_frequency,
+      total_repayable: calc.totalRepayable,
+      period_payment: calc.periodPayment,
+    });
+
     return { ok: true };
   });

@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fmtKES } from "@/lib/format";
-import { addLoanPayment, deleteLoanPayment, editLoanPayment, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fmtKES, fmtDate } from "@/lib/format";
+import { addLoanPayment, deleteLoanPayment, editLoanPayment, editLoanDetails, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { calcLoan, type Frequency } from "@/lib/loan-calc";
+import { ArrowLeft, Edit, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isOpeningLoanId, normalizeLoanId } from "@/lib/loan-balance";
 
@@ -87,6 +89,7 @@ function LoanLedger() {
   const [editPayment, setEditPayment] = useState<any>(null);
   const [editFine, setEditFineState] = useState<any>(null);
   const [editIns, setEditInsState] = useState<any>(null);
+  const [editLoan, setEditLoan] = useState<any>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [addPaymentPrefill, setAddPaymentPrefill] = useState<{ amount?: string; notes?: string } | null>(null);
   const [addInsOpen, setAddInsOpen] = useState(false);
@@ -394,6 +397,14 @@ function LoanLedger() {
             </div>
           </div>
         )}
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="font-serif text-lg">Loan Details</div>
+          {canEditPayments && (
+            <Button size="sm" variant="outline" onClick={() => setEditLoan(loan)}>
+              <Edit className="w-4 h-4 mr-2" /> Edit Loan Details
+            </Button>
+          )}
+        </div>
         <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Stat label="Principal" value={fmtKES(liveTotals.principal)} />
           {!isOpening && <Stat label="Interest" value={fmtKES(liveTotals.interest)} />}
@@ -754,6 +765,7 @@ function LoanLedger() {
       <EditPaymentDialog payment={editPayment} loanId={loanId} onClose={() => setEditPayment(null)} onSaved={refreshLoan} />
       {!isOpening && <EditFineDialog fine={editFine} onClose={() => setEditFineState(null)} onSaved={refreshLoan} />}
       {!isOpening && <EditInsuranceDialog payment={editIns} onClose={() => setEditInsState(null)} onSaved={refreshLoan} />}
+      <EditLoanDetailsDialog loan={editLoan} onClose={() => setEditLoan(null)} onSaved={refreshLoan} />
     </div>
   );
 }
@@ -1215,6 +1227,117 @@ function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Update Payment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
+  const doEditLoan = useServerFn(editLoanDetails);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    amount_borrowed: "",
+    interest_rate: "",
+    loan_date: "",
+    loan_term_months: "",
+    payment_frequency: "monthly" as Frequency,
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (!loan) return;
+    setForm({
+      amount_borrowed: String(loan.amount_borrowed ?? ""),
+      interest_rate: String(loan.interest_rate ?? ""),
+      loan_date: loan.loan_date ?? "",
+      loan_term_months: String(loan.loan_term_months ?? ""),
+      payment_frequency: (loan.payment_frequency ?? "monthly") as Frequency,
+      notes: loan.notes ?? "",
+    });
+  }, [loan?.id]);
+
+  const calc = useMemo(() => {
+    const amount = Number(form.amount_borrowed || 0);
+    const rate = Number(form.interest_rate || 0);
+    const term = Number(form.loan_term_months || 0);
+    return calcLoan(amount, rate, term, form.payment_frequency);
+  }, [form.amount_borrowed, form.interest_rate, form.loan_term_months, form.payment_frequency]);
+
+  const submit = async () => {
+    if (!loan) return;
+    if (!form.amount_borrowed || !form.interest_rate || !form.loan_date || !form.loan_term_months) {
+      toast.error("All fields are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await doEditLoan({
+        data: {
+          id: loan.id,
+          amount_borrowed: Number(form.amount_borrowed),
+          interest_rate: Number(form.interest_rate),
+          loan_date: form.loan_date,
+          loan_term_months: Number(form.loan_term_months),
+          payment_frequency: form.payment_frequency,
+          notes: form.notes || null,
+        },
+      });
+      toast.success("Loan details updated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to update loan");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!loan} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle className="font-serif">Edit Loan Details</DialogTitle></DialogHeader>
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800 mb-4">
+          <strong>Warning:</strong> Changing these values does NOT update the existing payment schedule or redistribute past payments.
+          Use this only to correct data-entry errors on loans with no payments yet, or be prepared to manually verify the schedule afterward.
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount_borrowed} onChange={(e) => setForm({ ...form, amount_borrowed: e.target.value })} /></div>
+            <div><Label>Interest Rate % (annual)</Label><Input type="number" step="0.1" value={form.interest_rate} onChange={(e) => setForm({ ...form, interest_rate: e.target.value })} /></div>
+            <div><Label>Term (months)</Label><Input type="number" min="1" value={form.loan_term_months} onChange={(e) => setForm({ ...form, loan_term_months: e.target.value })} /></div>
+            <div>
+              <Label>Frequency</Label>
+              <Select value={form.payment_frequency} onValueChange={(v: Frequency) => setForm({ ...form, payment_frequency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2"><Label>Loan Date</Label><Input type="date" value={form.loan_date} onChange={(e) => setForm({ ...form, loan_date: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          </div>
+
+          <div className="bg-muted/40 rounded-md p-4 text-sm grid grid-cols-2 gap-x-6 gap-y-1.5">
+            <div className="text-muted-foreground">Principal:</div>
+            <div className="text-right font-mono">{fmtKES(calc.principal)}</div>
+            <div className="text-muted-foreground">Interest (simple, {calc.interestRate}% p.a.):</div>
+            <div className="text-right font-mono">{fmtKES(calc.interest)}</div>
+            <div className="text-muted-foreground">Subtotal (Loan + Interest):</div>
+            <div className="text-right font-mono">{fmtKES(calc.withInterest)}</div>
+            <div className="text-muted-foreground">Insurance:</div>
+            <div className="text-right font-mono">{fmtKES(calc.insurance)}</div>
+            <div className="text-muted-foreground font-medium">Total Repayable:</div>
+            <div className="text-right font-mono font-bold">{fmtKES(calc.totalRepayable)}</div>
+            <div className="text-muted-foreground">{calc.periods} × {form.payment_frequency === "weekly" ? "weekly" : "monthly"} payment:</div>
+            <div className="text-right font-mono font-bold text-navy">{fmtKES(calc.periodPayment)}</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
