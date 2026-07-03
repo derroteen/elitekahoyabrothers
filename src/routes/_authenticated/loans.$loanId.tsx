@@ -271,8 +271,9 @@ function LoanLedger() {
       return { principal, interest: totalRepayable - principal, subtotal: totalRepayable, paid, outstanding, outstandingFines: 0, cleared };
     }
     const principal = Number(loan?.amount_borrowed ?? 0);
-    const interest = Number(loan?.total_interest_added ?? 0);
-    const subtotal = principal + interest; // excludes insurance
+    const totalRepayable = Number(loan?.total_repayable ?? 0);
+    const interest = totalRepayable - principal;
+    const subtotal = totalRepayable; // excludes insurance
     const paid = paymentTotals.amount; // SUM(loan_repayments.amount)
     const outstanding = Math.max(0, subtotal - paid);
     const outstandingFines = Math.max(0, fineHistoryTotals.amount - fineHistoryTotals.paid);
