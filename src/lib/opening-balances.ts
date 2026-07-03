@@ -97,9 +97,9 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
     savingsBalance += total - Number(entry.withdrawal ?? 0);
 
     // Handle loan balance
-    if (entry.description?.toLowerCase() === "loan issued") {
-      // Reset loan balance to the new loan amount
-      loanBalance = Number(entry.loan_payment ?? 0);
+    if (entry.loan_debit && Number(entry.loan_debit) > 0) {
+      // New loan issued: add loan_debit to running loan balance
+      loanBalance = loanBalance + Number(entry.loan_debit);
     } else {
       // Subtract loan payment, but never below 0
       loanBalance = Math.max(0, loanBalance - Number(entry.loan_payment ?? 0));
