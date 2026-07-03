@@ -29,6 +29,7 @@ const MANUAL_CATEGORIES: { value: string; label: string; defaultDesc: string; fi
   { value: "refund", label: "Refund", defaultDesc: "Refund", field: "bonus" },
   { value: "withdrawal", label: "Withdrawal", defaultDesc: "Withdrawal", field: "withdrawal" },
   { value: "adjustment", label: "Adjustment / Correction", defaultDesc: "Adjustment Entry", field: null },
+  { value: "loan_issued", label: "Loan Issued", defaultDesc: "Loan Issued (Principal + Interest)", field: null },
   { value: "other", label: "Other", defaultDesc: "Other Entry", field: null },
 ];
 
@@ -349,6 +350,7 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
       memberLoans.map((l: any) => [`${l.type}-${l.id}`, ""])
     ),
   });
+  const [selectedLoanKey, setSelectedLoanKey] = useState<string>("");
   // Effect 1: set entry_date and description ONCE when the dialog opens.
   // Must NOT depend on memberLoans — otherwise a background refetch of loans
   // (which produces a new array reference) would silently overwrite a date
@@ -378,6 +380,12 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
       }));
     }
   }, [open, memberLoans]);
+
+  useEffect(() => {
+    if (open && category === "loan_issued") {
+      setSelectedLoanKey("");
+    }
+  }, [open, category]);
 
   const onCategoryChange = (v: string) => {
     setCategory(v);
@@ -514,6 +522,25 @@ function NewEntryDialog({ open, onOpenChange, memberId, latestDate, memberLoans 
                   </div>
                 ))
               ) : null}
+              {category === "loan_issued" && (
+                <div className="col-span-2">
+                  <Label>Select Loan</Label>
+                  <Select value={selectedLoanKey} onValueChange={(v) => {
+                    setSelectedLoanKey(v);
+                    const loan = memberLoans.find((l: any) => `${l.type}-${l.id}` === v);
+                    if (loan) {
+                      setForm((f) => ({ ...f, loanPayments: { ...f.loanPayments, [v]: String(loan.total_repayable ?? 0) }, description: "Loan Issued (Principal + Interest)" }));
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Choose a loan…" /></SelectTrigger>
+                    <SelectContent>
+                      {memberLoans.map((l: any) => (
+                        <SelectItem key={`${l.type}-${l.id}`} value={`${l.type}-${l.id}`}>{l.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </>
           )}
 
