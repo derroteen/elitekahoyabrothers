@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports — EKB" }] }),
 });
 
-type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines" | "opening";
+type ReportKey = "summary" | "members" | "loans" | "savings" | "collections" | "fines" | "opening" | "benevolent";
 
 function ReportsPage() {
   const { role, loading } = useAuth();
@@ -27,7 +27,7 @@ function ReportsPage() {
     queryKey: ["reports-bundle"],
     enabled: allowed,
     queryFn: async () => {
-      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines, openings] = await Promise.all([
+      const [profs, roles, loans, sched, repay, savings, sheets, entries, fines, openings, loanOpenings, benevolentEntries] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, phone, membership_no, is_active, date_joined"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("loans").select("*"),
@@ -38,6 +38,8 @@ function ReportsPage() {
         (supabase.from("weekly_collection_entries" as any) as any).select("*"),
         (supabase.from("loan_fines" as any) as any).select("*"),
         (supabase.from("member_opening_balances" as any) as any).select("*"),
+        (supabase.from("loan_opening_balances" as any) as any).select("*"),
+        (supabase.from("benevolent_entries" as any) as any).select("*")
       ]);
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
@@ -51,6 +53,8 @@ function ReportsPage() {
         entries: (entries.data ?? []).map((e: any) => ({ ...e, member: memberMap.get(e.member_id) })),
         fines: fines.data ?? [],
         openings: (openings.data ?? []).map((o: any) => ({ ...o, member: memberMap.get(o.member_id) })),
+        loanOpenings: (loanOpenings.data ?? []).map((o: any) => ({ ...o, member: memberMap.get(o.member_id) })),
+        benevolentEntries: (benevolentEntries.data ?? []).map((b: any) => ({ ...b, member: memberMap.get(b.member_id) })),
         memberMap,
       };
     },
@@ -77,36 +81,39 @@ function ReportsPage() {
           { header: "Date", key: "loan_date", width: 12 },
           { header: "Member", key: "member_name", width: 24 },
           { header: "Member ID", key: "member_no", width: 12 },
-          { header: "Borrowed", key: "amount_borrowed", align: "right", width: 12 },
-          { header: "Rate %", key: "interest_rate", align: "right", width: 8 },
-          { header: "Term (m)", key: "loan_term_months", align: "right", width: 9 },
-          { header: "Frequency", key: "payment_frequency", width: 10 },
-          { header: "Insurance", key: "insurance", align: "right", width: 11 },
+          { header: "Type", key: "loan_type", width: 10 },
+          { header: "Principal", key: "principal", align: "right", width: 12 },
           { header: "Total Repay", key: "total_repayable", align: "right", width: 13 },
           { header: "Paid", key: "amount_paid", align: "right", width: 12 },
-          { header: "Balance", key: "balance", align: "right", width: 12 },
+          { header: "Outstanding", key: "outstanding_balance", align: "right", width: 12 },
           { header: "Status", key: "status", width: 10 },
         ];
       case "savings":
         return [
-          { header: "Date", key: "entry_date", width: 12 },
-          { header: "Member", key: "member_name", width: 24 },
+          { header: "Member", key: "member_name", width: 28 },
           { header: "Member ID", key: "member_no", width: 12 },
-          { header: "Type", key: "entry_type", width: 12 },
-          { header: "Amount", key: "amount", align: "right", width: 12 },
-          { header: "Balance", key: "balance", align: "right", width: 12 },
-          { header: "Notes", key: "notes", width: 24 },
+          { header: "Total Deposits", key: "total_deposits", align: "right", width: 14 },
+          { header: "Total Withdrawals", key: "total_withdrawals", align: "right", width: 14 },
+          { header: "Current Balance", key: "current_balance", align: "right", width: 14 },
         ];
       case "collections":
         return [
-          { header: "Week", key: "week_number", width: 6 },
+          { header: "Week", key: "week_number", width: 8 },
           { header: "Date", key: "collection_date", width: 12 },
-          { header: "Member", key: "member_name", width: 24 },
+          { header: "Total Members", key: "total_members", width: 10 },
+          { header: "Total Savings", key: "total_savings", align: "right", width: 14 },
+          { header: "Total Loan Repayments", key: "total_loan_repayments", align: "right", width: 14 },
+          { header: "Total Benevolent", key: "total_benevolent", align: "right", width: 14 },
+          { header: "Total Fines", key: "total_fines", align: "right", width: 12 },
+          { header: "Grand Total", key: "grand_total", align: "right", width: 14 },
+        ];
+      case "benevolent":
+        return [
+          { header: "Member", key: "member_name", width: 28 },
           { header: "Member ID", key: "member_no", width: 12 },
-          { header: "Contribution", key: "contribution", align: "right", width: 12 },
-          { header: "Loan Repayment", key: "loan_repayment", align: "right", width: 13 },
-          { header: "Penalty", key: "penalty", align: "right", width: 10 },
-          { header: "Total", key: "total", align: "right", width: 12 },
+          { header: "Total Contributions", key: "total_contributions", align: "right", width: 14 },
+          { header: "Total Withdrawals", key: "total_withdrawals", align: "right", width: 14 },
+          { header: "Current Balance", key: "current_balance", align: "right", width: 14 },
         ];
       case "fines":
         return [
@@ -142,45 +149,57 @@ function ReportsPage() {
           is_active_str: m.is_active ? "Yes" : "No",
           joined_str: fmtDate(m.date_joined),
         }));
-      case "loans":
-        return data.loans.map((l: any) => ({
-          ...l,
-          loan_date: fmtDate(l.loan_date),
-          member_name: l.member?.full_name ?? "—",
-          member_no: l.member?.membership_no ?? "—",
-          amount_borrowed: fmtKES(l.amount_borrowed),
-          insurance: fmtKES(l.insurance),
-          total_repayable: fmtKES(l.total_repayable),
-          amount_paid: fmtKES(l.amount_paid),
-          balance: fmtKES(l.balance),
-        }));
-      case "savings":
-        return data.savings.map((s: any) => ({
-          ...s,
-          entry_date: fmtDate(s.entry_date),
-          member_name: s.member?.full_name ?? "—",
-          member_no: s.member?.membership_no ?? "—",
-          amount: fmtKES(s.amount),
-          balance: fmtKES(s.balance),
-        }));
+      case "loans": {
+        const rows: any[] = [];
+        for (const l of data.loans as any[]) {
+          const principal = Number(l.amount_borrowed ?? 0);
+          const totalRepayable = Number(l.total_repayable ?? 0);
+          const amountPaid = Number(l.amount_paid ?? 0);
+          const outstanding = Number(l.balance ?? Math.max(0, totalRepayable - amountPaid));
+          rows.push({ loan_date: fmtDate(l.loan_date), member_name: l.member?.full_name ?? "—", member_no: l.member?.membership_no ?? "—", loan_type: "Regular", principal: fmtKES(principal), total_repayable: fmtKES(totalRepayable), amount_paid: fmtKES(amountPaid), outstanding_balance: fmtKES(outstanding), status: l.status ?? "" });
+        }
+        for (const o of data.loanOpenings as any[]) {
+          const principal = Number(o.balance ?? 0);
+          const totalRepayable = Number(o.total_repayable ?? 0);
+          const amountPaid = Number(o.amount_paid ?? 0);
+          const outstanding = Number(o.balance ?? Math.max(0, totalRepayable - amountPaid));
+          rows.push({ loan_date: fmtDate(o.loan_date ?? o.effective_date), member_name: o.member?.full_name ?? "—", member_no: o.member?.membership_no ?? "—", loan_type: "Opening", principal: fmtKES(principal), total_repayable: fmtKES(totalRepayable), amount_paid: fmtKES(amountPaid), outstanding_balance: fmtKES(outstanding), status: o.status ?? "" });
+        }
+        return rows;
+      }
+      case "savings": {
+        const rows: any[] = [];
+        for (const m of data.members as any[]) {
+          const memberEntries = (data.savings as any[]).filter((e: any) => e.member_id === m.id);
+          const totalDeposits = memberEntries.reduce((s: number, e: any) => s + Number(e.savings ?? 0) + Number(e.bonus ?? 0), 0);
+          const totalWithdrawals = memberEntries.reduce((s: number, e: any) => s + Number(e.withdrawal ?? 0), 0);
+          let currentBalance = 0;
+          if (memberEntries.length > 0) {
+            const latest = memberEntries.reduce((a, b) => (a.entry_date > b.entry_date ? a : b));
+            currentBalance = Number(latest.balance ?? 0);
+          } else {
+            const opening = (data.openings as any[]).find((o: any) => o.member_id === m.id);
+            currentBalance = opening ? Number(opening.opening_savings ?? 0) : 0;
+          }
+          rows.push({ member_name: m.full_name ?? "—", member_no: m.membership_no ?? "—", total_deposits: fmtKES(totalDeposits), total_withdrawals: fmtKES(totalWithdrawals), current_balance: fmtKES(currentBalance) });
+        }
+        return rows;
+      }
       case "collections": {
-        const sheetMap = new Map(data.sheets.map((s: any) => [s.id, s]));
-        return data.entries.map((e: any) => {
-          const sheet: any = sheetMap.get(e.collection_id) ?? {};
-          return {
-            week_number: sheet.week_number ?? "",
-            collection_date: fmtDate(sheet.collection_date),
-            member_name: e.member?.full_name ?? "—",
-            member_no: e.member?.membership_no ?? "—",
-            contribution: fmtKES(e.contribution),
-            loan_repayment: fmtKES(e.loan_repayment),
-            penalty: fmtKES(e.penalty),
-            total: fmtKES(Number(e.contribution || 0) + Number(e.loan_repayment || 0) + Number(e.penalty || 0)),
-          };
-        });
+        const rows: any[] = [];
+        for (const s of data.sheets as any[]) {
+          const sheetEntries = (data.entries as any[]).filter((e: any) => e.collection_id === s.id);
+          const totalMembers = new Set(sheetEntries.map((e: any) => e.member_id)).size;
+          const totalSavings = sheetEntries.reduce((t: number, e: any) => t + Number(e.savings ?? 0), 0);
+          const totalLoanRepay = sheetEntries.reduce((t: number, e: any) => t + Number(e.loan_refund ?? 0), 0);
+          const totalBenevolent = sheetEntries.reduce((t: number, e: any) => t + Number(e.benevolent_fund ?? 0), 0);
+          const totalFines = sheetEntries.reduce((t: number, e: any) => t + Number(e.fine ?? 0), 0);
+          const grandTotal = totalSavings + totalLoanRepay + totalBenevolent + totalFines;
+          rows.push({ week_number: s.week_number ?? "", collection_date: fmtDate(s.collection_date), total_members: totalMembers, total_savings: fmtKES(totalSavings), total_loan_repayments: fmtKES(totalLoanRepay), total_benevolent: fmtKES(totalBenevolent), total_fines: fmtKES(totalFines), grand_total: fmtKES(grandTotal) });
+        }
+        return rows;
       }
       case "fines": {
-        // Aggregate by member from fines table
         const byMember = new Map<string, { name: string; no: string; charged: number; paid: number }>();
         for (const f of data.fines as any[]) {
           const loan: any = (data.loans as any[]).find((l: any) => l.id === f.loan_id);
@@ -192,11 +211,30 @@ function ReportsPage() {
           cur.paid += Number(f.amount_paid || 0);
           byMember.set(key, cur);
         }
-        return Array.from(byMember.values()).map(v => ({
-          member_name: v.name, member_no: v.no,
-          total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid),
-          outstanding: fmtKES(v.charged - v.paid),
-        }));
+        // Include opening loan fines if present
+        for (const o of data.loanOpenings as any[]) {
+          const key = o.member_id;
+          const m: any = o.member;
+          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", charged: 0, paid: 0 };
+          cur.charged += Number(o.total_fines_charged ?? o.opening_fine ?? 0);
+          cur.paid += Number(o.total_fines_paid ?? o.opening_fine_paid ?? 0);
+          byMember.set(key, cur);
+        }
+        return Array.from(byMember.values()).map(v => ({ member_name: v.name, member_no: v.no, total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid), outstanding: fmtKES(v.charged - v.paid) }));
+      }
+      case "benevolent": {
+        // Aggregate benevolent_entries per member
+        const byMember = new Map<string, { name: string; no: string; contrib: number; withdraw: number; balance: number }>();
+        for (const b of data.benevolentEntries as any[]) {
+          const key = b.member_id;
+          const m: any = b.member;
+          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", contrib: 0, withdraw: 0, balance: 0 };
+          cur.contrib += Number(b.contribution ?? 0);
+          cur.withdraw += Number(b.withdrawal ?? 0);
+          cur.balance = Number(b.balance ?? cur.balance);
+          byMember.set(key, cur);
+        }
+        return Array.from(byMember.values()).map(v => ({ member_name: v.name, member_no: v.no, total_contributions: fmtKES(v.contrib), total_withdrawals: fmtKES(v.withdraw), current_balance: fmtKES(v.balance) }));
       }
       case "opening":
         return (data.openings as any[]).map((o: any) => ({
@@ -260,6 +298,7 @@ function ReportsPage() {
     { key: "opening", label: "Opening Balances", description: "Brought-forward balances per member (savings, loan, fine, insurance, benevolent)", icon: BarChart3 },
     { key: "loans", label: "Loan Register", description: "All loans with balances & status", icon: Banknote },
     { key: "fines", label: "Fine Summary", description: "Fines per member: charged / paid / outstanding", icon: Banknote },
+    { key: "benevolent", label: "Benevolent Fund", description: "Contributions, withdrawals, balances per member", icon: PiggyBank },
     { key: "savings", label: "Savings Ledger", description: "All savings transactions", icon: PiggyBank },
     { key: "collections", label: "Weekly Collections", description: "All collection sheet entries", icon: ClipboardList },
   ];
@@ -316,6 +355,7 @@ function ReportsPage() {
         { name: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { name: "Opening Balances", columns: buildColumns("opening"), rows: buildRows("opening") },
         { name: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { name: "Benevolent", columns: buildColumns("benevolent"), rows: buildRows("benevolent") },
         { name: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { name: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { name: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
@@ -325,6 +365,7 @@ function ReportsPage() {
         { heading: "Members", columns: buildColumns("members"), rows: buildRows("members") },
         { heading: "Opening Balances (Brought Forward)", columns: buildColumns("opening"), rows: buildRows("opening") },
         { heading: "Loans", columns: buildColumns("loans"), rows: buildRows("loans") },
+        { heading: "Benevolent Fund", columns: buildColumns("benevolent"), rows: buildRows("benevolent") },
         { heading: "Fines", columns: buildColumns("fines"), rows: buildRows("fines") },
         { heading: "Savings", columns: buildColumns("savings"), rows: buildRows("savings") },
         { heading: "Collections", columns: buildColumns("collections"), rows: buildRows("collections") },
