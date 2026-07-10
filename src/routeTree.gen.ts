@@ -33,6 +33,7 @@ import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authent
 import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
 import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedConstitutionRouteImport } from './routes/_authenticated/constitution'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
@@ -166,6 +167,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedConstitutionRoute =
+  AuthenticatedConstitutionRouteImport.update({
+    id: '/constitution',
+    path: '/constitution',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCollectionsRoute =
   AuthenticatedCollectionsRouteImport.update({
     id: '/collections',
@@ -217,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuthenticatedAuditRoute
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
+  '/constitution': typeof AuthenticatedConstitutionRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
@@ -249,6 +257,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AuthenticatedAuditRoute
   '/benevolent': typeof AuthenticatedBenevolentRoute
   '/collections': typeof AuthenticatedCollectionsRoute
+  '/constitution': typeof AuthenticatedConstitutionRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/members': typeof AuthenticatedMembersRoute
   '/my-attendance': typeof AuthenticatedMyAttendanceRoute
@@ -283,6 +292,7 @@ export interface FileRoutesById {
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/benevolent': typeof AuthenticatedBenevolentRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRoute
+  '/_authenticated/constitution': typeof AuthenticatedConstitutionRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/members': typeof AuthenticatedMembersRoute
   '/_authenticated/my-attendance': typeof AuthenticatedMyAttendanceRoute
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/benevolent'
     | '/collections'
+    | '/constitution'
     | '/dashboard'
     | '/members'
     | '/my-attendance'
@@ -349,6 +360,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/benevolent'
     | '/collections'
+    | '/constitution'
     | '/dashboard'
     | '/members'
     | '/my-attendance'
@@ -382,6 +394,7 @@ export interface FileRouteTypes {
     | '/_authenticated/audit'
     | '/_authenticated/benevolent'
     | '/_authenticated/collections'
+    | '/_authenticated/constitution'
     | '/_authenticated/dashboard'
     | '/_authenticated/members'
     | '/_authenticated/my-attendance'
@@ -583,6 +596,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/constitution': {
+      id: '/_authenticated/constitution'
+      path: '/constitution'
+      fullPath: '/constitution'
+      preLoaderRoute: typeof AuthenticatedConstitutionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/collections': {
       id: '/_authenticated/collections'
       path: '/collections'
@@ -641,6 +661,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBenevolentRoute: typeof AuthenticatedBenevolentRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRoute
+  AuthenticatedConstitutionRoute: typeof AuthenticatedConstitutionRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRoute
   AuthenticatedMyAttendanceRoute: typeof AuthenticatedMyAttendanceRoute
@@ -668,6 +689,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBenevolentRoute: AuthenticatedBenevolentRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRoute,
+  AuthenticatedConstitutionRoute: AuthenticatedConstitutionRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMembersRoute: AuthenticatedMembersRoute,
   AuthenticatedMyAttendanceRoute: AuthenticatedMyAttendanceRoute,
@@ -705,3 +727,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
