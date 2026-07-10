@@ -88,7 +88,7 @@ function CollectionsPage() {
       <PageHeader title="Weekly Collection Sheet" subtitle={`${sheets.length} sheets on file`}
         actions={
           canEdit ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={handleBackfillRepayments}
                 disabled={backfillingRepayments}
