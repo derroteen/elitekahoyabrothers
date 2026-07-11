@@ -98,6 +98,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           keywords: "Chama, Savings Group, Loans, Kenya, Passbook, Member Portal, Financial Management",
         }),
       },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "Dteq Solutions",
+          email: "infodteqsolutions@gmail.com",
+          description: "Web application developer. Built the Elite Kahoya Brothers chama management portal.",
+          url: "https://elitekahoyabrothers.com",
+          contactPoint: {
+            "@type": "ContactPoint",
+            email: "infodteqsolutions@gmail.com",
+            contactType: "technical support",
+          },
+        }),
+      },
     ],
   }),
   shellComponent: RootShell,
