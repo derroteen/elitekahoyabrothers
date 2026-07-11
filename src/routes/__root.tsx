@@ -204,6 +204,9 @@ function RootComponent() {
           </div>
         )}
         <Outlet />
+        <footer className="py-3 px-4 text-center text-xs text-muted-foreground border-t border-border">
+          Powered by <a href="mailto:infodteqsolutions@gmail.com" className="hover:underline">Dteq Solutions</a> · infodteqsolutions@gmail.com
+        </footer>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
