@@ -59,7 +59,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Elite Kahoya Brothers – Savings and Loans Chama" },
       { name: "description", content: "Elite Kahoya Brothers is a savings and loans chama providing member savings tracking, loan management, passbooks, reports, and financial records." },
       { name: "keywords", content: "Elite Kahoya Brothers, Chama, Savings Group, Loans, Kenya, Passbook, Member Portal, Financial Management" },
-      { name: "author", content: "Elite Kahoya Brothers" },
+      { name: "author", content: "Dteq Solutions" },
+      { name: "contact", content: "infodteqsolutions@gmail.com" },
+      { name: "designer", content: "Dteq Solutions - infodteqsolutions@gmail.com" },
       { name: "robots", content: "index, follow" },
       { property: "og:site_name", content: "Elite Kahoya Brothers" },
       { property: "og:title", content: "Elite Kahoya Brothers – Savings and Loans Chama" },
@@ -94,6 +96,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           description: "Elite Kahoya Brothers is a savings and loans chama providing member savings tracking, loan management, passbooks, reports, and financial records.",
           areaServed: "KE",
           keywords: "Chama, Savings Group, Loans, Kenya, Passbook, Member Portal, Financial Management",
+        }),
+      },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "Dteq Solutions",
+          email: "infodteqsolutions@gmail.com",
+          description: "Web application developer. Built the Elite Kahoya Brothers chama management portal.",
+          url: "https://elitekahoyabrothers.com",
+          contactPoint: {
+            "@type": "ContactPoint",
+            email: "infodteqsolutions@gmail.com",
+            contactType: "technical support",
+          },
         }),
       },
     ],
@@ -186,6 +204,9 @@ function RootComponent() {
           </div>
         )}
         <Outlet />
+        <footer className="py-3 px-4 text-center text-xs text-muted-foreground border-t border-border">
+          Powered by <a href="mailto:infodteqsolutions@gmail.com" className="hover:underline">Dteq Solutions</a> · infodteqsolutions@gmail.com
+        </footer>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
