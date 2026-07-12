@@ -175,8 +175,24 @@ function AttendancePage() {
   }, [entries]);
 
   const memberTotal = (memberId: string) =>
-    entries.filter(e => e.member_id === memberId).reduce((s, e) => s + Number(e.fine_amount), 0);
-  const grandTotal = entries.reduce((s, e) => s + Number(e.fine_amount), 0);
+    entries.filter(e => e.member_id === memberId).reduce((s, e) => s + fineFor(e.status), 0);
+  const memberFinePaid = (memberId: string) => {
+    const list = entries.filter(e => e.member_id === memberId && fineFor(e.status) > 0);
+    if (list.length === 0) return false;
+    return list.every(e => e.fine_paid === true);
+  };
+  const grandTotal = entries.reduce((s, e) => s + fineFor(e.status), 0);
+
+  const setFinePaid = useMutation({
+    mutationFn: async ({ memberId, paid }: { memberId: string; paid: boolean }) => {
+      const ids = entries.filter(e => e.member_id === memberId && fineFor(e.status) > 0).map(e => e.id);
+      if (ids.length === 0) return;
+      const { error } = await supabase.from("attendance_entries").update({ fine_paid: paid } as any).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance-entries", sheet?.id] }),
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const exportRows = members.map((m, i) => {
     const row: any = { no: i + 1, name: m.full_name };
