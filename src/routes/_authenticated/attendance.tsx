@@ -337,7 +337,40 @@ function AttendancePage() {
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2 text-right font-mono font-medium">{fmtKES(memberTotal(m.id))}</td>
+                    <td className="px-3 py-2 text-right font-mono font-medium">
+                      {(() => {
+                        const total = memberTotal(m.id);
+                        const paid = memberFinePaid(m.id);
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={total > 0 ? (paid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : ""}>
+                              {fmtKES(total)}
+                            </span>
+                            {total > 0 && (
+                              paid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-700 dark:text-green-300">
+                                  ✓ Paid
+                                  {canEdit && (
+                                    <button
+                                      className="ml-1 underline text-[10px] font-normal"
+                                      onClick={() => setFinePaid.mutate({ memberId: m.id, paid: false })}
+                                      title="Undo payment"
+                                    >undo</button>
+                                  )}
+                                </span>
+                              ) : canEdit ? (
+                                <button
+                                  className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/20 text-red-700 dark:text-red-300 hover:bg-red-500/30"
+                                  onClick={() => setFinePaid.mutate({ memberId: m.id, paid: true })}
+                                >Mark Paid</button>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/20 text-red-700 dark:text-red-300">Unpaid</span>
+                              )
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
