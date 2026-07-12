@@ -1,0 +1,1 @@
+ALTER TABLE public.attendance_entries ADD COLUMN IF NOT EXISTS fine_paid boolean NOT NULL DEFAULT false;
