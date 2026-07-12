@@ -27,7 +27,13 @@ type Status = "present" | "late" | "absent" | "apology";
 
 type Member = { id: string; full_name: string; membership_no: string | null; sort_order: number | null };
 type Sheet = { id: string; year: number; month: number; week_dates: string[]; notes: string | null };
-type Entry = { id: string; sheet_id: string; member_id: string; week_number: number; status: Status; arrival_time: string | null; fine_amount: number };
+type Entry = { id: string; sheet_id: string; member_id: string; week_number: number; status: Status; arrival_time: string | null; fine_amount: number; fine_paid?: boolean };
+
+function fineFor(s: Status): number {
+  if (s === "absent") return 200;
+  if (s === "late") return 20;
+  return 0;
+}
 
 function statusLabel(s: Status) { 
   if (s === "present") return "✓";
