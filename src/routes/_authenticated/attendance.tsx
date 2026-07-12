@@ -27,7 +27,13 @@ type Status = "present" | "late" | "absent" | "apology";
 
 type Member = { id: string; full_name: string; membership_no: string | null; sort_order: number | null };
 type Sheet = { id: string; year: number; month: number; week_dates: string[]; notes: string | null };
-type Entry = { id: string; sheet_id: string; member_id: string; week_number: number; status: Status; arrival_time: string | null; fine_amount: number };
+type Entry = { id: string; sheet_id: string; member_id: string; week_number: number; status: Status; arrival_time: string | null; fine_amount: number; fine_paid?: boolean };
+
+function fineFor(s: Status): number {
+  if (s === "absent") return 200;
+  if (s === "late") return 20;
+  return 0;
+}
 
 function statusLabel(s: Status) { 
   if (s === "present") return "✓";
@@ -169,8 +175,24 @@ function AttendancePage() {
   }, [entries]);
 
   const memberTotal = (memberId: string) =>
-    entries.filter(e => e.member_id === memberId).reduce((s, e) => s + Number(e.fine_amount), 0);
-  const grandTotal = entries.reduce((s, e) => s + Number(e.fine_amount), 0);
+    entries.filter(e => e.member_id === memberId).reduce((s, e) => s + fineFor(e.status), 0);
+  const memberFinePaid = (memberId: string) => {
+    const list = entries.filter(e => e.member_id === memberId && fineFor(e.status) > 0);
+    if (list.length === 0) return false;
+    return list.every(e => e.fine_paid === true);
+  };
+  const grandTotal = entries.reduce((s, e) => s + fineFor(e.status), 0);
+
+  const setFinePaid = useMutation({
+    mutationFn: async ({ memberId, paid }: { memberId: string; paid: boolean }) => {
+      const ids = entries.filter(e => e.member_id === memberId && fineFor(e.status) > 0).map(e => e.id);
+      if (ids.length === 0) return;
+      const { error } = await supabase.from("attendance_entries").update({ fine_paid: paid } as any).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance-entries", sheet?.id] }),
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const exportRows = members.map((m, i) => {
     const row: any = { no: i + 1, name: m.full_name };
@@ -315,7 +337,40 @@ function AttendancePage() {
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2 text-right font-mono font-medium">{fmtKES(memberTotal(m.id))}</td>
+                    <td className="px-3 py-2 text-right font-mono font-medium">
+                      {(() => {
+                        const total = memberTotal(m.id);
+                        const paid = memberFinePaid(m.id);
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={total > 0 ? (paid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : ""}>
+                              {fmtKES(total)}
+                            </span>
+                            {total > 0 && (
+                              paid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-700 dark:text-green-300">
+                                  ✓ Paid
+                                  {canEdit && (
+                                    <button
+                                      className="ml-1 underline text-[10px] font-normal"
+                                      onClick={() => setFinePaid.mutate({ memberId: m.id, paid: false })}
+                                      title="Undo payment"
+                                    >undo</button>
+                                  )}
+                                </span>
+                              ) : canEdit ? (
+                                <button
+                                  className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/20 text-red-700 dark:text-red-300 hover:bg-red-500/30"
+                                  onClick={() => setFinePaid.mutate({ memberId: m.id, paid: true })}
+                                >Mark Paid</button>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/20 text-red-700 dark:text-red-300">Unpaid</span>
+                              )
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>

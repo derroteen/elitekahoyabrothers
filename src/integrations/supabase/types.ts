@@ -49,6 +49,7 @@ export type Database = {
           arrival_time: string | null
           created_at: string
           fine_amount: number
+          fine_paid: boolean
           id: string
           member_id: string
           notes: string | null
@@ -61,6 +62,7 @@ export type Database = {
           arrival_time?: string | null
           created_at?: string
           fine_amount?: number
+          fine_paid?: boolean
           id?: string
           member_id: string
           notes?: string | null
@@ -73,6 +75,7 @@ export type Database = {
           arrival_time?: string | null
           created_at?: string
           fine_amount?: number
+          fine_paid?: boolean
           id?: string
           member_id?: string
           notes?: string | null
