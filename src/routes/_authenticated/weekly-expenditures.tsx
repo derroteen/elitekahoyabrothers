@@ -281,9 +281,13 @@ function WeeklyExpendituresPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                {Array.from({length:5}).map((_,i)=>(<TableRow key={i}>{Array.from({length:canEdit ? 7 : 6}).map((_,c)=>(<TableCell key={c}><Skeleton className="h-4 w-full" /></TableCell>))}</TableRow>))}
-              )}
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: canEdit ? 7 : 6 }).map((_, c) => (
+                    <TableCell key={c}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
               {!isLoading && rows.length === 0 && (
                 <TableRow><TableCell colSpan={canEdit ? 7 : 6} className="text-center text-muted-foreground py-6">No expenditures found for these filters</TableCell></TableRow>
               )}
