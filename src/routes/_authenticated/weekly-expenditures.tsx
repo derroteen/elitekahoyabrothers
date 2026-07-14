@@ -16,6 +16,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
 import { Pencil, Trash2, FileText, FileSpreadsheet, FileDown } from "lucide-react";
 import { deleteWeeklyExpenditure } from "@/lib/entries.functions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/weekly-expenditures")({
   component: WeeklyExpendituresPage,
@@ -281,7 +282,7 @@ function WeeklyExpendituresPage() {
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={canEdit ? 7 : 6} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>
+                {Array.from({length:5}).map((_,i)=>(<TableRow key={i}>{Array.from({length:canEdit ? 7 : 6}).map((_,c)=>(<TableCell key={c}><Skeleton className="h-4 w-full" /></TableCell>))}</TableRow>))}
               )}
               {!isLoading && rows.length === 0 && (
                 <TableRow><TableCell colSpan={canEdit ? 7 : 6} className="text-center text-muted-foreground py-6">No expenditures found for these filters</TableCell></TableRow>

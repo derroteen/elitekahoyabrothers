@@ -14,6 +14,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
   component: LoansAdmin,
@@ -181,7 +182,7 @@ function LoansAdmin() {
 
   useEffect(() => { if (!loading && role === "member") navigate({ to: "/dashboard" }); }, [loading, role, navigate]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (role === "member") return null;
   const canEdit = role === "super_admin" || role === "admin";
 
@@ -209,7 +210,7 @@ function LoansAdmin() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={6} />}
               {!isLoading && loans.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => {
                 const isOpening = !!l.__opening;
@@ -541,7 +542,7 @@ function ScheduleDialog({ loan, onClose }: any) {
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={6} />}
               {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No schedule generated</td></tr>}
               {rows.map((r: any) => (
                 <tr key={r.id} className="border-b last:border-0">

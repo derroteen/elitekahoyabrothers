@@ -15,6 +15,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
 import { Pencil, Trash2 } from "lucide-react";
 import { deleteBenevolentEntry } from "@/lib/entries.functions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/benevolent")({
   component: BenevolentLedger,
@@ -124,7 +125,7 @@ function BenevolentLedger() {
   ];
   const baseName = `benevolent_${member?.membership_no ?? "member"}`;
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!isStaff) return null;
 
   return (
@@ -202,7 +203,7 @@ function BenevolentLedger() {
                       {canEdit && <td></td>}
                     </tr>
                   )}
-                  {isLoading && <tr><td colSpan={canEdit ? 7 : 6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+                  {isLoading && <TableRowsSkeleton cols={canEdit ? 7 : 6} />}
                   {!isLoading && filtered.length === 0 && <tr><td colSpan={canEdit ? 7 : 6} className="p-6 text-center text-muted-foreground">No entries</td></tr>}
                   {filtered.map((e) => (
                     <tr key={e.id} className="border-t border-border">

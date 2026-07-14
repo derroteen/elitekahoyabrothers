@@ -25,6 +25,7 @@ import {
   bulkImportOpeningBalances,
 } from "@/lib/opening-balances.functions";
 import { deleteOpeningBalance } from "@/lib/entries.functions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/opening-balances")({
   component: OpeningBalancesPage,
@@ -114,7 +115,7 @@ function OpeningBalancesPage() {
     );
   }, [rows, search]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!canEdit) return null;
 
   return (
@@ -158,11 +159,7 @@ function OpeningBalancesPage() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr>
-                <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                  Loading…
-                </td>
-              </tr>
+              <TableRowsSkeleton cols={9} />
             )}
             {!isLoading && filtered.length === 0 && (
               <tr>

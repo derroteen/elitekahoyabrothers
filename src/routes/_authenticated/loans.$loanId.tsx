@@ -17,6 +17,7 @@ import { calcLoan, type Frequency } from "@/lib/loan-calc";
 import { ArrowLeft, Edit, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isOpeningLoanId, normalizeLoanId } from "@/lib/loan-balance";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/loans/$loanId")({
   component: LoanLedger,
@@ -331,7 +332,7 @@ function LoanLedger() {
     return () => { cancelled = true; };
   }, [canEditPayments, loanId, schedule, fines, isOpening]);
 
-  if (loanLoading || repaymentsLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loanLoading || repaymentsLoading) return <PageSkeleton />;
   if (!loan) return <div className="p-8 text-muted-foreground">Loan not found</div>;
 
   const nextDue = !isOpening ? schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid") : null;

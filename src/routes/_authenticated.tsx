@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, BookOpen, Banknote, PiggyBank, Megaphone, FileBarChart, Settings, ShieldCheck, LogOut, Menu, X, Database, ClipboardList, Wallet, Receipt, HeartHandshake, CalendarCheck } from "lucide-react";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
@@ -88,7 +89,7 @@ function AuthLayout() {
   });
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+    return <PageSkeleton />;
   }
   if (!user) { navigate({ to: "/login" }); return null; }
   if (!role) return <div className="min-h-screen flex items-center justify-center">No role assigned.</div>;

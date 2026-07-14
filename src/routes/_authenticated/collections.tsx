@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Trash2 } from "lucide-react";
 import { deleteWeeklyCollectionEntry } from "@/lib/entries.functions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/collections")({
   component: CollectionsPage,
@@ -41,7 +42,7 @@ function CollectionsPage() {
 
   useEffect(() => { if (!loading && role === "member") navigate({ to: "/dashboard" }); }, [loading, role, navigate]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (role === "member") return null;
   const canEdit = role === "super_admin" || role === "admin";
   const canDelete = role === "super_admin";
@@ -124,7 +125,7 @@ function CollectionsPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={7} />}
               {!isLoading && sheets.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No collection sheets yet</td></tr>}
               {sheets.map((s: any) => (
                 <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">

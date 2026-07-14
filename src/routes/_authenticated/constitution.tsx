@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import { useAuth } from "@/lib/auth-context";
 import { FileText } from "lucide-react";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/constitution")({
   component: ConstitutionPage,
@@ -17,7 +18,7 @@ function ConstitutionPage() {
   const allowed = !!role;
 
   useEffect(() => { if (!loading && !role) navigate({ to: "/login" }); }, [loading, role, navigate]);
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
 
   const downloadPDF = () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });

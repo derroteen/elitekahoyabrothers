@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 // Helper to safely calculate balance
 const calculateBalance = (totalRepayable: string, amountPaid: string) => {
@@ -339,7 +340,7 @@ function OpeningLoansPage() {
     }
   };
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!canEdit) return null;
 
   return (
@@ -386,11 +387,7 @@ function OpeningLoansPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr>
-                  <td colSpan={filtered.length > 0 ? 5 : 4} className="p-6 text-center text-muted-foreground">
-                    Loading…
-                  </td>
-                </tr>
+                <TableRowsSkeleton cols={filtered.length > 0 ? 5 : 4} />
               )}
               {!isLoading && filtered.length === 0 && (
                 <tr>
@@ -449,11 +446,7 @@ function OpeningLoansPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    Loading…
-                  </td>
-                </tr>
+                <TableRowsSkeleton cols={9} />
               )}
               {!isLoading && filtered.length === 0 && (
                 <tr>

@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { resetTestData, setSystemMode } from "@/lib/system.functions";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/system-reset")({
   component: SystemResetPage,
@@ -38,7 +39,7 @@ function SystemResetPage() {
   });
 
   useEffect(() => { if (!loading && role && role !== "super_admin") navigate({ to: "/dashboard" }); }, [loading, role, navigate]);
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (role !== "super_admin") return null;
 
   const devMode = settings?.development_mode ?? true;
