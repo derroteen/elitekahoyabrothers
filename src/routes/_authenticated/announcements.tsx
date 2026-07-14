@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { fmtDate } from "@/lib/format";
 import { Pin, Trash2 } from "lucide-react";
+import { InlineSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/announcements")({
   component: AnnouncementsPage,
@@ -41,7 +42,7 @@ function AnnouncementsPage() {
       <PageHeader title="Announcements" subtitle="SACCO updates and notices"
         actions={canEdit ? <Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Announcement</Button> : undefined} />
       <div className="space-y-3">
-        {isLoading && <Card className="p-6 text-center text-muted-foreground">Loading…</Card>}
+        {isLoading && <InlineSkeleton />}
         {!isLoading && items.length === 0 && <Card className="p-6 text-center text-muted-foreground">No announcements yet</Card>}
         {items.map((a: any) => (
           <Card key={a.id} className="p-5">

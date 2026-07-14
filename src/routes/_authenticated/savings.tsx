@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Pencil, Trash2 } from "lucide-react";
 import { deleteSavingsEntry } from "@/lib/entries.functions";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/savings")({
   component: SavingsAdmin,
@@ -59,7 +60,7 @@ function SavingsAdmin() {
 
   useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/dashboard" }); }, [loading, role, isStaff, navigate]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!isStaff) return null;
 
   const latestBal = entries.at(-1)?.balance ?? 0;
@@ -110,7 +111,7 @@ function SavingsAdmin() {
                 {canEdit && <th className="px-3 py-2 whitespace-nowrap"></th>}
               </tr></thead>
               <tbody>
-                {isLoading && <tr><td colSpan={canEdit ? 8 : 7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+                {isLoading && <TableRowsSkeleton cols={canEdit ? 8 : 7} />}
                 {!isLoading && entries.length === 0 && <tr><td colSpan={canEdit ? 8 : 7} className="p-6 text-center text-muted-foreground">No savings</td></tr>}
                 {entries.map((e) => (
                   <tr key={e.id} className="border-t border-border">

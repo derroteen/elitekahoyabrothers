@@ -10,6 +10,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
 import { FileSpreadsheet, FileText, Download, Users, Banknote, PiggyBank, ClipboardList, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -61,7 +62,7 @@ function ReportsPage() {
   });
 
   useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/dashboard" }); }, [loading, role, allowed, navigate]);
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!allowed) return null;
 
   const buildColumns = (key: ReportKey): Column[] => {

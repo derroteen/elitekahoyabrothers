@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
 import { fmtDate } from "@/lib/format";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/audit")({
   component: AuditPage,
@@ -23,7 +24,7 @@ function AuditPage() {
   });
 
   useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/dashboard" }); }, [loading, role, allowed, navigate]);
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!allowed) return null;
 
 
@@ -40,7 +41,7 @@ function AuditPage() {
             <th className="px-4 py-3">Loan ID</th>
           </tr></thead>
           <tbody>
-            {isLoading && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {isLoading && <TableRowsSkeleton cols={5} />}
             {!isLoading && logs.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No activity</td></tr>}
             {logs.map((l: any) => (
               <tr key={l.id} className="border-b border-border last:border-0 font-mono text-xs">

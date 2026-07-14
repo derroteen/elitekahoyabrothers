@@ -7,6 +7,7 @@ import { PageHeader, Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { exportCSV, exportXLSX, exportPDF, type Column } from "@/lib/exports";
+import { TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/my-benevolent")({
   component: MyBenevolent,
@@ -87,7 +88,7 @@ function MyBenevolent() {
                   <td className="px-3 py-2 text-right font-semibold">{Number(opening.opening_benevolent).toFixed(2)}</td>
                 </tr>
               )}
-              {isLoading && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={5} />}
               {!isLoading && entries.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
               {entries.map((e: any) => (
                 <tr key={e.id} className="border-t border-border">

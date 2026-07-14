@@ -3,6 +3,7 @@ import { Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
+import { TableRowsSkeleton } from "@/components/loading-skeletons";
 
 type MemberLoanColumn = {
   id: string;
@@ -140,7 +141,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={tableColSpan} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {loading && <TableRowsSkeleton cols={tableColSpan} />}
             {!loading && entries.length === 0 && <tr><td colSpan={tableColSpan} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
             {entries.map((e, rowIndex) => {
               const bf = (e as any).__brought_forward;

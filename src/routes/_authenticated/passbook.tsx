@@ -15,6 +15,7 @@ import { fmtKES } from "@/lib/format";
 import { PassbookTable } from "@/components/PassbookTable";
 import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry, updateOpeningBalance, deleteOpeningBalance } from "@/lib/passbook.functions";
 import { forceDeletePassbookEntry } from "@/lib/entries.functions";
+import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
   component: PassbookAdmin,
@@ -143,7 +144,7 @@ function PassbookAdmin() {
 
   useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/dashboard" }); }, [loading, role, isStaff, navigate]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!isStaff) return null;
 
   const selectedMember = members.find((m: any) => m.id === memberId);

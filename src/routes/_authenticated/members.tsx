@@ -22,6 +22,7 @@ import {
 } from "@/lib/members.functions";
 import { MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/members")({
   component: MembersPage,
@@ -70,7 +71,7 @@ function MembersPage() {
     if (!loading && role && !isStaff) navigate({ to: "/dashboard" });
   }, [loading, role, isStaff, navigate]);
 
-  if (loading || !role) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (loading || !role) return <PageSkeleton />;
   if (!isStaff) return null;
   const isSuper = role === "super_admin";
 
@@ -148,7 +149,7 @@ function MembersPage() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+            {isLoading && <TableRowsSkeleton cols={8} />}
             {!isLoading && filtered.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No members</td></tr>}
             {filtered.map((m: any) => {
               const r = m.user_roles?.[0]?.role;

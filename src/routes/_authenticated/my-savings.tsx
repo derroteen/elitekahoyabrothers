@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
 import { fmtKES, fmtDate } from "@/lib/format";
+import { TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/my-savings")({
   component: MySavings,
@@ -32,7 +33,7 @@ function MySavings() {
               <th className="px-3 py-2 text-right whitespace-nowrap">Balance</th>
             </tr></thead>
             <tbody>
-              {isLoading && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={5} />}
               {!isLoading && entries.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No entries yet</td></tr>}
               {entries.map((e: any) => (
                 <tr key={e.id} className="border-t border-border">

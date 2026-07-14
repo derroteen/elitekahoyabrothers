@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
+import { TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/my-loans")({
   component: MyLoans,
@@ -83,7 +84,7 @@ function MyLoans() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={7} />}
               {!isLoading && loans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No loans yet</td></tr>}
               {loans.map((l: any) => (
                 <tr key={l.id} className={`border-b border-border last:border-0 ${l.__opening ? "bg-amber-50/40" : ""}`}>

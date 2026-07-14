@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader, Card } from "@/components/PageHeader";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { fetchOpeningBalance } from "@/lib/opening-balances";
+import { TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/my-weekly")({
   component: MyWeekly,
@@ -89,7 +90,7 @@ function MyWeekly() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
+              {isLoading && <TableRowsSkeleton cols={9} />}
               {!isLoading && display.length === 0 && (
                 <>
                   {openingSavings > 0 && (
