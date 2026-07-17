@@ -111,7 +111,7 @@ function MembersPage() {
     <div>
       <PageHeader
         title="Members"
-        subtitle={`${members.length} registered · ${filtered.length} shown`}
+        subtitle={`${visibleMembers.length} registered · ${filtered.length} shown`}
         actions={<Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Member</Button>}
       />
       <Card className="p-4 mb-4 flex flex-wrap gap-3 items-end">
