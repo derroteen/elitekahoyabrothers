@@ -81,7 +81,18 @@ function MembersPage() {
   };
 
 
-  const filtered = members.filter((m: any) => {
+  const { user } = useAuth();
+  const visibleMembers = members.filter((m: any) => {
+    const r = m.user_roles?.[0]?.role;
+    if (isSuper) {
+      // Super admin sees all except their own row
+      return m.id !== user?.id;
+    }
+    // Admin sees only regular members
+    return r === "member";
+  });
+
+  const filtered = visibleMembers.filter((m: any) => {
     const r = m.user_roles?.[0]?.role;
     if (roleFilter !== "all" && r !== roleFilter) return false;
     if (statusFilter === "active" && !m.is_active) return false;
@@ -100,7 +111,7 @@ function MembersPage() {
     <div>
       <PageHeader
         title="Members"
-        subtitle={`${members.length} registered · ${filtered.length} shown`}
+        subtitle={`${visibleMembers.length} registered · ${filtered.length} shown`}
         actions={<Button onClick={() => setOpen(true)} className="bg-navy text-white hover:bg-navy-2">+ New Member</Button>}
       />
       <Card className="p-4 mb-4 flex flex-wrap gap-3 items-end">
