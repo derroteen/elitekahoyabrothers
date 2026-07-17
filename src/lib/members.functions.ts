@@ -32,6 +32,8 @@ const CreateInput = z.object({
   phone: z.string().max(50).optional().nullable(),
   password: z.string().min(6).max(200),
   role: z.enum(["member", "auditor", "admin"]).default("member"),
+  registration_fee: z.number().min(0).default(0),
+  date_joined: z.string().optional().nullable(),
 });
 
 export const adminCreateMember = createServerFn({ method: "POST" })
@@ -55,7 +57,14 @@ export const adminCreateMember = createServerFn({ method: "POST" })
       },
     });
     if (error || !created.user) throw new Error(error?.message ?? "Failed to create user");
-    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: resolvedEmail, role: data.role });
+    const fee = Number(data.registration_fee ?? 0);
+    const updates: Record<string, any> = {
+      registration_fee: fee,
+      registration_fee_paid: fee >= 20000,
+    };
+    if (data.date_joined) updates.date_joined = data.date_joined;
+    await supabaseAdmin.from("profiles").update(updates as any).eq("id", created.user.id);
+    await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: resolvedEmail, role: data.role, registration_fee: fee, registration_fee_paid: updates.registration_fee_paid, date_joined: updates.date_joined });
     return { id: created.user.id, email: created.user.email };
   });
 

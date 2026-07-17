@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS registration_fee numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS registration_fee_paid boolean NOT NULL DEFAULT false;

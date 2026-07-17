@@ -910,6 +910,8 @@ export type Database = {
           membership_no: string | null
           must_change_password: boolean
           phone: string | null
+          registration_fee: number
+          registration_fee_paid: boolean
           sort_order: number | null
           updated_at: string
         }
@@ -923,6 +925,8 @@ export type Database = {
           membership_no?: string | null
           must_change_password?: boolean
           phone?: string | null
+          registration_fee?: number
+          registration_fee_paid?: boolean
           sort_order?: number | null
           updated_at?: string
         }
@@ -936,6 +940,8 @@ export type Database = {
           membership_no?: string | null
           must_change_password?: boolean
           phone?: string | null
+          registration_fee?: number
+          registration_fee_paid?: boolean
           sort_order?: number | null
           updated_at?: string
         }
