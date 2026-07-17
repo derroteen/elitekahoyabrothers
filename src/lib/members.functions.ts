@@ -63,7 +63,7 @@ export const adminCreateMember = createServerFn({ method: "POST" })
       registration_fee_paid: fee >= 20000,
     };
     if (data.date_joined) updates.date_joined = data.date_joined;
-    await supabaseAdmin.from("profiles").update(updates).eq("id", created.user.id);
+    await supabaseAdmin.from("profiles").update(updates as any).eq("id", created.user.id);
     await audit(context.userId, "INSERT", created.user.id, null, { full_name: data.full_name, email: resolvedEmail, role: data.role, registration_fee: fee, registration_fee_paid: updates.registration_fee_paid, date_joined: updates.date_joined });
     return { id: created.user.id, email: created.user.email };
   });
