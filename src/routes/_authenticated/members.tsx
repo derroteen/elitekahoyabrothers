@@ -53,7 +53,7 @@ function MembersPage() {
       const [pRes, rRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, full_name, email, phone, membership_no, is_active, date_joined")
+          .select("id, full_name, email, phone, membership_no, is_active, date_joined, registration_fee, registration_fee_paid")
           .order("sort_order", { ascending: true, nullsFirst: false })
           .order("membership_no", { ascending: true, nullsFirst: false }),
         supabase.from("user_roles").select("user_id, role"),
@@ -228,17 +228,29 @@ function MembersPage() {
 }
 
 function NewMemberDialog({ open, onOpenChange, onCreated, canSetRole }: { open: boolean; onOpenChange: (b: boolean) => void; onCreated: () => void; canSetRole: boolean }) {
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "", password: "", role: "member" });
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({ full_name: "", email: "", phone: "", password: "", role: "member", registration_fee: 20000, date_joined: today });
   const [submitting, setSubmitting] = useState(false);
   const createMember = useServerFn(adminCreateMember);
 
   const submit = async () => {
     if (!form.full_name || !form.password) { toast.error("Name and password are required"); return; }
+    if (form.registration_fee === null || form.registration_fee === undefined || isNaN(Number(form.registration_fee)) || Number(form.registration_fee) < 0) {
+      toast.error("Registration fee is required"); return;
+    }
     setSubmitting(true);
     try {
-      await createMember({ data: { ...form, phone: form.phone || null, role: form.role as any } });
+      await createMember({ data: {
+        full_name: form.full_name,
+        email: form.email,
+        phone: form.phone || null,
+        password: form.password,
+        role: form.role as any,
+        registration_fee: Number(form.registration_fee),
+        date_joined: form.date_joined || null,
+      } });
       toast.success("Member created. They must change password on first login.");
-      setForm({ full_name: "", email: "", phone: "", password: "", role: "member" });
+      setForm({ full_name: "", email: "", phone: "", password: "", role: "member", registration_fee: 20000, date_joined: today });
       onOpenChange(false); onCreated();
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setSubmitting(false); }
@@ -252,6 +264,8 @@ function NewMemberDialog({ open, onOpenChange, onCreated, canSetRole }: { open: 
           <div><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
           <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+          <div><Label>Date Joined</Label><Input type="date" value={form.date_joined} onChange={(e) => setForm({ ...form, date_joined: e.target.value })} /></div>
+          <div><Label>Registration Fee (KES)</Label><Input type="number" min={0} required value={form.registration_fee} onChange={(e) => setForm({ ...form, registration_fee: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
           <div><Label>Temporary password</Label><Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
           {canSetRole && (
             <div>
