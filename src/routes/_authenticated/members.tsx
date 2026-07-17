@@ -330,6 +330,17 @@ function EditDialog({ member, onClose, onSaved, canSetRole }: any) {
               </Select>
             </div>
           )}
+          <div className="mt-2 rounded-md border border-border bg-muted/30 p-3 space-y-1.5 text-sm">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1">Membership Details</div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Date Joined</span><span>{fmtDate(member.date_joined)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Registration Fee</span><span className="font-medium">{fmtKES(member.registration_fee ?? 0)}</span></div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Status</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${member.registration_fee_paid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                {member.registration_fee_paid ? "Paid" : "Unpaid"}
+              </span>
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
