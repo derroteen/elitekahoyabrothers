@@ -96,13 +96,26 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
     const total = Number(entry.savings ?? 0) + Number(entry.bonus ?? 0);
     savingsBalance += total - Number(entry.withdrawal ?? 0);
 
-    // Handle loan balance
-    if (entry.loan_debit && Number(entry.loan_debit) > 0) {
-      // New loan issued: add loan_debit to running loan balance
-      loanBalance = loanBalance + Number(entry.loan_debit);
+    const category = String(entry.category ?? "");
+    const description = String(entry.description ?? "");
+    const loanDebit = Number(entry.loan_debit ?? 0);
+    const loanPayment = Number(entry.loan_payment ?? 0);
+    const isOpeningBF =
+      category === "opening_loan" || /brought forward/i.test(description);
+    const isLoanIssued =
+      category === "loan_issued" || /loan issued/i.test(description);
+
+    if (isOpeningBF) {
+      // Opening loan already reflected in bf.loan_balance — skip its debit
+    } else if (isLoanIssued && loanDebit > 0) {
+      // New loan issued: RESET running balance to the new loan amount
+      loanBalance = loanDebit;
+    } else if (loanDebit > 0) {
+      // Any other debit rows still add
+      loanBalance = loanBalance + loanDebit;
     } else {
-      // Subtract loan payment, but never below 0
-      loanBalance = Math.max(0, loanBalance - Number(entry.loan_payment ?? 0));
+      // Repayment: subtract, never below 0
+      loanBalance = Math.max(0, loanBalance - loanPayment);
     }
 
     return {
