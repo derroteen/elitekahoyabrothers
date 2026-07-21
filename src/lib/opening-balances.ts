@@ -96,26 +96,35 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
     const total = Number(entry.savings ?? 0) + Number(entry.bonus ?? 0);
     savingsBalance += total - Number(entry.withdrawal ?? 0);
 
-    const category = String(entry.category ?? "");
+    const category = String(entry.category ?? "").toLowerCase();
     const description = String(entry.description ?? "");
+    const source = String((entry as any).source ?? "").toLowerCase();
     const loanDebit = Number(entry.loan_debit ?? 0);
     const loanPayment = Number(entry.loan_payment ?? 0);
     const isOpeningBF =
       category === "opening_loan" || /brought forward/i.test(description);
+
+    // Loan issue rows in this app may store the issued amount in loan_payment.
+    // Detect both explicit descriptions and category/source hints.
     const isLoanIssued =
-      category === "loan_issued" || /loan issued/i.test(description);
+      /loan issued/i.test(description) ||
+      category === "loan_issued" ||
+      (category === "loan" && loanPayment > 0 && !/repay/i.test(description)) ||
+      (source.includes("loan") && source.includes("issued") && loanPayment > 0);
 
     if (isOpeningBF) {
-      // Opening loan already reflected in bf.loan_balance — skip its debit
-    } else if (isLoanIssued && loanDebit > 0) {
-      // New loan issued: RESET running balance to the new loan amount
-      loanBalance = loanDebit;
-    } else if (loanDebit > 0) {
-      // Any other debit rows still add
-      loanBalance = loanBalance + loanDebit;
-    } else {
+      // Opening loan already reflected in bf.loan_balance — skip any opening duplicate value
+    } else if (isLoanIssued) {
+      // New loan issued: RESET running balance to issued amount.
+      // Prefer loan_payment based on current passbook data shape, fallback to loan_debit.
+      const issuedAmount = loanPayment > 0 ? loanPayment : loanDebit;
+      loanBalance = Math.max(0, issuedAmount);
+    } else if (loanPayment > 0) {
       // Repayment: subtract, never below 0
       loanBalance = Math.max(0, loanBalance - loanPayment);
+    } else if (loanDebit > 0) {
+      // Any other debit rows still add (legacy/backward compatibility)
+      loanBalance = Math.max(0, loanBalance + loanDebit);
     }
 
     return {
