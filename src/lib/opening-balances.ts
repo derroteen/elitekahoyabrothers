@@ -89,9 +89,8 @@ export function broughtForwardRow(ob: OpeningBalance | null): any | null {
 /** Prepend the B/F row to a sorted-ascending list of passbook entries. */
 export function withBroughtForward(entries: any[], ob: OpeningBalance | null): any[] {
   const bf = broughtForwardRow(ob);
-  if (!bf) return entries;
-  let savingsBalance = Number(bf.balance ?? 0);
-  let loanBalance = Number(bf.loan_balance ?? 0);
+  let savingsBalance = Number(bf?.balance ?? 0);
+  let loanBalance = Number(bf?.loan_balance ?? 0);
   const adjusted = entries.map((entry) => {
     const total = Number(entry.savings ?? 0) + Number(entry.bonus ?? 0);
     savingsBalance += total - Number(entry.withdrawal ?? 0);
@@ -109,15 +108,15 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
     const isLoanIssued =
       /loan issued/i.test(description) ||
       category === "loan_issued" ||
-      (category === "loan" && loanPayment > 0 && !/repay/i.test(description)) ||
-      (source.includes("loan") && source.includes("issued") && loanPayment > 0);
+      (category === "loan" && (loanPayment > 0 || loanDebit > 0) && !/repay/i.test(description)) ||
+      (source.includes("loan") && source.includes("issued") && (loanPayment > 0 || loanDebit > 0));
 
     if (isOpeningBF) {
       // Opening loan already reflected in bf.loan_balance — skip any opening duplicate value
     } else if (isLoanIssued) {
       // New loan issued: RESET running balance to issued amount.
       // Prefer loan_payment based on current passbook data shape, fallback to loan_debit.
-      const issuedAmount = loanPayment > 0 ? loanPayment : loanDebit;
+      const issuedAmount = Math.max(loanPayment, loanDebit);
       loanBalance = Math.max(0, issuedAmount);
     } else if (loanPayment > 0) {
       // Repayment: subtract, never below 0
@@ -134,5 +133,5 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
       loan_balance: loanBalance,
     };
   });
-  return [bf, ...adjusted];
+  return bf ? [bf, ...adjusted] : adjusted;
 }
