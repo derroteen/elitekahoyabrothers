@@ -37,6 +37,20 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
+function isLoanIssuedEntry(entry: any): boolean {
+  const category = String(entry.category ?? "").toLowerCase();
+  const description = String(entry.description ?? "");
+  const source = String(entry.source ?? "").toLowerCase();
+  const loanDebit = Number(entry.loan_debit ?? 0);
+  const loanPayment = Number(entry.loan_payment ?? 0);
+  return (
+    /loan issued/i.test(description) ||
+    category === "loan_issued" ||
+    (category === "loan" && (loanDebit > 0 || loanPayment > 0) && !/repay/i.test(description)) ||
+    (source.includes("loan") && source.includes("issued") && (loanDebit > 0 || loanPayment > 0))
+  );
+}
+
 export function PassbookTable({ entries, loading, memberName, membershipNo, memberLoans, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; memberLoans?: MemberLoanColumn[]; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
@@ -76,6 +90,15 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
         const matchesLoan =
           (loan.type === "loan" && entry.loan_id === loan.id) ||
           (loan.type === "opening" && entry.opening_loan_id === loan.id);
+        const isIssue = matchesLoan && isLoanIssuedEntry(entry);
+        if (isIssue) {
+          runningBalances[index] = Math.max(
+            Number(entry.loan_debit ?? 0),
+            Number(entry.loan_payment ?? 0),
+            Number(perLoanPaymentsByRow[rowIndex]?.[index] ?? 0)
+          );
+          return;
+        }
         if (matchesLoan && entry.loan_debit && Number(entry.loan_debit) > 0) {
           runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
         }
