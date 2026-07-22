@@ -73,6 +73,10 @@ function loanPaymentForRow(entry: any, loan: MemberLoanColumn): number {
     (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
   );
   if (junctionPayment) return Number(junctionPayment.amount ?? 0);
+  const repayment = entry.loan_repayments?.find(
+    (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
+  );
+  if (repayment) return Number(repayment.amount ?? 0);
   return entryMatchesLoan(entry, loan) ? Number(entry.loan_payment ?? 0) : 0;
 }
 

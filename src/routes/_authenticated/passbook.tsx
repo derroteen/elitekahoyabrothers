@@ -134,7 +134,7 @@ function PassbookAdmin() {
     queryFn: async () => {
       const { fetchOpeningBalance, withBroughtForward } = await import("@/lib/opening-balances");
       const [entriesRes, opening] = await Promise.all([
-        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*)").eq("member_id", memberId).order("entry_date", { ascending: true }),
+        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*), loan_repayments(*)").eq("member_id", memberId).order("entry_date", { ascending: true }),
         fetchOpeningBalance(memberId),
       ]);
       if (entriesRes.error) throw entriesRes.error;

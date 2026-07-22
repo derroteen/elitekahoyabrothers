@@ -77,7 +77,7 @@ function MyPassbook() {
     enabled: !!user,
     queryFn: async () => {
       const [entriesRes, opening] = await Promise.all([
-        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*)").eq("member_id", user!.id).order("entry_date", { ascending: true }),
+        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*), loan_repayments(*)").eq("member_id", user!.id).order("entry_date", { ascending: true }),
         fetchOpeningBalance(user!.id),
       ]);
       if (entriesRes.error) throw entriesRes.error;
