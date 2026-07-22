@@ -77,11 +77,33 @@ function MyPassbook() {
     enabled: !!user,
     queryFn: async () => {
       const [entriesRes, opening] = await Promise.all([
-        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*), loan_repayments(*)").eq("member_id", user!.id).order("entry_date", { ascending: true }),
+        supabase.from("passbook_entries").select("*, passbook_entry_loan_payments(*)").eq("member_id", user!.id).order("entry_date", { ascending: true }),
         fetchOpeningBalance(user!.id),
       ]);
       if (entriesRes.error) throw entriesRes.error;
-      return withBroughtForward(entriesRes.data ?? [], opening);
+      const rawEntries = entriesRes.data ?? [];
+      const weeklyIds = Array.from(new Set(rawEntries.map((entry: any) => entry.weekly_entry_id).filter(Boolean)));
+      let repayments: any[] = [];
+      if (weeklyIds.length > 0) {
+        const { data: repaymentRows, error: repaymentError } = await (supabase.from("loan_repayments" as any) as any)
+          .select("*")
+          .in("weekly_entry_id", weeklyIds);
+        if (repaymentError) throw repaymentError;
+        repayments = repaymentRows ?? [];
+      }
+      const repaymentsByWeeklyId = repayments.reduce((map, repayment) => {
+        const key = repayment.weekly_entry_id;
+        if (!key) return map;
+        map.set(key, [...(map.get(key) ?? []), repayment]);
+        return map;
+      }, new Map<string, any[]>());
+      return withBroughtForward(
+        rawEntries.map((entry: any) => ({
+          ...entry,
+          loan_repayments: entry.weekly_entry_id ? (repaymentsByWeeklyId.get(entry.weekly_entry_id) ?? []) : [],
+        })),
+        opening,
+      );
     },
     staleTime: 0, // Consider data stale immediately
     refetchInterval: 5000, // Refetch every 5 seconds
