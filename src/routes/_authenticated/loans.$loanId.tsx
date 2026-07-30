@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { addLoanPayment, deleteLoanPayment, editLoanPayment, editLoanDetails, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
-import { calcLoan, type Frequency } from "@/lib/loan-calc";
+import { calcLoan, graceEndISO, type Frequency } from "@/lib/loan-calc";
 import { ArrowLeft, Edit, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isOpeningLoanId, normalizeLoanId } from "@/lib/loan-balance";
@@ -288,16 +288,23 @@ function LoanLedger() {
 
     (async () => {
       const today = todayISO();
+      // Grace period: no fines for any period due within one month of the loan date.
+      // NOTE: existing loans may already carry fines inside this window from before
+      // this rule; they are intentionally NOT deleted here and must be reviewed and
+      // removed manually by an admin.
+      const graceEnd = loan?.loan_date ? graceEndISO(loan.loan_date) : null;
       const existingScheduleIds = new Set(fines.filter((f: any) => f.schedule_id).map((f: any) => f.schedule_id));
       let created = 0;
 
       for (const s of schedule as any[]) {
         if (cancelled) return;
+        if (graceEnd && String(s.due_date).slice(0, 10) <= graceEnd) continue;
         if (s.due_date >= today) continue;
         if (Number(s.amount_paid ?? 0) > 0) continue;
         if (s.prepaid) continue;
         if (s.status === "paid" || s.status === "prepaid") continue;
         if (existingScheduleIds.has(s.id)) continue;
+
 
         const { error: fineErr } = await (supabase.from("loan_fines" as any) as any).insert({
           loan_id: loanId,
@@ -330,7 +337,7 @@ function LoanLedger() {
     })();
 
     return () => { cancelled = true; };
-  }, [canEditPayments, loanId, schedule, fines, isOpening]);
+  }, [canEditPayments, loanId, schedule, fines, isOpening, loan?.loan_date]);
 
   if (loanLoading || repaymentsLoading) return <PageSkeleton />;
   if (!loan) return <div className="p-8 text-muted-foreground">Loan not found</div>;
