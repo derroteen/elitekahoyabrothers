@@ -337,7 +337,7 @@ function LoanLedger() {
     })();
 
     return () => { cancelled = true; };
-  }, [canEditPayments, loanId, schedule, fines, isOpening]);
+  }, [canEditPayments, loanId, schedule, fines, isOpening, loan?.loan_date]);
 
   if (loanLoading || repaymentsLoading) return <PageSkeleton />;
   if (!loan) return <div className="p-8 text-muted-foreground">Loan not found</div>;
