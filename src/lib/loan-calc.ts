@@ -54,14 +54,36 @@ export function calcLoan(principal: number, ratePct: number, termMonths: number,
 
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
+/**
+ * Grace period: repayments start ONE MONTH after the loan date.
+ * Returns the ISO date (yyyy-mm-dd) of the first repayment / end of grace period.
+ */
+export function graceEndISO(loanDate: string | Date) {
+  const d = new Date(loanDate);
+  d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * NOTE: No fine may ever be charged for a period whose due_date is on or before
+ * graceEndISO(loan_date). Existing loans may still carry fines charged inside
+ * this first month from before this rule existed — those should be reviewed and
+ * deleted manually by an admin; they are intentionally NOT auto-deleted here.
+ */
+export function isWithinGracePeriod(loanDate: string | Date, dueDate: string | Date) {
+  const due = typeof dueDate === "string" ? dueDate.slice(0, 10) : dueDate.toISOString().slice(0, 10);
+  return due <= graceEndISO(loanDate);
+}
+
 export function buildSchedule(loanDate: string, calc: LoanCalc) {
-  const start = new Date(loanDate);
+  // First repayment falls one month after the loan date (grace period).
+  const start = new Date(graceEndISO(loanDate));
   const rows: { period_number: number; due_date: string; expected_amount: number; balance_remaining: number }[] = [];
   let remaining = calc.totalRepayable;
   for (let i = 1; i <= calc.periods; i++) {
     const due = new Date(start);
-    if (calc.frequency === "weekly") due.setDate(due.getDate() + 7 * i);
-    else due.setMonth(due.getMonth() + i);
+    if (calc.frequency === "weekly") due.setDate(due.getDate() + 7 * (i - 1));
+    else due.setMonth(due.getMonth() + (i - 1));
     const expected = i === calc.periods ? round2(remaining) : calc.periodPayment;
     remaining = round2(remaining - expected);
     rows.push({
@@ -73,3 +95,4 @@ export function buildSchedule(loanDate: string, calc: LoanCalc) {
   }
   return rows;
 }
+
