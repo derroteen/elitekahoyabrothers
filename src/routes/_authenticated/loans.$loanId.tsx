@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { addLoanPayment, deleteLoanPayment, editLoanPayment, editLoanDetails, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
-import { calcLoan, type Frequency } from "@/lib/loan-calc";
+import { calcLoan, graceEndISO, type Frequency } from "@/lib/loan-calc";
 import { ArrowLeft, Edit, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isOpeningLoanId, normalizeLoanId } from "@/lib/loan-balance";
