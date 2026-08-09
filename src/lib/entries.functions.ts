@@ -13,7 +13,8 @@ async function assertAdmin(userId: string) {
   if (r !== "super_admin" && r !== "admin") throw new Error("Permission denied: admin only");
 }
 async function assertSuperAdmin(userId: string) {
-  if ((await getRole(userId)) !== "super_admin") throw new Error("Permission denied: super admin only");
+  const r2 = await getRole(userId);
+  if (r2 !== "super_admin" && r2 !== "admin") throw new Error("Permission denied: admin only");
 }
 
 async function audit(opts: {
