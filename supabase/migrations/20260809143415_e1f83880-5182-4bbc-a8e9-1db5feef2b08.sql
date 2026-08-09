@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Super admin can delete opening loans" ON public.loan_opening_balances;
+CREATE POLICY "Staff can delete opening loans" ON public.loan_opening_balances FOR DELETE TO authenticated USING (public.is_staff(auth.uid()));
