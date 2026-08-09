@@ -45,7 +45,7 @@ function CollectionsPage() {
   if (loading || !role) return <PageSkeleton />;
   if (role === "member") return null;
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   const handleBackfillRepayments = async () => {
     setBackfillingRepayments(true);

@@ -38,7 +38,7 @@ function SavingsAdmin() {
 
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   const { data: members = [] } = useQuery({
     queryKey: ["members-lite"],
