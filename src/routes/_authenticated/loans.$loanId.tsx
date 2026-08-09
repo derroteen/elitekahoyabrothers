@@ -177,7 +177,7 @@ function LoanLedger() {
   });
 
   const canEditPayments = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
 
   const refreshLoan = () => {

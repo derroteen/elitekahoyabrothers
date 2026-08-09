@@ -208,7 +208,7 @@ function PassbookAdmin() {
 
   const selectedMember = members.find((m: any) => m.id === memberId);
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
   const doForceDelete = useServerFn(forceDeletePassbookEntry);
   const doDelete = useServerFn(deletePassbookEntry);
   const onEditEntry = (entry: any) => {

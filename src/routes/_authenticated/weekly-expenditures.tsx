@@ -49,7 +49,7 @@ function WeeklyExpendituresPage() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
   const doDelete = useServerFn(deleteWeeklyExpenditure);
 
   const today = new Date();
