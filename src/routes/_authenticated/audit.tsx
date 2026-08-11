@@ -32,7 +32,7 @@ function AuditPage() {
         supabase.from("profiles").select("id, full_name"),
       ]);
       const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
-      return (auditRows ?? []).map((l) => ({ ...l, full_name: nameById.get(l.actor_id) ?? null }));
+      return (auditRows ?? []).map((l) => ({ ...l, full_name: nameById.get(l.actor_id ?? "") ?? null }));
     },
   });
 
