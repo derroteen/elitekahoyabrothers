@@ -12,6 +12,12 @@ export const Route = createFileRoute("/_authenticated/audit")({
   head: () => ({ meta: [{ title: "Audit Log — EKB" }] }),
 });
 
+function formatAction(action: string) {
+  return action
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function AuditPage() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
@@ -20,7 +26,14 @@ function AuditPage() {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["audit"],
     enabled: allowed,
-    queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () => {
+      const [{ data: auditRows }, { data: profiles }] = await Promise.all([
+        supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("profiles").select("id, full_name"),
+      ]);
+      const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+      return (auditRows ?? []).map((l) => ({ ...l, full_name: nameById.get(l.actor_id) ?? null }));
+    },
   });
 
   useEffect(() => { if (!loading && role && !allowed) navigate({ to: "/dashboard" }); }, [loading, role, allowed, navigate]);
