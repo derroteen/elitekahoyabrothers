@@ -59,8 +59,8 @@ function AuditPage() {
             {logs.map((l: any) => (
               <tr key={l.id} className="border-b border-border last:border-0 font-mono text-xs">
                 <td className="px-4 py-3">{fmtDate(l.created_at)} {new Date(l.created_at).toLocaleTimeString()}</td>
-                <td className="px-4 py-3 text-muted-foreground">{l.actor_id?.slice(0, 8) ?? "system"}</td>
-                <td className="px-4 py-3">{l.action}</td>
+                <td className="px-4 py-3 text-muted-foreground">{l.full_name ?? l.actor_id?.slice(0, 8) ?? "system"}</td>
+                <td className="px-4 py-3">{formatAction(l.action)}</td>
                 <td className="px-4 py-3 text-right">{l.new_value?.amount ?? l.old_value?.amount ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{(l.new_value?.loan_id ?? l.record_id)?.slice?.(0, 8) ?? "—"}</td>
               </tr>
