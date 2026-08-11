@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Trash2 } from "lucide-react";
-import { deleteWeeklyCollectionEntry } from "@/lib/entries.functions";
+import { deleteWeeklyCollectionEntry, deleteWeeklyCollectionSheet } from "@/lib/entries.functions";
 import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/collections")({
