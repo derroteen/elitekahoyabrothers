@@ -509,12 +509,13 @@ function SheetEditor({ id, onClose, canEdit, canDelete, sheets, setActiveId }: {
 
 function DeleteSheetDialog({ id, onClose, onDeleted }: { id: string; onClose: () => void; onDeleted: () => void }) {
   const [busy, setBusy] = useState(false);
-  const doDeleteSheet = useServerFn(deleteWeeklyCollectionSheet);
   const confirm = async () => {
     setBusy(true);
     try {
-      await doDeleteSheet({ data: { id } });
+      const { error } = await (supabase as any).rpc("delete_weekly_sheet_cascade", { _collection_id: id });
+      if (error) throw error;
       toast.success("Week sheet and all connected entries deleted");
+
       onDeleted();
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to delete");
