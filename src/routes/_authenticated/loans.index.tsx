@@ -389,6 +389,15 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     onOpenChange(false); onCreated();
   };
 
+  const submit = () => {
+    if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
+    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
+    if (activeLoanInfo) { setConfirmOpen(true); return; }
+    void doCreate();
+  };
+
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
