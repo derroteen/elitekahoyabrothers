@@ -336,16 +336,32 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     queryKey: ["member-active-loan", form.member_id],
     enabled: !!form.member_id,
     queryFn: async () => {
-      const [loansRes, openingRes] = await Promise.all([
-        supabase.from("loans").select("id, balance, loan_date, status").eq("member_id", form.member_id)
+      const [loansRes, openingRes, repaymentsRes] = await Promise.all([
+        supabase.from("loans").select("id, total_repayable, balance, loan_date, status").eq("member_id", form.member_id)
           .in("status", ["active", "approved", "overdue", "completed_with_fine"]).gt("balance", 0)
           .order("loan_date", { ascending: false }),
-        (supabase as any).from("loan_opening_balances").select("id, balance, loan_date").eq("member_id", form.member_id)
+        (supabase as any).from("loan_opening_balances").select("id, total_repayable, balance, loan_date").eq("member_id", form.member_id)
           .gt("balance", 0).order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
       ]);
+      const repaymentsByLoan = new Map<string, number>();
+      const repaymentsByOpeningLoan = new Map<string, number>();
+      for (const r of (repaymentsRes.data ?? []) as any[]) {
+        if (r.opening_loan_id) {
+          repaymentsByOpeningLoan.set(r.opening_loan_id, (repaymentsByOpeningLoan.get(r.opening_loan_id) ?? 0) + Number(r.amount ?? 0));
+        } else if (r.loan_id) {
+          repaymentsByLoan.set(r.loan_id, (repaymentsByLoan.get(r.loan_id) ?? 0) + Number(r.amount ?? 0));
+        }
+      }
       const rows = [
-        ...((loansRes.data ?? []) as any[]).map((l) => ({ balance: Number(l.balance || 0), loan_date: l.loan_date })),
-        ...((openingRes.data ?? []) as any[]).map((l) => ({ balance: Number(l.balance || 0), loan_date: l.loan_date })),
+        ...((loansRes.data ?? []) as any[]).map((l) => ({
+          balance: Math.max(0, Number(l.total_repayable ?? l.balance ?? 0) - (repaymentsByLoan.get(l.id) ?? 0)),
+          loan_date: l.loan_date,
+        })),
+        ...((openingRes.data ?? []) as any[]).map((o) => ({
+          balance: Math.max(0, Number(o.total_repayable ?? o.balance ?? 0) - (repaymentsByOpeningLoan.get(o.id) ?? 0)),
+          loan_date: o.loan_date,
+        })),
       ];
       if (!rows.length) return null;
       const total = rows.reduce((s, r) => s + r.balance, 0);
