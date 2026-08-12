@@ -326,16 +326,38 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     term: "12", customTerm: "", date: new Date().toISOString().slice(0, 10), notes: "", purpose: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const selectedMember = members.find((m: any) => m.id === form.member_id);
   const effectiveTerm = form.term === "custom" ? Number(form.customTerm || 0) : Number(form.term || 0);
   const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), effectiveTerm, form.freq), [form.amount, form.interest, effectiveTerm, form.freq]);
 
+  const { data: activeLoanInfo } = useQuery({
+    queryKey: ["member-active-loan", form.member_id],
+    enabled: !!form.member_id,
+    queryFn: async () => {
+      const [loansRes, openingRes] = await Promise.all([
+        supabase.from("loans").select("id, balance, loan_date, status").eq("member_id", form.member_id)
+          .in("status", ["active", "approved", "overdue", "completed_with_fine"]).gt("balance", 0)
+          .order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_opening_balances").select("id, balance, loan_date").eq("member_id", form.member_id)
+          .gt("balance", 0).order("loan_date", { ascending: false }),
+      ]);
+      const rows = [
+        ...((loansRes.data ?? []) as any[]).map((l) => ({ balance: Number(l.balance || 0), loan_date: l.loan_date })),
+        ...((openingRes.data ?? []) as any[]).map((l) => ({ balance: Number(l.balance || 0), loan_date: l.loan_date })),
+      ];
+      if (!rows.length) return null;
+      const total = rows.reduce((s, r) => s + r.balance, 0);
+      const latest = rows.slice().sort((a, b) => String(b.loan_date).localeCompare(String(a.loan_date)))[0];
+      return { total, loan_date: latest.loan_date, count: rows.length };
+    },
+  });
 
-  const submit = async () => {
-    if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
-    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
+  const doCreate = async () => {
+    setConfirmOpen(false);
     setSubmitting(true);
+
     const purposeNote = form.purpose ? `Purpose: ${form.purpose}${form.notes ? ` · ${form.notes}` : ""}` : (form.notes || null);
     const startDate = new Date(form.date); startDate.setMonth(startDate.getMonth() + 1);
     const { data: loan, error } = await supabase.from("loans").insert({
