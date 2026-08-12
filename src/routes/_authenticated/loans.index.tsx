@@ -476,8 +476,32 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Create"}</Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-serif">Create loan for member with existing active loan?</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>{selectedMember?.full_name} already has an unpaid loan with an outstanding balance of {fmtKES(activeLoanInfo?.total ?? 0)}.</p>
+            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3">
+              <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ Important notice for the administrator:</div>
+              <p className="mt-1">Once this new loan is created, the following entries will NOT be automatically posted to the system and must be added manually:</p>
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                <li>The new loan entry in the member's Passbook</li>
+                <li>The new loan repayment entries in the Loan Ledger</li>
+              </ul>
+              <p className="mt-2">You will need to manually add a "Loan Issued" passbook entry and record repayments through the loan ledger after creation.</p>
+            </div>
+            <p className="font-medium">Are you sure you want to proceed?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={() => void doCreate()} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">Yes, Create Loan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
+
 }
 
 function RepaymentDialog({ loan, onClose, onSaved }: any) {
