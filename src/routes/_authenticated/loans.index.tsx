@@ -410,7 +410,16 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               <SelectContent>{members.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.membership_no} · {m.full_name}</SelectItem>)}</SelectContent>
             </Select>
             {selectedMember && <div className="text-xs text-muted-foreground mt-1 font-mono">Membership No: {selectedMember.membership_no}</div>}
+            {activeLoanInfo && (
+              <div className="mt-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+                <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ This member already has an active loan.</div>
+                <div className="mt-1 text-amber-800/90 dark:text-amber-200/90">
+                  {selectedMember?.full_name} currently has an outstanding balance of {fmtKES(activeLoanInfo.total)} on an existing loan dated {fmtDate(activeLoanInfo.loan_date)}. Creating a new loan will result in multiple active loans for this member.
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
             <div><Label>Interest Rate % (annual)</Label><Input type="number" step="0.1" value={form.interest} onChange={(e) => setForm({ ...form, interest: e.target.value })} /></div>
