@@ -14,6 +14,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
+import { syncLoanIssuedPassbookEntry } from "@/lib/loan.functions";
 import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
