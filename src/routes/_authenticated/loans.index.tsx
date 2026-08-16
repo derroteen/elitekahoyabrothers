@@ -118,7 +118,10 @@ function LoansAdmin() {
         message: `Your loan of ${fmtKES(loan.amount_borrowed)} has been approved.`,
         type: "loan",
       } as any);
+      // Ensure a "Loan Issued" passbook entry exists (idempotent)
+      try { await syncLoanIssuedEntry({ data: { loan_id: loan.id } }); } catch { /* non-fatal */ }
     },
+
     onSuccess: () => { toast.success("Loan approved"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
     onError: (e: any) => toast.error(e.message),
   });
