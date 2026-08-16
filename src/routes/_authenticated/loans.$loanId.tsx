@@ -1245,6 +1245,7 @@ function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
 function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
   const doEditLoan = useServerFn(editLoanDetails);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [form, setForm] = useState({
     amount_borrowed: "",
     interest_rate: "",
@@ -1273,12 +1274,17 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
     return calcLoan(amount, rate, term, form.payment_frequency);
   }, [form.amount_borrowed, form.interest_rate, form.loan_term_months, form.payment_frequency]);
 
-  const submit = async () => {
+  const requestSave = () => {
     if (!loan) return;
     if (!form.amount_borrowed || !form.interest_rate || !form.loan_date || !form.loan_term_months) {
       toast.error("All fields are required");
       return;
     }
+    setConfirmOpen(true);
+  };
+
+  const submit = async () => {
+    if (!loan) return;
     setSubmitting(true);
     try {
       await doEditLoan({
@@ -1293,6 +1299,7 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
         },
       });
       toast.success("Loan details updated");
+      setConfirmOpen(false);
       onClose();
       onSaved();
     } catch (err: any) {
@@ -1303,13 +1310,11 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
   };
 
   return (
+    <>
     <Dialog open={!!loan} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-serif">Edit Loan Details</DialogTitle></DialogHeader>
-        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800 mb-4">
-          <strong>Warning:</strong> Changing these values does NOT update the existing payment schedule or redistribute past payments.
-          Use this only to correct data-entry errors on loans with no payments yet, or be prepared to manually verify the schedule afterward.
-        </div>
+
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount_borrowed} onChange={(e) => setForm({ ...form, amount_borrowed: e.target.value })} /></div>
@@ -1346,9 +1351,31 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={requestSave} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle className="font-serif">Confirm Loan Edit</DialogTitle></DialogHeader>
+        <div className="text-sm space-y-2">
+          <p>Saving these changes will:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Regenerate the repayment schedule (unpaid periods only)</li>
+            <li>Update the Loan Issued entry in this member's passbook</li>
+            <li>Recalculate all loan balances</li>
+          </ul>
+          <p className="text-muted-foreground">Already paid periods and recorded repayments will NOT be changed.</p>
+          <p className="font-medium">Are you sure you want to proceed?</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
+

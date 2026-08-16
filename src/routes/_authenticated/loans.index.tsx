@@ -14,6 +14,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
+import { syncLoanIssuedPassbookEntry } from "@/lib/loan.functions";
 import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
@@ -118,7 +119,10 @@ function LoansAdmin() {
         message: `Your loan of ${fmtKES(loan.amount_borrowed)} has been approved.`,
         type: "loan",
       } as any);
+      // Ensure a "Loan Issued" passbook entry exists (idempotent)
+      try { await syncLoanIssuedPassbookEntry({ data: { loan_id: loan.id } }); } catch { /* non-fatal */ }
     },
+
     onSuccess: () => { toast.success("Loan approved"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
     onError: (e: any) => toast.error(e.message),
   });
