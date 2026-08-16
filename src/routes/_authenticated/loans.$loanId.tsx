@@ -1351,9 +1351,31 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={requestSave} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle className="font-serif">Confirm Loan Edit</DialogTitle></DialogHeader>
+        <div className="text-sm space-y-2">
+          <p>Saving these changes will:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Regenerate the repayment schedule (unpaid periods only)</li>
+            <li>Update the Loan Issued entry in this member's passbook</li>
+            <li>Recalculate all loan balances</li>
+          </ul>
+          <p className="text-muted-foreground">Already paid periods and recorded repayments will NOT be changed.</p>
+          <p className="font-medium">Are you sure you want to proceed?</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
+
