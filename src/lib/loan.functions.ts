@@ -446,6 +446,50 @@ const EditLoanDetailsInput = z.object({
   notes: z.string().max(2000).optional().nullable(),
 });
 
+async function ensureLoanIssuedEntry(loanId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: loan } = await supabaseAdmin.from("loans").select("*").eq("id", loanId).single();
+  if (!loan) return;
+  const amount = Number((loan as any).total_repayable || 0);
+  const { data: existing } = await (supabaseAdmin as any)
+    .from("passbook_entries")
+    .select("id")
+    .eq("member_id", (loan as any).member_id)
+    .eq("description", "Loan Issued")
+    .or(`loan_id.eq.${loanId},and(entry_date.eq.${(loan as any).loan_date},loan_debit.eq.${amount})`)
+    .maybeSingle();
+  if (existing) return;
+  await (supabaseAdmin as any).from("passbook_entries").insert({
+    member_id: (loan as any).member_id,
+    entry_date: (loan as any).loan_date,
+    savings: 0,
+    bonus: 0,
+    withdrawal: 0,
+    loan_payment: 0,
+    loan_debit: amount,
+    total: 0,
+    balance: 0,
+    loan_balance: 0,
+    description: "Loan Issued",
+    remarks: "Loan Issued (Principal + Interest)",
+    category: "loan_issued",
+    source: "loan",
+    loan_id: loanId,
+    created_by: (loan as any).created_by ?? null,
+  });
+  await supabaseAdmin.rpc("recompute_passbook_balances", { _member: (loan as any).member_id } as any);
+}
+
+/** Creates the "Loan Issued" passbook entry for an approved/active loan (idempotent). */
+export const syncLoanIssuedPassbookEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ loan_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertLoanEditor(context.userId);
+    await ensureLoanIssuedEntry(data.loan_id);
+    return { ok: true };
+  });
+
 export const editLoanDetails = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => EditLoanDetailsInput.parse(i))
@@ -465,10 +509,75 @@ export const editLoanDetails = createServerFn({ method: "POST" })
       payment_frequency: data.payment_frequency,
       total_repayable: calc.totalRepayable,
       period_payment: calc.periodPayment,
+      insurance: calc.insurance,
       notes: data.notes ?? (before as any).notes,
     } as any).eq("id", data.id);
 
     if (error) throw new Error(error.message);
+
+    // --- CHANGE 1: regenerate unpaid schedule periods (paid periods untouched) ---
+    const { data: allPeriods = [] } = await (supabaseAdmin.from("loan_schedule" as any) as any)
+      .select("*").eq("loan_id", data.id).order("period_number");
+    const kept = (allPeriods as any[]).filter((p) => p.status === "paid" || Number(p.amount_paid || 0) > 0);
+    await (supabaseAdmin.from("loan_schedule" as any) as any)
+      .delete().eq("loan_id", data.id).eq("status", "paid" as any).neq("id", "00000000-0000-0000-0000-000000000000"); // no-op guard
+    const keptIds = new Set(kept.map((p) => p.id));
+    const toDelete = (allPeriods as any[]).filter((p) => !keptIds.has(p.id)).map((p) => p.id);
+    if (toDelete.length) {
+      await (supabaseAdmin.from("loan_schedule" as any) as any).delete().in("id", toDelete);
+    }
+
+    const keptPaid = kept.reduce((s, p) => s + Number(p.amount_paid || 0), 0);
+    const remainingTotal = Math.max(0, calc.totalRepayable - keptPaid);
+    const remainingPeriods = Math.max(0, calc.periods - kept.length);
+    if (remainingPeriods > 0 && remainingTotal > 0) {
+      const start = new Date(graceEndISO(data.loan_date));
+      const per = Math.round((remainingTotal / remainingPeriods) * 100) / 100;
+      let left = remainingTotal;
+      const rows: any[] = [];
+      for (let i = 1; i <= remainingPeriods; i++) {
+        const index = kept.length + i;
+        const due = new Date(start);
+        if (data.payment_frequency === "weekly") due.setDate(due.getDate() + 7 * (index - 1));
+        else due.setMonth(due.getMonth() + (index - 1));
+        const expected = i === remainingPeriods ? Math.round(left * 100) / 100 : per;
+        left = Math.round((left - expected) * 100) / 100;
+        rows.push({
+          loan_id: data.id,
+          period_number: index,
+          due_date: due.toISOString().slice(0, 10),
+          expected_amount: expected,
+          amount_paid: 0,
+          fine_amount: 0,
+          fine_paid: 0,
+          balance_remaining: Math.max(0, left),
+          status: "pending",
+          prepaid: false,
+        });
+      }
+      await (supabaseAdmin.from("loan_schedule" as any) as any).insert(rows);
+    }
+
+    // --- CHANGE 2: sync the "Loan Issued" passbook entry ---
+    const memberId = (before as any).member_id;
+    const { data: issued } = await (supabaseAdmin as any)
+      .from("passbook_entries")
+      .select("id")
+      .eq("member_id", memberId)
+      .eq("description", "Loan Issued")
+      .or(`loan_id.eq.${data.id},entry_date.eq.${(before as any).loan_date}`)
+      .maybeSingle();
+    if (issued) {
+      await (supabaseAdmin as any).from("passbook_entries")
+        .update({ loan_debit: calc.totalRepayable, entry_date: data.loan_date })
+        .eq("id", (issued as any).id);
+    } else if (["approved", "active", "overdue", "completed", "completed_with_fine"].includes(String((before as any).status))) {
+      await ensureLoanIssuedEntry(data.id);
+    }
+
+    // --- CHANGE 4: recalculate loan balances from actual repayments ---
+    await recalculateLoan(data.id);
+    await supabaseAdmin.rpc("recompute_passbook_balances", { _member: memberId } as any);
 
     await writeLoanAudit(context.userId, "Loan Details Edited", data.id, calc.principal, before, {
       amount_borrowed: calc.principal,
@@ -478,7 +587,9 @@ export const editLoanDetails = createServerFn({ method: "POST" })
       payment_frequency: data.payment_frequency,
       total_repayable: calc.totalRepayable,
       period_payment: calc.periodPayment,
+      schedule_regenerated: remainingPeriods,
     });
 
     return { ok: true };
   });
+
