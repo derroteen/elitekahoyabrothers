@@ -120,7 +120,7 @@ function LoansAdmin() {
         type: "loan",
       } as any);
       // Ensure a "Loan Issued" passbook entry exists (idempotent)
-      try { await syncLoanIssuedEntry({ data: { loan_id: loan.id } }); } catch { /* non-fatal */ }
+      try { await syncLoanIssuedPassbookEntry({ data: { loan_id: loan.id } }); } catch { /* non-fatal */ }
     },
 
     onSuccess: () => { toast.success("Loan approved"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
