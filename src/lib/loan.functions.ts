@@ -519,8 +519,6 @@ export const editLoanDetails = createServerFn({ method: "POST" })
     const { data: allPeriods = [] } = await (supabaseAdmin.from("loan_schedule" as any) as any)
       .select("*").eq("loan_id", data.id).order("period_number");
     const kept = (allPeriods as any[]).filter((p) => p.status === "paid" || Number(p.amount_paid || 0) > 0);
-    await (supabaseAdmin.from("loan_schedule" as any) as any)
-      .delete().eq("loan_id", data.id).eq("status", "paid" as any).neq("id", "00000000-0000-0000-0000-000000000000"); // no-op guard
     const keptIds = new Set(kept.map((p) => p.id));
     const toDelete = (allPeriods as any[]).filter((p) => !keptIds.has(p.id)).map((p) => p.id);
     if (toDelete.length) {
