@@ -1,1 +1,0 @@
-import{s}from"./index-Diz_ni5J.js";async function o(){const{data:r}=await s.from("user_roles").select("user_id, role");return new Set((r??[]).filter(e=>e.role!=="member").map(e=>e.user_id))}function a(r,e){return r.filter(t=>!e.has(t.id))}export{o as fetchNonMemberIds,a as filterMembersOnly};
