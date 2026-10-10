@@ -9,57 +9,46 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as ChangePasswordRouteImport } from './routes/change-password'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedWeeklyExpendituresRouteImport } from './routes/_authenticated/weekly-expenditures'
-import { Route as AuthenticatedSystemResetRouteImport } from './routes/_authenticated/system-reset'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
-import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
-import { Route as AuthenticatedPassbooksRouteImport } from './routes/_authenticated/passbooks'
-import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
-import { Route as AuthenticatedOpeningLoansRouteImport } from './routes/_authenticated/opening-loans'
-import { Route as AuthenticatedOpeningBalancesRouteImport } from './routes/_authenticated/opening-balances'
-import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticated/my-weekly'
-import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
-import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
-import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
-import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
-import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
-import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedConstitutionRouteImport } from './routes/_authenticated/constitution'
-import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
-import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
-import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
-import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedAnnouncementsRouteImport } from './routes/_authenticated/announcements'
+import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
+import { Route as AuthenticatedBenevolentRouteImport } from './routes/_authenticated/benevolent'
+import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
+import { Route as AuthenticatedConstitutionRouteImport } from './routes/_authenticated/constitution'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedMembersRouteImport } from './routes/_authenticated/members'
+import { Route as AuthenticatedMyAttendanceRouteImport } from './routes/_authenticated/my-attendance'
+import { Route as AuthenticatedMyBenevolentRouteImport } from './routes/_authenticated/my-benevolent'
+import { Route as AuthenticatedMyLoansRouteImport } from './routes/_authenticated/my-loans'
+import { Route as AuthenticatedMyPassbookRouteImport } from './routes/_authenticated/my-passbook'
+import { Route as AuthenticatedMySavingsRouteImport } from './routes/_authenticated/my-savings'
+import { Route as AuthenticatedMyWeeklyRouteImport } from './routes/_authenticated/my-weekly'
+import { Route as AuthenticatedOpeningBalancesRouteImport } from './routes/_authenticated/opening-balances'
+import { Route as AuthenticatedOpeningLoansRouteImport } from './routes/_authenticated/opening-loans'
+import { Route as AuthenticatedPassbookRouteImport } from './routes/_authenticated/passbook'
+import { Route as AuthenticatedPassbooksRouteImport } from './routes/_authenticated/passbooks'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedSavingsRouteImport } from './routes/_authenticated/savings'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSystemResetRouteImport } from './routes/_authenticated/system-reset'
+import { Route as AuthenticatedWeeklyExpendituresRouteImport } from './routes/_authenticated/weekly-expenditures'
 import { Route as AuthenticatedLoansIndexRouteImport } from './routes/_authenticated/loans.index'
 import { Route as AuthenticatedLoansLoanIdRouteImport } from './routes/_authenticated/loans.$loanId'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
@@ -67,121 +56,35 @@ const ChangePasswordRoute = ChangePasswordRouteImport.update({
   path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedWeeklyExpendituresRoute =
-  AuthenticatedWeeklyExpendituresRouteImport.update({
-    id: '/weekly-expenditures',
-    path: '/weekly-expenditures',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAnnouncementsRoute =
+  AuthenticatedAnnouncementsRouteImport.update({
+    id: '/announcements',
+    path: '/announcements',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedSystemResetRoute =
-  AuthenticatedSystemResetRouteImport.update({
-    id: '/system-reset',
-    path: '/system-reset',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSavingsRoute = AuthenticatedSavingsRouteImport.update({
-  id: '/savings',
-  path: '/savings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPassbooksRoute = AuthenticatedPassbooksRouteImport.update({
-  id: '/passbooks',
-  path: '/passbooks',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
-  id: '/passbook',
-  path: '/passbook',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedOpeningLoansRoute =
-  AuthenticatedOpeningLoansRouteImport.update({
-    id: '/opening-loans',
-    path: '/opening-loans',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedOpeningBalancesRoute =
-  AuthenticatedOpeningBalancesRouteImport.update({
-    id: '/opening-balances',
-    path: '/opening-balances',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMyWeeklyRoute = AuthenticatedMyWeeklyRouteImport.update({
-  id: '/my-weekly',
-  path: '/my-weekly',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMySavingsRoute = AuthenticatedMySavingsRouteImport.update({
-  id: '/my-savings',
-  path: '/my-savings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMyPassbookRoute = AuthenticatedMyPassbookRouteImport.update({
-  id: '/my-passbook',
-  path: '/my-passbook',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMyLoansRoute = AuthenticatedMyLoansRouteImport.update({
-  id: '/my-loans',
-  path: '/my-loans',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMyBenevolentRoute =
-  AuthenticatedMyBenevolentRouteImport.update({
-    id: '/my-benevolent',
-    path: '/my-benevolent',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMyAttendanceRoute =
-  AuthenticatedMyAttendanceRouteImport.update({
-    id: '/my-attendance',
-    path: '/my-attendance',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
-  id: '/members',
-  path: '/members',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedConstitutionRoute =
-  AuthenticatedConstitutionRouteImport.update({
-    id: '/constitution',
-    path: '/constitution',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCollectionsRoute =
-  AuthenticatedCollectionsRouteImport.update({
-    id: '/collections',
-    path: '/collections',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedBenevolentRoute = AuthenticatedBenevolentRouteImport.update({
-  id: '/benevolent',
-  path: '/benevolent',
+const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
@@ -189,15 +92,112 @@ const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
-  id: '/attendance',
-  path: '/attendance',
+const AuthenticatedBenevolentRoute = AuthenticatedBenevolentRouteImport.update({
+  id: '/benevolent',
+  path: '/benevolent',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAnnouncementsRoute =
-  AuthenticatedAnnouncementsRouteImport.update({
-    id: '/announcements',
-    path: '/announcements',
+const AuthenticatedCollectionsRoute =
+  AuthenticatedCollectionsRouteImport.update({
+    id: '/collections',
+    path: '/collections',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedConstitutionRoute =
+  AuthenticatedConstitutionRouteImport.update({
+    id: '/constitution',
+    path: '/constitution',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyAttendanceRoute =
+  AuthenticatedMyAttendanceRouteImport.update({
+    id: '/my-attendance',
+    path: '/my-attendance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMyBenevolentRoute =
+  AuthenticatedMyBenevolentRouteImport.update({
+    id: '/my-benevolent',
+    path: '/my-benevolent',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMyLoansRoute = AuthenticatedMyLoansRouteImport.update({
+  id: '/my-loans',
+  path: '/my-loans',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyPassbookRoute = AuthenticatedMyPassbookRouteImport.update({
+  id: '/my-passbook',
+  path: '/my-passbook',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMySavingsRoute = AuthenticatedMySavingsRouteImport.update({
+  id: '/my-savings',
+  path: '/my-savings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyWeeklyRoute = AuthenticatedMyWeeklyRouteImport.update({
+  id: '/my-weekly',
+  path: '/my-weekly',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOpeningBalancesRoute =
+  AuthenticatedOpeningBalancesRouteImport.update({
+    id: '/opening-balances',
+    path: '/opening-balances',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOpeningLoansRoute =
+  AuthenticatedOpeningLoansRouteImport.update({
+    id: '/opening-loans',
+    path: '/opening-loans',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPassbookRoute = AuthenticatedPassbookRouteImport.update({
+  id: '/passbook',
+  path: '/passbook',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPassbooksRoute = AuthenticatedPassbooksRouteImport.update({
+  id: '/passbooks',
+  path: '/passbooks',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSavingsRoute = AuthenticatedSavingsRouteImport.update({
+  id: '/savings',
+  path: '/savings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSystemResetRoute =
+  AuthenticatedSystemResetRouteImport.update({
+    id: '/system-reset',
+    path: '/system-reset',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWeeklyExpendituresRoute =
+  AuthenticatedWeeklyExpendituresRouteImport.update({
+    id: '/weekly-expenditures',
+    path: '/weekly-expenditures',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedLoansIndexRoute = AuthenticatedLoansIndexRouteImport.update({
@@ -428,39 +428,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/change-password': {
-      id: '/change-password'
-      path: '/change-password'
-      fullPath: '/change-password'
-      preLoaderRoute: typeof ChangePasswordRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -470,158 +442,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/weekly-expenditures': {
-      id: '/_authenticated/weekly-expenditures'
-      path: '/weekly-expenditures'
-      fullPath: '/weekly-expenditures'
-      preLoaderRoute: typeof AuthenticatedWeeklyExpendituresRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/system-reset': {
-      id: '/_authenticated/system-reset'
-      path: '/system-reset'
-      fullPath: '/system-reset'
-      preLoaderRoute: typeof AuthenticatedSystemResetRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/savings': {
-      id: '/_authenticated/savings'
-      path: '/savings'
-      fullPath: '/savings'
-      preLoaderRoute: typeof AuthenticatedSavingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/reports': {
-      id: '/_authenticated/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AuthenticatedReportsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/passbooks': {
-      id: '/_authenticated/passbooks'
-      path: '/passbooks'
-      fullPath: '/passbooks'
-      preLoaderRoute: typeof AuthenticatedPassbooksRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/passbook': {
-      id: '/_authenticated/passbook'
-      path: '/passbook'
-      fullPath: '/passbook'
-      preLoaderRoute: typeof AuthenticatedPassbookRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/opening-loans': {
-      id: '/_authenticated/opening-loans'
-      path: '/opening-loans'
-      fullPath: '/opening-loans'
-      preLoaderRoute: typeof AuthenticatedOpeningLoansRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/opening-balances': {
-      id: '/_authenticated/opening-balances'
-      path: '/opening-balances'
-      fullPath: '/opening-balances'
-      preLoaderRoute: typeof AuthenticatedOpeningBalancesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-weekly': {
-      id: '/_authenticated/my-weekly'
-      path: '/my-weekly'
-      fullPath: '/my-weekly'
-      preLoaderRoute: typeof AuthenticatedMyWeeklyRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-savings': {
-      id: '/_authenticated/my-savings'
-      path: '/my-savings'
-      fullPath: '/my-savings'
-      preLoaderRoute: typeof AuthenticatedMySavingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-passbook': {
-      id: '/_authenticated/my-passbook'
-      path: '/my-passbook'
-      fullPath: '/my-passbook'
-      preLoaderRoute: typeof AuthenticatedMyPassbookRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-loans': {
-      id: '/_authenticated/my-loans'
-      path: '/my-loans'
-      fullPath: '/my-loans'
-      preLoaderRoute: typeof AuthenticatedMyLoansRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-benevolent': {
-      id: '/_authenticated/my-benevolent'
-      path: '/my-benevolent'
-      fullPath: '/my-benevolent'
-      preLoaderRoute: typeof AuthenticatedMyBenevolentRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/my-attendance': {
-      id: '/_authenticated/my-attendance'
-      path: '/my-attendance'
-      fullPath: '/my-attendance'
-      preLoaderRoute: typeof AuthenticatedMyAttendanceRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/members': {
-      id: '/_authenticated/members'
-      path: '/members'
-      fullPath: '/members'
-      preLoaderRoute: typeof AuthenticatedMembersRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/constitution': {
-      id: '/_authenticated/constitution'
-      path: '/constitution'
-      fullPath: '/constitution'
-      preLoaderRoute: typeof AuthenticatedConstitutionRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/collections': {
-      id: '/_authenticated/collections'
-      path: '/collections'
-      fullPath: '/collections'
-      preLoaderRoute: typeof AuthenticatedCollectionsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/benevolent': {
-      id: '/_authenticated/benevolent'
-      path: '/benevolent'
-      fullPath: '/benevolent'
-      preLoaderRoute: typeof AuthenticatedBenevolentRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/audit': {
-      id: '/_authenticated/audit'
-      path: '/audit'
-      fullPath: '/audit'
-      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+    '/_authenticated/announcements': {
+      id: '/_authenticated/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/attendance': {
@@ -631,11 +491,151 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/announcements': {
-      id: '/_authenticated/announcements'
-      path: '/announcements'
-      fullPath: '/announcements'
-      preLoaderRoute: typeof AuthenticatedAnnouncementsRouteImport
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/benevolent': {
+      id: '/_authenticated/benevolent'
+      path: '/benevolent'
+      fullPath: '/benevolent'
+      preLoaderRoute: typeof AuthenticatedBenevolentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/collections': {
+      id: '/_authenticated/collections'
+      path: '/collections'
+      fullPath: '/collections'
+      preLoaderRoute: typeof AuthenticatedCollectionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/constitution': {
+      id: '/_authenticated/constitution'
+      path: '/constitution'
+      fullPath: '/constitution'
+      preLoaderRoute: typeof AuthenticatedConstitutionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/members': {
+      id: '/_authenticated/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof AuthenticatedMembersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-attendance': {
+      id: '/_authenticated/my-attendance'
+      path: '/my-attendance'
+      fullPath: '/my-attendance'
+      preLoaderRoute: typeof AuthenticatedMyAttendanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-benevolent': {
+      id: '/_authenticated/my-benevolent'
+      path: '/my-benevolent'
+      fullPath: '/my-benevolent'
+      preLoaderRoute: typeof AuthenticatedMyBenevolentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-loans': {
+      id: '/_authenticated/my-loans'
+      path: '/my-loans'
+      fullPath: '/my-loans'
+      preLoaderRoute: typeof AuthenticatedMyLoansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-passbook': {
+      id: '/_authenticated/my-passbook'
+      path: '/my-passbook'
+      fullPath: '/my-passbook'
+      preLoaderRoute: typeof AuthenticatedMyPassbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-savings': {
+      id: '/_authenticated/my-savings'
+      path: '/my-savings'
+      fullPath: '/my-savings'
+      preLoaderRoute: typeof AuthenticatedMySavingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-weekly': {
+      id: '/_authenticated/my-weekly'
+      path: '/my-weekly'
+      fullPath: '/my-weekly'
+      preLoaderRoute: typeof AuthenticatedMyWeeklyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/opening-balances': {
+      id: '/_authenticated/opening-balances'
+      path: '/opening-balances'
+      fullPath: '/opening-balances'
+      preLoaderRoute: typeof AuthenticatedOpeningBalancesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/opening-loans': {
+      id: '/_authenticated/opening-loans'
+      path: '/opening-loans'
+      fullPath: '/opening-loans'
+      preLoaderRoute: typeof AuthenticatedOpeningLoansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/passbook': {
+      id: '/_authenticated/passbook'
+      path: '/passbook'
+      fullPath: '/passbook'
+      preLoaderRoute: typeof AuthenticatedPassbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/passbooks': {
+      id: '/_authenticated/passbooks'
+      path: '/passbooks'
+      fullPath: '/passbooks'
+      preLoaderRoute: typeof AuthenticatedPassbooksRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/savings': {
+      id: '/_authenticated/savings'
+      path: '/savings'
+      fullPath: '/savings'
+      preLoaderRoute: typeof AuthenticatedSavingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/system-reset': {
+      id: '/_authenticated/system-reset'
+      path: '/system-reset'
+      fullPath: '/system-reset'
+      preLoaderRoute: typeof AuthenticatedSystemResetRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/weekly-expenditures': {
+      id: '/_authenticated/weekly-expenditures'
+      path: '/weekly-expenditures'
+      fullPath: '/weekly-expenditures'
+      preLoaderRoute: typeof AuthenticatedWeeklyExpendituresRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/loans/': {

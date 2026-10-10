@@ -1,0 +1,10 @@
+# Elite Kahoya Brothers
+
+> Members portal for the Elite Kahoya Brothers savings and loans group — savings, loans, accountability, and growth.
+
+This is a private, members-only portal. All dashboard, savings, loans, passbook, collections, reports, audit, settings, and admin surfaces require sign-in and are intentionally not listed for crawlers.
+
+## Pages
+
+- [Sign in](/login): Member, admin, auditor, and super-admin sign-in.
+- [Forgot password](/forgot-password): Request a password reset link by email.

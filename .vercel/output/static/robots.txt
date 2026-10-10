@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /change-password
+Disallow: /reset-password
+
+Sitemap: https://www.elitekahoyabrothers.com/sitemap.xml
