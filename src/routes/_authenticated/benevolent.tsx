@@ -46,7 +46,7 @@ function BenevolentLedger() {
 
   const isStaff = role === "super_admin" || role === "admin" || role === "auditor";
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   useEffect(() => { if (!loading && role && !isStaff) navigate({ to: "/my-benevolent" }); }, [loading, role, isStaff, navigate]);
 

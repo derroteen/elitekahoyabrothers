@@ -26,6 +26,7 @@ function CollectionsPage() {
   const qc = useQueryClient();
   const [openNew, setOpenNew] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [backfillingRepayments, setBackfillingRepayments] = useState(false);
   const [backfillingSavingsBenevolent, setBackfillingSavingsBenevolent] = useState(false);
@@ -45,7 +46,7 @@ function CollectionsPage() {
   if (loading || !role) return <PageSkeleton />;
   if (role === "member") return null;
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   const handleBackfillRepayments = async () => {
     setBackfillingRepayments(true);
@@ -137,6 +138,7 @@ function CollectionsPage() {
                   <td className="px-4 py-3 text-right font-mono">{fmtKES(s.cash_in_hand)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Button size="sm" variant="ghost" onClick={() => setActiveId(s.id)}>Open</Button>
+                    {canEdit && <Button size="sm" variant="ghost" onClick={() => setEditId(s.id)}>Edit</Button>}
                     {canDelete && <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeleteId(s.id)}>Delete</Button>}
                   </td>
                 </tr>
@@ -148,8 +150,68 @@ function CollectionsPage() {
 
       <NewSheetDialog open={openNew} onOpenChange={setOpenNew} lastSheet={sheets[0]} onCreated={(id: string) => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setActiveId(id); }} />
       {activeId && <SheetEditor id={activeId} onClose={() => setActiveId(null)} canEdit={canEdit} canDelete={canDelete} sheets={sheets} setActiveId={setActiveId} />}
+      {editId && <EditSheetDialog sheet={sheets.find((s: any) => s.id === editId)} allSheets={sheets} onClose={() => setEditId(null)} onSaved={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); qc.invalidateQueries({ queryKey: ["collection-sheet", editId] }); setEditId(null); }} />}
       {deleteId && <DeleteSheetDialog id={deleteId} onClose={() => setDeleteId(null)} onDeleted={() => { qc.invalidateQueries({ queryKey: ["collections-list"] }); setDeleteId(null); }} />}
     </div>
+  );
+}
+
+function EditSheetDialog({ sheet, allSheets, onClose, onSaved }: { sheet: any; allSheets: any[]; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    week_number: String(sheet?.week_number ?? ""),
+    collection_date: (sheet?.collection_date ?? "").slice(0, 10),
+    treasurer_name: sheet?.treasurer_name ?? "",
+    banked_by: sheet?.banked_by ?? "",
+    cash_in_hand: String(sheet?.cash_in_hand ?? 0),
+    banked_in_advance: String(sheet?.banked_in_advance ?? 0),
+    notes: sheet?.notes ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  if (!sheet) return null;
+
+  const submit = async () => {
+    const wk = Number(form.week_number);
+    if (!form.week_number || !Number.isFinite(wk) || wk <= 0) { toast.error("Valid week number required"); return; }
+    if (!form.collection_date) { toast.error("Collection date required"); return; }
+    if (allSheets.some((s: any) => s.id !== sheet.id && Number(s.week_number) === wk)) {
+      toast.error(`Week ${wk} already exists. Please choose a different week number.`);
+      return;
+    }
+    setBusy(true);
+    const { error } = await (supabase.from("weekly_collections" as any) as any).update({
+      week_number: wk,
+      collection_date: form.collection_date,
+      treasurer_name: form.treasurer_name || null,
+      banked_by: form.banked_by || null,
+      cash_in_hand: Number(form.cash_in_hand || 0),
+      banked_in_advance: Number(form.banked_in_advance || 0),
+      notes: form.notes || null,
+    }).eq("id", sheet.id);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Sheet updated successfully");
+    onSaved();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-serif">Edit Collection Sheet</DialogTitle></DialogHeader>
+        <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+          <div><Label>Week Number</Label><Input type="number" value={form.week_number} onChange={(e) => setForm({ ...form, week_number: e.target.value })} /></div>
+          <div><Label>Collection Date</Label><Input type="date" value={form.collection_date} onChange={(e) => setForm({ ...form, collection_date: e.target.value })} /></div>
+          <div><Label>Treasurer Name</Label><Input value={form.treasurer_name} onChange={(e) => setForm({ ...form, treasurer_name: e.target.value })} /></div>
+          <div><Label>Banked By</Label><Input value={form.banked_by} onChange={(e) => setForm({ ...form, banked_by: e.target.value })} placeholder="e.g. M-PESA, cash" /></div>
+          <div><Label>Cash In Hand</Label><Input type="number" step="0.01" value={form.cash_in_hand} onChange={(e) => setForm({ ...form, cash_in_hand: e.target.value })} /></div>
+          <div><Label>Banked In Advance</Label><Input type="number" step="0.01" value={form.banked_in_advance} onChange={(e) => setForm({ ...form, banked_in_advance: e.target.value })} /></div>
+          <div><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="bg-navy text-white hover:bg-navy-2">{busy ? "Saving…" : "Save Changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -449,19 +511,24 @@ function DeleteSheetDialog({ id, onClose, onDeleted }: { id: string; onClose: ()
   const [busy, setBusy] = useState(false);
   const confirm = async () => {
     setBusy(true);
-    const { error: e1 } = await (supabase.from("weekly_collection_entries" as any) as any).delete().eq("collection_id", id);
-    if (e1) { setBusy(false); toast.error(e1.message); return; }
-    const { error: e2 } = await (supabase.from("weekly_collections" as any) as any).delete().eq("id", id);
-    setBusy(false);
-    if (e2) { toast.error(e2.message); return; }
-    toast.success("Week sheet deleted");
-    onDeleted();
+    try {
+      const { error } = await (supabase as any).rpc("delete_weekly_sheet_cascade", { _collection_id: id });
+      if (error) throw error;
+      toast.success("Week sheet and all connected entries deleted");
+
+      onDeleted();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to delete");
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader><DialogTitle className="font-serif">Delete Week Sheet?</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">This permanently removes the week sheet and all of its entries. This action cannot be undone.</p>
+        <p className="text-sm text-muted-foreground">Deleting this weekly sheet will also permanently delete all savings, benevolent, loan repayment, and passbook entries recorded from this sheet for all members. This cannot be undone. Are you sure?</p>
+
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={confirm} disabled={busy} className="bg-red-600 text-white hover:bg-red-700">{busy ? "Deleting…" : "Delete Permanently"}</Button>

@@ -54,7 +54,7 @@ function AttendancePage() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
   const doDeleteEntry = useServerFn(deleteAttendanceEntry);
   const today = new Date();
   const [year, setYear] = useState<number>(today.getFullYear());

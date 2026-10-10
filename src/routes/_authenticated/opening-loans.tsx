@@ -82,7 +82,7 @@ function OpeningLoansPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const canEdit = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
 
   useEffect(() => {
     if (!loading && role && !canEdit) navigate({ to: "/dashboard" });

@@ -13,7 +13,8 @@ async function assertAdmin(userId: string) {
   if (r !== "super_admin" && r !== "admin") throw new Error("Permission denied: admin only");
 }
 async function assertSuperAdmin(userId: string) {
-  if ((await getRole(userId)) !== "super_admin") throw new Error("Permission denied: super admin only");
+  const r2 = await getRole(userId);
+  if (r2 !== "super_admin" && r2 !== "admin") throw new Error("Permission denied: admin only");
 }
 
 async function audit(opts: {
@@ -463,4 +464,94 @@ export const removeAppliedFines = createServerFn({ method: "POST" })
     await supabaseAdmin.from("loans").update({ total_fines_charged: 0, total_fines_paid: 0, outstanding_fines: 0 } as any).eq("id", data.loan_id);
     await audit({ actorId: context.userId, action: "bulk_remove_fines", tableName: "loan_fines", recordId: data.loan_id, oldValue: { count: (fines as any[]).length } });
     return { ok: true, removed: (fines as any[]).length };
+  });
+
+// WEEKLY COLLECTION SHEET — cascade delete of all linked entries across modules
+export const deleteWeeklyCollectionSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: sheet } = await sb.from("weekly_collections").select("*").eq("id", data.id).maybeSingle();
+    if (!sheet) throw new Error("Sheet not found");
+
+    const { data: entries, error: entriesErr } = await sb
+      .from("weekly_collection_entries")
+      .select("id, member_id")
+      .eq("collection_id", data.id);
+    if (entriesErr) throw new Error(entriesErr.message);
+
+    const entryIds: string[] = (entries ?? []).map((e: any) => e.id);
+    const memberIds: string[] = Array.from(new Set((entries ?? []).map((e: any) => e.member_id).filter(Boolean)));
+
+    const affectedLoanIds = new Set<string>();
+    const affectedOpeningLoanIds = new Set<string>();
+
+    if (entryIds.length > 0) {
+      // Collect loans affected before deleting repayments
+      const { data: reps } = await sb
+        .from("loan_repayments")
+        .select("loan_id, opening_loan_id")
+        .in("weekly_entry_id", entryIds);
+      for (const r of reps ?? []) {
+        if (r.loan_id) affectedLoanIds.add(r.loan_id);
+        if (r.opening_loan_id) affectedOpeningLoanIds.add(r.opening_loan_id);
+      }
+
+      // 1. linked entries first
+      for (const table of ["savings_entries", "benevolent_entries", "loan_repayments", "passbook_entries"]) {
+        const { error } = await sb.from(table).delete().in("weekly_entry_id", entryIds);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+    }
+
+    // 2. weekly_collection_entries
+    const { error: e1 } = await sb.from("weekly_collection_entries").delete().eq("collection_id", data.id);
+    if (e1) throw new Error(e1.message);
+
+    // 3. the sheet itself
+    const { error: e2 } = await sb.from("weekly_collections").delete().eq("id", data.id);
+    if (e2) throw new Error(e2.message);
+
+    // Recalculate balances
+    for (const memberId of memberIds) {
+      await sb.rpc("recompute_savings_balances", { _member: memberId });
+      await sb.rpc("recompute_benevolent_balances", { _member: memberId });
+      await sb.rpc("recompute_passbook_balances", { _member: memberId });
+    }
+
+    for (const loanId of affectedLoanIds) {
+      const { data: loan } = await sb.from("loans").select("total_repayable, total_fines_charged, status").eq("id", loanId).maybeSingle();
+      if (!loan) continue;
+      const { data: rows } = await sb.from("loan_repayments").select("amount, principal_paid, fine_paid").eq("loan_id", loanId);
+      const totalPaid = (rows ?? []).reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+      const principal = (rows ?? []).reduce((s: number, r: any) => s + Number(r.principal_paid ?? 0), 0);
+      const fines = (rows ?? []).reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0);
+      const repayable = Number(loan.total_repayable ?? 0);
+      const balance = Math.max(0, repayable - (principal > 0 ? principal : totalPaid));
+      await sb.from("loans").update({
+        amount_paid: totalPaid,
+        balance,
+        total_fines_paid: fines,
+        outstanding_fines: Math.max(0, Number(loan.total_fines_charged ?? 0) - fines),
+        status: balance > 0 && ["completed", "completed_with_fine"].includes(String(loan.status)) ? "active" : loan.status,
+      }).eq("id", loanId);
+    }
+
+    for (const openingLoanId of affectedOpeningLoanIds) {
+      await sb.rpc("recalculate_opening_loan_balance", { _opening_loan_id: openingLoanId });
+    }
+
+    await audit({
+      actorId: context.userId,
+      action: "deleted",
+      tableName: "weekly_collections",
+      recordId: data.id,
+      oldValue: { sheet, entry_count: entryIds.length },
+    });
+
+    return { ok: true, entries: entryIds.length, members: memberIds.length };
   });

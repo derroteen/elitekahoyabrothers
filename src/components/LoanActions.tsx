@@ -22,7 +22,7 @@ export function LoanActions({ loan, role }: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isAdmin = role === "admin" || role === "super_admin";
-  const isSuperAdmin = role === "super_admin";
+  const isSuperAdmin = role === "super_admin" || role === "admin";
   const isCleared = Number(loan?.balance ?? 0) <= 0 || loan?.status === "cleared";
   const [payOpen, setPayOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);

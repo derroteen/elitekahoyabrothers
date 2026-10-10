@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fmtKES, fmtDate } from "@/lib/format";
 import { addLoanPayment, deleteLoanPayment, editLoanPayment, editLoanDetails, updateLoanPassbookOpeningBalance } from "@/lib/loan.functions";
 import { deleteLoanFine, editLoanFine, deleteInsurancePayment, editInsurancePayment, addLoanFine, addInsurancePayment, recordFinePayment, removeAppliedFines } from "@/lib/entries.functions";
-import { calcLoan, type Frequency } from "@/lib/loan-calc";
+import { calcLoan, graceEndISO, type Frequency } from "@/lib/loan-calc";
 import { ArrowLeft, Edit, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isOpeningLoanId, normalizeLoanId } from "@/lib/loan-balance";
@@ -177,7 +177,7 @@ function LoanLedger() {
   });
 
   const canEditPayments = role === "super_admin" || role === "admin";
-  const canDelete = role === "super_admin";
+  const canDelete = role === "super_admin" || role === "admin";
   const backTo = isStaff ? "/loans" : "/my-loans";
 
   const refreshLoan = () => {
@@ -288,16 +288,23 @@ function LoanLedger() {
 
     (async () => {
       const today = todayISO();
+      // Grace period: no fines for any period due within one month of the loan date.
+      // NOTE: existing loans may already carry fines inside this window from before
+      // this rule; they are intentionally NOT deleted here and must be reviewed and
+      // removed manually by an admin.
+      const graceEnd = loan?.loan_date ? graceEndISO(loan.loan_date) : null;
       const existingScheduleIds = new Set(fines.filter((f: any) => f.schedule_id).map((f: any) => f.schedule_id));
       let created = 0;
 
       for (const s of schedule as any[]) {
         if (cancelled) return;
+        if (graceEnd && String(s.due_date).slice(0, 10) <= graceEnd) continue;
         if (s.due_date >= today) continue;
         if (Number(s.amount_paid ?? 0) > 0) continue;
         if (s.prepaid) continue;
         if (s.status === "paid" || s.status === "prepaid") continue;
         if (existingScheduleIds.has(s.id)) continue;
+
 
         const { error: fineErr } = await (supabase.from("loan_fines" as any) as any).insert({
           loan_id: loanId,
@@ -330,7 +337,7 @@ function LoanLedger() {
     })();
 
     return () => { cancelled = true; };
-  }, [canEditPayments, loanId, schedule, fines, isOpening]);
+  }, [canEditPayments, loanId, schedule, fines, isOpening, loan?.loan_date]);
 
   if (loanLoading || repaymentsLoading) return <PageSkeleton />;
   if (!loan) return <div className="p-8 text-muted-foreground">Loan not found</div>;
@@ -1238,6 +1245,7 @@ function EditInsuranceDialog({ payment, onClose, onSaved }: any) {
 function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
   const doEditLoan = useServerFn(editLoanDetails);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [form, setForm] = useState({
     amount_borrowed: "",
     interest_rate: "",
@@ -1266,12 +1274,17 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
     return calcLoan(amount, rate, term, form.payment_frequency);
   }, [form.amount_borrowed, form.interest_rate, form.loan_term_months, form.payment_frequency]);
 
-  const submit = async () => {
+  const requestSave = () => {
     if (!loan) return;
     if (!form.amount_borrowed || !form.interest_rate || !form.loan_date || !form.loan_term_months) {
       toast.error("All fields are required");
       return;
     }
+    setConfirmOpen(true);
+  };
+
+  const submit = async () => {
+    if (!loan) return;
     setSubmitting(true);
     try {
       await doEditLoan({
@@ -1286,6 +1299,7 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
         },
       });
       toast.success("Loan details updated");
+      setConfirmOpen(false);
       onClose();
       onSaved();
     } catch (err: any) {
@@ -1296,13 +1310,11 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
   };
 
   return (
+    <>
     <Dialog open={!!loan} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-serif">Edit Loan Details</DialogTitle></DialogHeader>
-        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800 mb-4">
-          <strong>Warning:</strong> Changing these values does NOT update the existing payment schedule or redistribute past payments.
-          Use this only to correct data-entry errors on loans with no payments yet, or be prepared to manually verify the schedule afterward.
-        </div>
+
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount_borrowed} onChange={(e) => setForm({ ...form, amount_borrowed: e.target.value })} /></div>
@@ -1339,9 +1351,31 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={requestSave} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle className="font-serif">Confirm Loan Edit</DialogTitle></DialogHeader>
+        <div className="text-sm space-y-2">
+          <p>Saving these changes will:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Regenerate the repayment schedule (unpaid periods only)</li>
+            <li>Update the Loan Issued entry in this member's passbook</li>
+            <li>Recalculate all loan balances</li>
+          </ul>
+          <p className="text-muted-foreground">Already paid periods and recorded repayments will NOT be changed.</p>
+          <p className="font-medium">Are you sure you want to proceed?</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
+

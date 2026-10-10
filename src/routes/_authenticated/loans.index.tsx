@@ -14,6 +14,7 @@ import { fmtKES, fmtDate } from "@/lib/format";
 import { calcLoan, buildSchedule, type Frequency } from "@/lib/loan-calc";
 import { calculateOutstandingBalanceFromData } from "@/lib/loan-balance";
 import { LoanActions } from "@/components/LoanActions";
+import { syncLoanIssuedPassbookEntry } from "@/lib/loan.functions";
 import { PageSkeleton, TableRowsSkeleton } from "@/components/loading-skeletons";
 
 export const Route = createFileRoute("/_authenticated/loans/")({
@@ -118,7 +119,10 @@ function LoansAdmin() {
         message: `Your loan of ${fmtKES(loan.amount_borrowed)} has been approved.`,
         type: "loan",
       } as any);
+      // Ensure a "Loan Issued" passbook entry exists (idempotent)
+      try { await syncLoanIssuedPassbookEntry({ data: { loan_id: loan.id } }); } catch { /* non-fatal */ }
     },
+
     onSuccess: () => { toast.success("Loan approved"); qc.invalidateQueries({ queryKey: ["loans-all"] }); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -326,16 +330,54 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     term: "12", customTerm: "", date: new Date().toISOString().slice(0, 10), notes: "", purpose: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const selectedMember = members.find((m: any) => m.id === form.member_id);
   const effectiveTerm = form.term === "custom" ? Number(form.customTerm || 0) : Number(form.term || 0);
   const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), effectiveTerm, form.freq), [form.amount, form.interest, effectiveTerm, form.freq]);
 
+  const { data: activeLoanInfo } = useQuery({
+    queryKey: ["member-active-loan", form.member_id],
+    enabled: !!form.member_id,
+    queryFn: async () => {
+      const [loansRes, openingRes, repaymentsRes] = await Promise.all([
+        supabase.from("loans").select("id, total_repayable, balance, loan_date, status").eq("member_id", form.member_id)
+          .in("status", ["active", "approved", "overdue", "completed_with_fine"]).gt("balance", 0)
+          .order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_opening_balances").select("id, total_repayable, balance, loan_date").eq("member_id", form.member_id)
+          .gt("balance", 0).order("loan_date", { ascending: false }),
+        (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
+      ]);
+      const repaymentsByLoan = new Map<string, number>();
+      const repaymentsByOpeningLoan = new Map<string, number>();
+      for (const r of (repaymentsRes.data ?? []) as any[]) {
+        if (r.opening_loan_id) {
+          repaymentsByOpeningLoan.set(r.opening_loan_id, (repaymentsByOpeningLoan.get(r.opening_loan_id) ?? 0) + Number(r.amount ?? 0));
+        } else if (r.loan_id) {
+          repaymentsByLoan.set(r.loan_id, (repaymentsByLoan.get(r.loan_id) ?? 0) + Number(r.amount ?? 0));
+        }
+      }
+      const rows = [
+        ...((loansRes.data ?? []) as any[]).map((l) => ({
+          balance: Math.max(0, Number(l.total_repayable ?? l.balance ?? 0) - (repaymentsByLoan.get(l.id) ?? 0)),
+          loan_date: l.loan_date,
+        })),
+        ...((openingRes.data ?? []) as any[]).map((o) => ({
+          balance: Math.max(0, Number(o.total_repayable ?? o.balance ?? 0) - (repaymentsByOpeningLoan.get(o.id) ?? 0)),
+          loan_date: o.loan_date,
+        })),
+      ];
+      if (!rows.length) return null;
+      const total = rows.reduce((s, r) => s + r.balance, 0);
+      const latest = rows.slice().sort((a, b) => String(b.loan_date).localeCompare(String(a.loan_date)))[0];
+      return { total, loan_date: latest.loan_date, count: rows.length };
+    },
+  });
 
-  const submit = async () => {
-    if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
-    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
+  const doCreate = async () => {
+    setConfirmOpen(false);
     setSubmitting(true);
+
     const purposeNote = form.purpose ? `Purpose: ${form.purpose}${form.notes ? ` · ${form.notes}` : ""}` : (form.notes || null);
     const startDate = new Date(form.date); startDate.setMonth(startDate.getMonth() + 1);
     const { data: loan, error } = await supabase.from("loans").insert({
@@ -367,6 +409,15 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
     onOpenChange(false); onCreated();
   };
 
+  const submit = () => {
+    if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
+    if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
+    if (activeLoanInfo) { setConfirmOpen(true); return; }
+    void doCreate();
+  };
+
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -379,7 +430,16 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               <SelectContent>{members.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.membership_no} · {m.full_name}</SelectItem>)}</SelectContent>
             </Select>
             {selectedMember && <div className="text-xs text-muted-foreground mt-1 font-mono">Membership No: {selectedMember.membership_no}</div>}
+            {activeLoanInfo && (
+              <div className="mt-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+                <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ This member already has an active loan.</div>
+                <div className="mt-1 text-amber-800/90 dark:text-amber-200/90">
+                  {selectedMember?.full_name} currently has an outstanding balance of {fmtKES(activeLoanInfo.total)} on an existing loan dated {fmtDate(activeLoanInfo.loan_date)}. Creating a new loan will result in multiple active loans for this member.
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Amount Borrowed (KES)</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
             <div><Label>Interest Rate % (annual)</Label><Input type="number" step="0.1" value={form.interest} onChange={(e) => setForm({ ...form, interest: e.target.value })} /></div>
@@ -436,8 +496,32 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
           <Button onClick={submit} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">{submitting ? "Saving…" : "Create"}</Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-serif">Create loan for member with existing active loan?</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>{selectedMember?.full_name} already has an unpaid loan with an outstanding balance of {fmtKES(activeLoanInfo?.total ?? 0)}.</p>
+            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3">
+              <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ Important notice for the administrator:</div>
+              <p className="mt-1">Once this new loan is created, the following entries will NOT be automatically posted to the system and must be added manually:</p>
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                <li>The new loan entry in the member's Passbook</li>
+                <li>The new loan repayment entries in the Loan Ledger</li>
+              </ul>
+              <p className="mt-2">You will need to manually add a "Loan Issued" passbook entry and record repayments through the loan ledger after creation.</p>
+            </div>
+            <p className="font-medium">Are you sure you want to proceed?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={() => void doCreate()} disabled={submitting} className="bg-navy text-white hover:bg-navy-2">Yes, Create Loan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
+
 }
 
 function RepaymentDialog({ loan, onClose, onSaved }: any) {

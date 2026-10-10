@@ -11,6 +11,7 @@ type MemberLoanColumn = {
   label: string;
   total_repayable: number;
   passbook_opening_balance?: number | null;
+  sort_date?: string | null;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -37,6 +38,48 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
+function isLoanIssuedEntry(entry: any): boolean {
+  const category = String(entry.category ?? "").toLowerCase();
+  const description = String(entry.description ?? "");
+  const source = String(entry.source ?? "").toLowerCase();
+  const loanDebit = Number(entry.loan_debit ?? 0);
+  const loanPayment = Number(entry.loan_payment ?? 0);
+  return (
+    /loan issued/i.test(description) ||
+    category === "loan_issued" ||
+    (category === "loan" && (loanDebit > 0 || loanPayment > 0) && !/repay/i.test(description)) ||
+    (source.includes("loan") && source.includes("issued") && (loanDebit > 0 || loanPayment > 0))
+  );
+}
+
+function entryMatchesLoan(entry: any, loan: MemberLoanColumn): boolean {
+  const directMatch =
+    (loan.type === "loan" && entry.loan_id === loan.id) ||
+    (loan.type === "opening" && entry.opening_loan_id === loan.id);
+  if (directMatch) return true;
+
+  // Historical loan-issued passbook rows may not have the loan_id populated.
+  // In that case, match the issue row back to the regular loan by its issue date.
+  return Boolean(
+    loan.type === "loan" &&
+      isLoanIssuedEntry(entry) &&
+      loan.sort_date &&
+      entry.entry_date === loan.sort_date
+  );
+}
+
+function loanPaymentForRow(entry: any, loan: MemberLoanColumn): number {
+  const junctionPayment = entry.passbook_entry_loan_payments?.find(
+    (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
+  );
+  if (junctionPayment) return Number(junctionPayment.amount ?? 0);
+  const repayment = entry.loan_repayments?.find(
+    (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
+  );
+  if (repayment) return Number(repayment.amount ?? 0);
+  return entryMatchesLoan(entry, loan) ? Number(entry.loan_payment ?? 0) : 0;
+}
+
 export function PassbookTable({ entries, loading, memberName, membershipNo, memberLoans, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; memberLoans?: MemberLoanColumn[]; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
@@ -51,18 +94,7 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
     if (perLoanColumns.length === 0) return [];
     return entries.map((entry) => {
       return perLoanColumns.map((loan) => {
-        // First check the junction table first, then fall back to original single loan
-        const junctionPayment = entry.passbook_entry_loan_payments?.find(
-          (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
-        );
-        if (junctionPayment) {
-          return Number(junctionPayment.amount ?? 0);
-        }
-        // Fall back to original behavior for backward compatibility
-        const matchesLoan =
-          (loan.type === "loan" && entry.loan_id === loan.id) ||
-          (loan.type === "opening" && entry.opening_loan_id === loan.id);
-        return matchesLoan ? Number(entry.loan_payment ?? 0) : 0;
+        return isLoanIssuedEntry(entry) ? 0 : loanPaymentForRow(entry, loan);
       });
     });
   })();
@@ -70,18 +102,32 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
   const perLoanBalancesByRow = (() => {
     if (perLoanColumns.length === 0) return [];
     const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0));
+    const loanStarted = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0) > 0);
     return entries.map((entry, rowIndex) => {
       perLoanColumns.forEach((loan, index) => {
-        // First check for initial loan debit
-        const matchesLoan =
-          (loan.type === "loan" && entry.loan_id === loan.id) ||
-          (loan.type === "opening" && entry.opening_loan_id === loan.id);
+        const matchesLoan = entryMatchesLoan(entry, loan);
+        const isIssue = matchesLoan && isLoanIssuedEntry(entry);
+        if (isIssue) {
+          runningBalances[index] = Math.max(
+            Number(entry.loan_debit ?? 0),
+            Number(entry.loan_payment ?? 0),
+            Number(loanPaymentForRow(entry, loan) ?? 0),
+            Number(loan.total_repayable ?? 0)
+          );
+          loanStarted[index] = true;
+          return;
+        }
         if (matchesLoan && entry.loan_debit && Number(entry.loan_debit) > 0) {
           runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
+          loanStarted[index] = true;
         }
         // Now subtract the per-loan payment from our perLoanPaymentsByRow
         const payment = perLoanPaymentsByRow[rowIndex]?.[index] ?? 0;
         if (payment > 0) {
+          if (!loanStarted[index] && loan.type === "loan" && Number(loan.total_repayable ?? 0) > 0) {
+            runningBalances[index] = Number(loan.total_repayable ?? 0);
+            loanStarted[index] = true;
+          }
           runningBalances[index] = Math.max(0, runningBalances[index] - payment);
         }
       });
