@@ -128,16 +128,18 @@ async function recalculateLoan(loanId: string) {
     }).eq("id", row.id);
   }
   for (const [id, breakdown] of paymentBreakdown) {
-    await supabaseAdmin.from("loan_repayments").update({ fine_paid: breakdown.fine, principal_paid: breakdown.principal } as any).eq("id", id);
+    await supabaseAdmin.from("loan_repayments").update({
+      fine_paid: breakdown.fine,
+      ...(breakdown.principal > 0 ? { principal_paid: breakdown.principal } : {}),
+    } as any).eq("id", id);
   }
 
   const totalFinePaid = [...paymentBreakdown.values()].reduce((sum, p) => sum + p.fine, 0);
-  const totalPrincipalPaid = [...paymentBreakdown.values()].reduce((sum, p) => sum + p.principal, 0);
-  const totalPaid = totalFinePaid + totalPrincipalPaid;
-  const balance = Math.max(0, Number(loan.total_repayable || loan.balance || 0) - totalPrincipalPaid);
+  const totalPaid = (payments as any[]).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const balance = Math.max(0, Number(loan.total_repayable ?? 0) - totalPaid);
   const totalFines = Number(loan.total_fines_charged || 0);
   const outstandingFines = Math.max(0, totalFines - totalFinePaid);
-  const status = balance <= 0 ? (outstandingFines > 0 ? "completed_with_fine" : "completed") : loan.status === "completed" || loan.status === "completed_with_fine" ? "active" : loan.status;
+  const status = balance <= 0 ? (outstandingFines > 0 ? "completed_with_fine" : "completed") : "active";
 
   await supabaseAdmin.from("loans").update({ amount_paid: totalPaid, balance, total_fines_paid: totalFinePaid, outstanding_fines: outstandingFines, status } as any).eq("id", loanId);
 }
@@ -590,4 +592,3 @@ export const editLoanDetails = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
-

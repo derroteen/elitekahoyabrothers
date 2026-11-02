@@ -52,8 +52,8 @@ function LoansAdmin() {
         (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
       ]);
       const pmap = new Map((profs ?? []).map((p: any) => [p.id, p]));
-      const repaymentsByLoan = new Map<string, any[]>();
-      const repaymentsByOpeningLoan = new Map<string, any[]>();
+      const repaymentsByLoan = new Map<string, { amount?: number | string | null }[]>();
+      const repaymentsByOpeningLoan = new Map<string, { amount?: number | string | null }[]>();
       for (const r of repayments ?? []) {
         const row = r as any;
         if (row.opening_loan_id) {
@@ -336,41 +336,50 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   const effectiveTerm = form.term === "custom" ? Number(form.customTerm || 0) : Number(form.term || 0);
   const calc = useMemo(() => calcLoan(Number(form.amount || 0), Number(form.interest || 0), effectiveTerm, form.freq), [form.amount, form.interest, effectiveTerm, form.freq]);
 
-  const { data: activeLoanInfo } = useQuery({
+  const {
+    data: activeLoanInfo,
+    isFetching: activeLoanInfoFetching,
+    isError: activeLoanInfoError,
+  } = useQuery({
     queryKey: ["member-active-loan", form.member_id],
     enabled: !!form.member_id,
     queryFn: async () => {
       const [loansRes, openingRes, repaymentsRes] = await Promise.all([
-        supabase.from("loans").select("id, total_repayable, balance, loan_date, status").eq("member_id", form.member_id)
-          .in("status", ["active", "approved", "overdue", "completed_with_fine"]).gt("balance", 0)
-          .order("loan_date", { ascending: false }),
-        (supabase as any).from("loan_opening_balances").select("id, total_repayable, balance, loan_date").eq("member_id", form.member_id)
-          .gt("balance", 0).order("loan_date", { ascending: false }),
+        supabase.from("loans").select("id, total_repayable, loan_date").eq("member_id", form.member_id),
+        (supabase as any).from("loan_opening_balances").select("id, total_repayable, loan_date").eq("member_id", form.member_id),
         (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
       ]);
-      const repaymentsByLoan = new Map<string, number>();
-      const repaymentsByOpeningLoan = new Map<string, number>();
+      if (loansRes.error) throw loansRes.error;
+      if (openingRes.error) throw openingRes.error;
+      if (repaymentsRes.error) throw repaymentsRes.error;
+
+      const repaymentsByLoan = new Map<string, any[]>();
+      const repaymentsByOpeningLoan = new Map<string, any[]>();
       for (const r of (repaymentsRes.data ?? []) as any[]) {
         if (r.opening_loan_id) {
-          repaymentsByOpeningLoan.set(r.opening_loan_id, (repaymentsByOpeningLoan.get(r.opening_loan_id) ?? 0) + Number(r.amount ?? 0));
+          const loanRepayments = repaymentsByOpeningLoan.get(r.opening_loan_id) ?? [];
+          loanRepayments.push(r);
+          repaymentsByOpeningLoan.set(r.opening_loan_id, loanRepayments);
         } else if (r.loan_id) {
-          repaymentsByLoan.set(r.loan_id, (repaymentsByLoan.get(r.loan_id) ?? 0) + Number(r.amount ?? 0));
+          const loanRepayments = repaymentsByLoan.get(r.loan_id) ?? [];
+          loanRepayments.push(r);
+          repaymentsByLoan.set(r.loan_id, loanRepayments);
         }
       }
-      const rows = [
+      const rows: { balance: number; loan_date: string | null }[] = [
         ...((loansRes.data ?? []) as any[]).map((l) => ({
-          balance: Math.max(0, Number(l.total_repayable ?? l.balance ?? 0) - (repaymentsByLoan.get(l.id) ?? 0)),
+          balance: calculateOutstandingBalanceFromData(l, repaymentsByLoan.get(l.id) ?? []),
           loan_date: l.loan_date,
         })),
         ...((openingRes.data ?? []) as any[]).map((o) => ({
-          balance: Math.max(0, Number(o.total_repayable ?? o.balance ?? 0) - (repaymentsByOpeningLoan.get(o.id) ?? 0)),
+          balance: calculateOutstandingBalanceFromData({ ...o, __opening: true }, repaymentsByOpeningLoan.get(o.id) ?? []),
           loan_date: o.loan_date,
         })),
-      ];
+      ].filter((loan) => loan.balance > 0)
+        .sort((a, b) => String(b.loan_date).localeCompare(String(a.loan_date)));
       if (!rows.length) return null;
       const total = rows.reduce((s, r) => s + r.balance, 0);
-      const latest = rows.slice().sort((a, b) => String(b.loan_date).localeCompare(String(a.loan_date)))[0];
-      return { total, loan_date: latest.loan_date, count: rows.length };
+      return { total, loans: rows };
     },
   });
 
@@ -412,6 +421,8 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
   const submit = () => {
     if (!form.member_id || !form.amount) { toast.error("Member and amount required"); return; }
     if (!effectiveTerm || effectiveTerm < 1) { toast.error("Valid payment period required"); return; }
+    if (activeLoanInfoFetching) { toast.error("Please wait while existing loans are checked."); return; }
+    if (activeLoanInfoError) { toast.error("Could not check existing loans. Please try again."); return; }
     if (activeLoanInfo) { setConfirmOpen(true); return; }
     void doCreate();
   };
@@ -430,11 +441,17 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
               <SelectContent>{members.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.membership_no} · {m.full_name}</SelectItem>)}</SelectContent>
             </Select>
             {selectedMember && <div className="text-xs text-muted-foreground mt-1 font-mono">Membership No: {selectedMember.membership_no}</div>}
-            {activeLoanInfo && (
+            {activeLoanInfo && !activeLoanInfoFetching && !activeLoanInfoError && (
               <div className="mt-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
                 <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ This member already has an active loan.</div>
                 <div className="mt-1 text-amber-800/90 dark:text-amber-200/90">
-                  {selectedMember?.full_name} currently has an outstanding balance of {fmtKES(activeLoanInfo.total)} on an existing loan dated {fmtDate(activeLoanInfo.loan_date)}. Creating a new loan will result in multiple active loans for this member.
+                  {selectedMember?.full_name} currently has a total outstanding balance of {fmtKES(activeLoanInfo.total)} across existing loans:
+                  <ul className="list-disc pl-5 mt-1">
+                    {activeLoanInfo.loans.map((loan, index) => (
+                      <li key={`${loan.loan_date}-${index}`}>Loan dated {fmtDate(loan.loan_date)}: {fmtKES(loan.balance)} outstanding</li>
+                    ))}
+                  </ul>
+                  Creating a new loan will result in multiple active loans for this member.
                 </div>
               </div>
             )}
@@ -501,7 +518,14 @@ function NewLoanDialog({ open, onOpenChange, onCreated }: any) {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-serif">Create loan for member with existing active loan?</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm">
-            <p>{selectedMember?.full_name} already has an unpaid loan with an outstanding balance of {fmtKES(activeLoanInfo?.total ?? 0)}.</p>
+            <div>
+              <p>{selectedMember?.full_name} already has unpaid loans with a total outstanding balance of {fmtKES(activeLoanInfo?.total ?? 0)}:</p>
+              <ul className="list-disc pl-5 mt-1">
+                {activeLoanInfo?.loans.map((loan, index) => (
+                  <li key={`${loan.loan_date}-${index}`}>Loan dated {fmtDate(loan.loan_date)}: {fmtKES(loan.balance)} outstanding</li>
+                ))}
+              </ul>
+            </div>
             <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3">
               <div className="font-semibold text-amber-800 dark:text-amber-300">⚠️ Important notice for the administrator:</div>
               <p className="mt-1">Once this new loan is created, the following entries will NOT be automatically posted to the system and must be added manually:</p>
