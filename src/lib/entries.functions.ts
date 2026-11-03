@@ -524,20 +524,16 @@ export const deleteWeeklyCollectionSheet = createServerFn({ method: "POST" })
     }
 
     for (const loanId of affectedLoanIds) {
-      const { data: loan } = await sb.from("loans").select("total_repayable, total_fines_charged, status").eq("id", loanId).maybeSingle();
+      const { data: loan } = await sb.from("loans").select("total_repayable").eq("id", loanId).maybeSingle();
       if (!loan) continue;
-      const { data: rows } = await sb.from("loan_repayments").select("amount, principal_paid, fine_paid").eq("loan_id", loanId);
+      const { data: rows } = await sb.from("loan_repayments").select("amount").eq("loan_id", loanId);
       const totalPaid = (rows ?? []).reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
-      const principal = (rows ?? []).reduce((s: number, r: any) => s + Number(r.principal_paid ?? 0), 0);
-      const fines = (rows ?? []).reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0);
       const repayable = Number(loan.total_repayable ?? 0);
-      const balance = Math.max(0, repayable - (principal > 0 ? principal : totalPaid));
+      const balance = Math.max(0, repayable - totalPaid);
       await sb.from("loans").update({
         amount_paid: totalPaid,
         balance,
-        total_fines_paid: fines,
-        outstanding_fines: Math.max(0, Number(loan.total_fines_charged ?? 0) - fines),
-        status: balance > 0 && ["completed", "completed_with_fine"].includes(String(loan.status)) ? "active" : loan.status,
+        status: balance <= 0 ? "completed" : "active",
       }).eq("id", loanId);
     }
 

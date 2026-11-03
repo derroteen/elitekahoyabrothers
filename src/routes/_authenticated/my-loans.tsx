@@ -18,14 +18,27 @@ function MyLoans() {
     queryKey: ["my-loans", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [real, opening, repayments] = await Promise.all([
+      const [real, opening, repayments, fines] = await Promise.all([
         supabase.from("loans").select("*").eq("member_id", user!.id).order("created_at", { ascending: false }),
         (supabase as any).from("loan_opening_balances").select("*").eq("member_id", user!.id).order("loan_date", { ascending: false }),
         (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
+        (supabase as any).from("loan_fines").select("loan_id, amount, amount_paid, status"),
       ]);
-      
+      if (fines.error) throw fines.error;
+
       const repaymentsByLoan = new Map<string, any[]>();
       const repaymentsByOpeningLoan = new Map<string, any[]>();
+      const finesByLoan = new Map<string, { charged: number; paid: number; outstanding: number }>();
+      for (const fine of fines.data ?? []) {
+        const totals = finesByLoan.get(fine.loan_id) ?? { charged: 0, paid: 0, outstanding: 0 };
+        const amount = Number(fine.amount ?? 0);
+        const paid = Number(fine.amount_paid ?? 0);
+        totals.charged += amount;
+        totals.paid += paid;
+        totals.outstanding += fine.status === "waived" ? 0 : Math.max(0, amount - paid);
+        finesByLoan.set(fine.loan_id, totals);
+      }
+
       for (const r of repayments.data ?? []) {
         const row = r as any;
         if (row.opening_loan_id) {
@@ -55,10 +68,16 @@ function MyLoans() {
       
       const realRows = (real.data ?? []).map((l: any) => {
         const loanRepayments = repaymentsByLoan.get(l.id) ?? [];
+        const balance = calculateOutstandingBalanceFromData(l, loanRepayments);
+        const fineTotals = finesByLoan.get(l.id) ?? { charged: 0, paid: 0, outstanding: 0 };
         return {
           ...l,
-          balance: calculateOutstandingBalanceFromData(l, loanRepayments),
+          balance,
           amount_paid: loanRepayments.reduce((sum, r) => sum + Number(r.amount ?? 0), 0),
+          total_fines_charged: fineTotals.charged,
+          total_fines_paid: fineTotals.paid,
+          outstanding_fines: fineTotals.outstanding,
+          status: balance <= 0 ? "completed" : l.status === "completed" || l.status === "completed_with_fine" ? "active" : l.status,
         };
       });
 
@@ -94,7 +113,7 @@ function MyLoans() {
                   <td className="px-4 py-3 text-right font-mono font-bold text-navy">{fmtKES(l.balance)}</td>
                   <td className={`px-4 py-3 text-right font-mono ${Number(l.outstanding_fines) > 0 ? "text-red-600 font-bold" : ""}`}>{fmtKES(l.outstanding_fines ?? 0)}</td>
                   <td className="px-4 py-3 text-xs uppercase tracking-wider">
-                    {l.__opening ? <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Opening B/F</span> : l.status === "cleared" ? <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">Cleared</span> : (l.status ?? "").replace(/_/g, " ")}
+                    {l.__opening ? <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Opening B/F</span> : l.status === "completed" ? <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">Cleared</span> : (l.status ?? "").replace(/_/g, " ")}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link 

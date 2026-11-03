@@ -71,34 +71,15 @@ async function recalculateLoan(loanId: string) {
   const { data: loan, error: loanErr } = await supabaseAdmin.from("loans").select("*").eq("id", loanId).single();
   if (loanErr || !loan) throw new Error("Loan not found");
 
-  await (supabaseAdmin.from("loan_fines" as any) as any).update({ amount_paid: 0, status: "unpaid" }).eq("loan_id", loanId);
-  await (supabaseAdmin.from("loan_schedule" as any) as any).update({ amount_paid: 0, fine_paid: 0, payment_date: null, prepaid: false, status: "pending", remarks: null }).eq("loan_id", loanId);
+  await (supabaseAdmin.from("loan_schedule" as any) as any).update({ amount_paid: 0, payment_date: null, prepaid: false, status: "pending", remarks: null }).eq("loan_id", loanId);
 
-  const { data: fines = [] } = await (supabaseAdmin.from("loan_fines" as any) as any).select("*").eq("loan_id", loanId).order("fine_date").order("created_at");
   const { data: schedule = [] } = await (supabaseAdmin.from("loan_schedule" as any) as any).select("*").eq("loan_id", loanId).order("period_number");
   const { data: payments = [] } = await supabaseAdmin.from("loan_repayments").select("*").eq("loan_id", loanId).order("payment_date").order("created_at");
 
-  const finePaid = new Map<string, number>();
   const schedPaid = new Map<string, number>();
-  const schedFinePaid = new Map<string, number>();
-  const paymentBreakdown = new Map<string, { fine: number; principal: number }>();
 
   for (const payment of payments as any[]) {
     let remaining = Number(payment.amount || 0);
-    let paidFine = 0;
-    let paidPrincipal = 0;
-
-    for (const fine of fines as any[]) {
-      if (remaining <= 0) break;
-      const already = finePaid.get(fine.id) ?? 0;
-      const due = Number(fine.amount || 0) - already;
-      if (due <= 0) continue;
-      const pay = Math.min(remaining, due);
-      finePaid.set(fine.id, already + pay);
-      if (fine.schedule_id) schedFinePaid.set(fine.schedule_id, (schedFinePaid.get(fine.schedule_id) ?? 0) + pay);
-      remaining -= pay;
-      paidFine += pay;
-    }
 
     for (const row of schedule as any[]) {
       if (remaining <= 0) break;
@@ -108,40 +89,28 @@ async function recalculateLoan(loanId: string) {
       const pay = Math.min(remaining, due);
       schedPaid.set(row.id, already + pay);
       remaining -= pay;
-      paidPrincipal += pay;
     }
-
-    paymentBreakdown.set(payment.id, { fine: paidFine, principal: paidPrincipal });
-  }
-
-  for (const fine of fines as any[]) {
-    const paid = finePaid.get(fine.id) ?? 0;
-    await (supabaseAdmin.from("loan_fines" as any) as any).update({ amount_paid: paid, status: paid >= Number(fine.amount || 0) ? "paid" : paid > 0 ? "partial" : "unpaid" }).eq("id", fine.id);
   }
   for (const row of schedule as any[]) {
     const paid = schedPaid.get(row.id) ?? 0;
     const fullyPaid = paid >= Number(row.expected_amount || 0);
     await (supabaseAdmin.from("loan_schedule" as any) as any).update({
       amount_paid: paid,
-      fine_paid: schedFinePaid.get(row.id) ?? 0,
       status: fullyPaid ? "paid" : row.status === "overdue" ? "overdue" : "pending",
     }).eq("id", row.id);
   }
-  for (const [id, breakdown] of paymentBreakdown) {
+  for (const payment of payments as any[]) {
     await supabaseAdmin.from("loan_repayments").update({
-      fine_paid: breakdown.fine,
-      ...(breakdown.principal > 0 ? { principal_paid: breakdown.principal } : {}),
-    } as any).eq("id", id);
+      fine_paid: 0,
+      principal_paid: Number(payment.amount || 0),
+    } as any).eq("id", payment.id);
   }
 
-  const totalFinePaid = [...paymentBreakdown.values()].reduce((sum, p) => sum + p.fine, 0);
   const totalPaid = (payments as any[]).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const balance = Math.max(0, Number(loan.total_repayable ?? 0) - totalPaid);
-  const totalFines = Number(loan.total_fines_charged || 0);
-  const outstandingFines = Math.max(0, totalFines - totalFinePaid);
-  const status = balance <= 0 ? (outstandingFines > 0 ? "completed_with_fine" : "completed") : "active";
+  const status = balance <= 0 ? "completed" : "active";
 
-  await supabaseAdmin.from("loans").update({ amount_paid: totalPaid, balance, total_fines_paid: totalFinePaid, outstanding_fines: outstandingFines, status } as any).eq("id", loanId);
+  await supabaseAdmin.from("loans").update({ amount_paid: totalPaid, balance, status } as any).eq("id", loanId);
 }
 
 async function syncPassbookPayment(payment: any) {

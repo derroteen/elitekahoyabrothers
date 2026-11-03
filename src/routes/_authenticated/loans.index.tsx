@@ -45,15 +45,27 @@ function LoansAdmin() {
     queryKey: ["loans-all"],
     enabled: !!role && role !== "member",
     queryFn: async () => {
-      const [{ data: ls }, { data: profs }, { data: openings }, { data: repayments }] = await Promise.all([
+      const [{ data: ls }, { data: profs }, { data: openings }, { data: repayments }, finesRes] = await Promise.all([
         supabase.from("loans").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, full_name, membership_no"),
         (supabase as any).from("loan_opening_balances").select("*").order("loan_date", { ascending: false }),
         (supabase as any).from("loan_repayments").select("loan_id, opening_loan_id, amount"),
+        (supabase as any).from("loan_fines").select("loan_id, amount, amount_paid, status"),
       ]);
+      if (finesRes.error) throw finesRes.error;
       const pmap = new Map((profs ?? []).map((p: any) => [p.id, p]));
       const repaymentsByLoan = new Map<string, { amount?: number | string | null }[]>();
       const repaymentsByOpeningLoan = new Map<string, { amount?: number | string | null }[]>();
+      const finesByLoan = new Map<string, { charged: number; paid: number; outstanding: number }>();
+      for (const fine of finesRes.data ?? []) {
+        const totals = finesByLoan.get(fine.loan_id) ?? { charged: 0, paid: 0, outstanding: 0 };
+        const amount = Number(fine.amount ?? 0);
+        const paid = Number(fine.amount_paid ?? 0);
+        totals.charged += amount;
+        totals.paid += paid;
+        totals.outstanding += fine.status === "waived" ? 0 : Math.max(0, amount - paid);
+        finesByLoan.set(fine.loan_id, totals);
+      }
       for (const r of repayments ?? []) {
         const row = r as any;
         if (row.opening_loan_id) {
@@ -68,10 +80,16 @@ function LoansAdmin() {
       }
       const real = (ls ?? []).map((l: any) => {
         const loanRepayments = repaymentsByLoan.get(l.id) ?? [];
+        const balance = calculateOutstandingBalanceFromData(l, loanRepayments);
+        const fineTotals = finesByLoan.get(l.id) ?? { charged: 0, paid: 0, outstanding: 0 };
         return {
           ...l,
-          balance: calculateOutstandingBalanceFromData(l, loanRepayments),
+          balance,
           amount_paid: loanRepayments.reduce((sum, r) => sum + Number(r.amount ?? 0), 0),
+          total_fines_charged: fineTotals.charged,
+          total_fines_paid: fineTotals.paid,
+          outstanding_fines: fineTotals.outstanding,
+          status: balance <= 0 ? "completed" : l.status === "completed" || l.status === "completed_with_fine" ? "active" : l.status,
           profile: pmap.get(l.member_id),
         };
       });
@@ -559,9 +577,7 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
 
   const required = Number(loan.period_payment || 0);
   const amt = Number(form.amount || 0);
-  const outFines = Number(loan.outstanding_fines || 0);
-  const previewFinePaid = Math.min(amt, outFines);
-  const previewExcess = Math.max(0, amt - outFines - required);
+  const previewExcess = Math.max(0, amt - required);
 
   const submit = async () => {
     if (!form.amount) { toast.error("Amount required"); return; }
@@ -578,7 +594,7 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    toast.success(`Repayment recorded · ${r.installments_covered ?? 0} installment(s) covered${r.fine_paid > 0 ? `, ${fmtKES(r.fine_paid)} fines paid` : ""}`);
+    toast.success(`Repayment recorded · ${r.installments_covered ?? 0} installment(s) covered`);
     onClose(); onSaved();
   };
 
@@ -590,7 +606,6 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
           <div>Member: <span className="text-foreground">{loan.profile?.full_name} · {loan.profile?.membership_no}</span></div>
           <div>Required per period: {fmtKES(required)}</div>
           <div>Current balance: {fmtKES(loan.balance)}</div>
-          {outFines > 0 && <div className="text-red-600">Outstanding fines: {fmtKES(outFines)}</div>}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Amount Paid</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
@@ -612,9 +627,8 @@ function RepaymentDialog({ loan, onClose, onSaved }: any) {
         </div>
         {amt > 0 && (
           <div className="bg-muted/40 rounded-md p-3 text-xs space-y-1">
-            {previewFinePaid > 0 && <div>Fines covered: <span className="font-mono">{fmtKES(previewFinePaid)}</span></div>}
             {previewExcess > 0 && <div className="text-emerald-700">Excess (prepays future): <span className="font-mono">{fmtKES(previewExcess)}</span></div>}
-            <div className="text-muted-foreground">Allocation order: outstanding fines → current installments → future installments (prepaid)</div>
+            <div className="text-muted-foreground">Allocation order: current installments → future installments (prepaid). Fines are paid separately through the Fine Ledger.</div>
           </div>
         )}
         <DialogFooter>

@@ -50,9 +50,27 @@ function ReportsPage() {
       if (errors.length) throw errors[0];
       const roleMap = new Map((roles.data ?? []).map((r: any) => [r.user_id, r.role]));
       const memberMap = new Map((profs.data ?? []).map((p: any) => [p.id, p]));
+      const repaymentsByLoan = new Map<string, any[]>();
+      for (const repayment of repay.data ?? []) {
+        if (!repayment.loan_id) continue;
+        const rows = repaymentsByLoan.get(repayment.loan_id) ?? [];
+        rows.push(repayment);
+        repaymentsByLoan.set(repayment.loan_id, rows);
+      }
+      const reportLoans = (loans.data ?? []).map((loan: any) => {
+        const paid = (repaymentsByLoan.get(loan.id) ?? []).reduce((sum: number, repayment: any) => sum + Number(repayment.amount ?? 0), 0);
+        const balance = Math.max(0, Number(loan.total_repayable ?? 0) - paid);
+        return {
+          ...loan,
+          amount_paid: paid,
+          balance,
+          status: balance <= 0 ? "completed" : ["completed", "completed_with_fine"].includes(loan.status) ? "active" : loan.status,
+          member: memberMap.get(loan.member_id),
+        };
+      });
       return {
         members: (profs.data ?? []).filter((p: any) => (roleMap.get(p.id) ?? "member") === "member").map((p: any) => ({ ...p, role: "member" })),
-        loans: (loans.data ?? []).map((l: any) => ({ ...l, member: memberMap.get(l.member_id) })),
+        loans: reportLoans,
         schedule: sched.data ?? [],
         repayments: repay.data ?? [],
         savings: (savings.data ?? []).map((s: any) => ({ ...s, member: memberMap.get(s.member_id) })),
@@ -168,8 +186,9 @@ function ReportsPage() {
           const principal = Number(l.amount_borrowed ?? 0);
           const totalRepayable = Number(l.total_repayable ?? 0);
           const amountPaid = Number(l.amount_paid ?? 0);
-          const outstanding = Number(l.balance ?? 0);
-          rows.push({ loan_date: fmtDate(l.loan_date), member_name: l.member?.full_name ?? "—", member_no: l.member?.membership_no ?? "—", loan_type: "Regular", principal: fmtKES(principal), total_repayable: fmtKES(totalRepayable), amount_paid: fmtKES(amountPaid), outstanding_balance: fmtKES(outstanding), status: l.status ?? "" });
+          const outstanding = Math.max(0, totalRepayable - amountPaid);
+          const status = outstanding <= 0 ? "completed" : ["completed", "completed_with_fine"].includes(l.status) ? "active" : l.status ?? "";
+          rows.push({ loan_date: fmtDate(l.loan_date), member_name: l.member?.full_name ?? "—", member_no: l.member?.membership_no ?? "—", loan_type: "Regular", principal: fmtKES(principal), total_repayable: fmtKES(totalRepayable), amount_paid: fmtKES(amountPaid), outstanding_balance: fmtKES(outstanding), status });
         }
         for (const o of source.loanOpenings as any[]) {
           const principal = Number(o.principal ?? 0) || Number(o.total_repayable ?? 0);
@@ -221,18 +240,19 @@ function ReportsPage() {
         return rows;
       }
       case "fines": {
-        const byMember = new Map<string, { name: string; no: string; charged: number; paid: number }>();
+        const byMember = new Map<string, { name: string; no: string; charged: number; paid: number; outstanding: number }>();
         for (const f of source.fines as any[]) {
           const loan: any = (source.loans as any[]).find((l: any) => l.id === f.loan_id);
           if (!loan) continue;
           const m: any = loan.member;
           const key = loan.member_id;
-          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", charged: 0, paid: 0 };
+          const cur = byMember.get(key) ?? { name: m?.full_name ?? "—", no: m?.membership_no ?? "—", charged: 0, paid: 0, outstanding: 0 };
           cur.charged += Number(f.amount || 0);
           cur.paid += Number(f.amount_paid || 0);
+          cur.outstanding += f.status === "waived" ? 0 : Math.max(0, Number(f.amount || 0) - Number(f.amount_paid || 0));
           byMember.set(key, cur);
         }
-        return Array.from(byMember.values()).map(v => ({ member_name: v.name, member_no: v.no, total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid), outstanding: fmtKES(Math.max(0, v.charged - v.paid)) }));
+        return Array.from(byMember.values()).map(v => ({ member_name: v.name, member_no: v.no, total_charged: fmtKES(v.charged), total_paid: fmtKES(v.paid), outstanding: fmtKES(v.outstanding) }));
       }
       case "benevolent": {
         // Aggregate benevolent_entries per member
@@ -297,7 +317,8 @@ function ReportsPage() {
     }
     const totalFinesCharged = reportData.fines.reduce((s: number, f: any) => s + Number(f.amount || 0), 0) + openingFineTotal;
     const totalFinesPaid = reportData.fines.reduce((s: number, f: any) => s + Number(f.amount_paid || 0), 0);
-    const totalOutstandingFines = reportData.fines.reduce((s: number, f: any) => s + Math.max(0, Number(f.amount || 0) - Number(f.amount_paid || 0)), 0) + openingFineTotal;
+    const totalOutstandingFines = reportData.fines.reduce((s: number, f: any) =>
+      s + (f.status === "waived" ? 0 : Math.max(0, Number(f.amount || 0) - Number(f.amount_paid || 0))), 0) + openingFineTotal;
     return {
       members: reportData.members.length,
       active: reportData.members.filter((m: any) => m.is_active).length,
@@ -322,15 +343,25 @@ function ReportsPage() {
     const savingsCollected = savings.reduce((total: number, entry: any) => total + Number(entry.amount || 0) + Number(entry.bonus || 0), 0);
     const loanRepayments = repayments.reduce((total: number, entry: any) => total + Number(entry.amount || 0), 0);
     const benevolentCollected = benevolent.reduce((total: number, entry: any) => total + Number(entry.contribution || 0), 0);
-    const finesCollected = repayments.reduce((total: number, entry: any) => total + Number(entry.fine_paid || 0), 0);
+    const finesCollected = reportData.fines
+      .filter((fine: any) => String(fine.reason ?? "").includes(`[Paid ${year}-`))
+      .reduce((total: number, fine: any) => total + Number(fine.amount_paid || 0), 0);
     const insuranceCollected = insurance.reduce((total: number, entry: any) => total + Number(entry.amount || 0), 0);
     const collectionsTotal = savingsCollected + loanRepayments + benevolentCollected + finesCollected + insuranceCollected;
     const loansIssued = reportData.loans.filter((loan: any) => inYear(loan.loan_date));
-    const loanBookAtYearEnd = [...reportData.loans, ...reportData.loanOpenings].filter((loan: any) => !loan.loan_date || loan.loan_date <= yearEnd);
+    const loansAtYearEnd = reportData.loans
+      .filter((loan: any) => !loan.loan_date || loan.loan_date <= yearEnd)
+      .map((loan: any) => {
+        const paid = reportData.repayments
+          .filter((repayment: any) => repayment.loan_id === loan.id && (!repayment.payment_date || repayment.payment_date <= yearEnd))
+          .reduce((total: number, repayment: any) => total + Number(repayment.amount || 0), 0);
+        return { ...loan, balance: Math.max(0, Number(loan.total_repayable || 0) - paid) };
+      });
+    const loanBookAtYearEnd = [...loansAtYearEnd, ...reportData.loanOpenings.filter((loan: any) => !loan.loan_date || loan.loan_date <= yearEnd)];
     const outstandingLoans = loanBookAtYearEnd.filter((loan: any) => Number(loan.balance || 0) > 0);
     const activeLoans = outstandingLoans.length;
     const clearedLoans = loanBookAtYearEnd.filter((loan: any) =>
-      ["completed", "completed_with_fine"].includes(loan.status) || (Number(loan.total_repayable || 0) > 0 && Number(loan.balance || 0) <= 0)
+      Number(loan.total_repayable || 0) > 0 && Number(loan.balance || 0) <= 0
     ).length;
     const loanBalance = outstandingLoans.reduce((total: number, loan: any) => total + Number(loan.balance || 0), 0);
     const latestBalances = (entries: any[], balanceField: string, openingField: string) => {
@@ -348,7 +379,8 @@ function ReportsPage() {
     const savingsBalance = latestBalances(reportData.savings, "balance", "opening_savings");
     const benevolentBalance = latestBalances(reportData.benevolentEntries, "balance", "opening_benevolent");
     const outstandingFines = reportData.fines.filter((fine: any) => !fine.fine_date || fine.fine_date <= yearEnd)
-      .reduce((total: number, fine: any) => total + Math.max(0, Number(fine.amount || 0) - Number(fine.amount_paid || 0)), 0);
+      .reduce((total: number, fine: any) =>
+        total + (fine.status === "waived" ? 0 : Math.max(0, Number(fine.amount || 0) - Number(fine.amount_paid || 0))), 0);
     const weeklySheets = reportData.sheets.filter((sheet: any) => inYear(sheet.collection_date))
       .sort((a: any, b: any) => String(a.collection_date).localeCompare(String(b.collection_date)));
     const weeklyRows: any[] = weeklySheets.map((sheet: any) => {

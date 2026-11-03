@@ -70,14 +70,6 @@ function finePeriodLabel(fine: any, schedule: any[]) {
   return fine.reason?.replace(/\s*\[Paid.*$/, "") ?? "—";
 }
 
-function fineRepaymentDate(f: any) {
-  const dmy = f.reason?.match(/\[Paid (\d{2}\/\d{2}\/\d{4})/);
-  if (dmy) return dmy[1];
-  const iso = f.reason?.match(/\[Paid (\d{4}-\d{2}-\d{2})/);
-  if (iso) return fmtLedgerDate(iso[1]);
-  return fmtLedgerDate(f.updated_at ?? f.fine_date);
-}
-
 function LoanLedger() {
   const { loanId } = Route.useParams();
   const { user, role } = useAuth();
@@ -220,37 +212,20 @@ function LoanLedger() {
   const ledgerTotals = useMemo(() => {
     const expected = ledgerRows.reduce((s: number, r: any) => s + Number(r.expected_amount ?? 0), 0);
     const paid = ledgerRows.reduce((s: number, r: any) => s + Number(r.amount_paid ?? 0), 0);
-    const fineCharged = ledgerRows.reduce((s: number, r: any) => s + Number(r.fine_amount ?? 0), 0);
-    const finePaid = ledgerRows.reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0);
-    return {
-      expected,
-      paid,
-      fineCharged,
-      finePaid,
-      outstandingFine: fineCharged - finePaid,
-      currentBalance: isOpening ? Number(loan?.balance ?? 0) : Number(loan?.balance ?? 0),
-    };
-  }, [ledgerRows, loan?.balance, isOpening]);
+    return { expected, paid };
+  }, [ledgerRows]);
 
   const paymentTotals = useMemo(() => ({
     amount: repayments.reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0),
-    finePaid: repayments.reduce((s: number, r: any) => s + Number(r.fine_paid ?? 0), 0),
     principalPaid: repayments.reduce((s: number, r: any) => s + Number(r.principal_paid ?? 0), 0),
   }), [repayments]);
 
   const fineHistoryTotals = useMemo(() => ({
     amount: fines.reduce((s: number, f: any) => s + Number(f.amount ?? 0), 0),
     paid: fines.reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0),
+    outstanding: fines.reduce((s: number, f: any) =>
+      s + (f.status === "waived" ? 0 : Math.max(0, Number(f.amount ?? 0) - Number(f.amount_paid ?? 0))), 0),
   }), [fines]);
-
-  const fineRepayments = useMemo(
-    () => fines.filter((f: any) => Number(f.amount_paid ?? 0) > 0),
-    [fines],
-  );
-
-  const fineRepaymentTotals = useMemo(() => ({
-    paid: fineRepayments.reduce((s: number, f: any) => s + Number(f.amount_paid ?? 0), 0),
-  }), [fineRepayments]);
 
   const insuranceTotals = useMemo(() => ({
     amount: insurancePayments.reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0),
@@ -269,7 +244,7 @@ function LoanLedger() {
       const paid = paymentTotals.amount;
       const outstanding = Math.max(0, totalRepayable - paid);
       const cleared = outstanding <= 0;
-      return { principal, interest: totalRepayable - principal, subtotal: totalRepayable, paid, outstanding, outstandingFines: 0, cleared };
+      return { principal, interest: totalRepayable - principal, subtotal: totalRepayable, paid, outstanding, cleared };
     }
     const principal = Number(loan?.amount_borrowed ?? 0);
     const totalRepayable = Number(loan?.total_repayable ?? 0);
@@ -277,13 +252,12 @@ function LoanLedger() {
     const subtotal = totalRepayable; // excludes insurance
     const paid = paymentTotals.amount; // SUM(loan_repayments.amount)
     const outstanding = Math.max(0, subtotal - paid);
-    const outstandingFines = Math.max(0, fineHistoryTotals.amount - fineHistoryTotals.paid);
-    const cleared = subtotal > 0 && outstanding === 0 && outstandingFines === 0;
-    return { principal, interest, subtotal, paid, outstanding, outstandingFines, cleared };
-  }, [loan, paymentTotals.amount, fineHistoryTotals.amount, fineHistoryTotals.paid, isOpening]);
+    const cleared = outstanding === 0;
+    return { principal, interest, subtotal, paid, outstanding, cleared };
+  }, [loan, paymentTotals.amount, isOpening]);
 
   useEffect(() => {
-    if (isOpening || !canEditPayments || !loanId || schedule.length === 0 || finesGeneratedRef.current) return;
+    if (isOpening || !canEditPayments || !loanId || repaymentsLoading || liveTotals.outstanding <= 0 || schedule.length === 0 || finesGeneratedRef.current) return;
     let cancelled = false;
 
     (async () => {
@@ -337,12 +311,19 @@ function LoanLedger() {
     })();
 
     return () => { cancelled = true; };
-  }, [canEditPayments, loanId, schedule, fines, isOpening, loan?.loan_date]);
+  }, [canEditPayments, loanId, schedule, fines, isOpening, loan?.loan_date, liveTotals.outstanding, repaymentsLoading]);
 
   if (loanLoading || repaymentsLoading) return <PageSkeleton />;
   if (!loan) return <div className="p-8 text-muted-foreground">Loan not found</div>;
 
   const nextDue = !isOpening ? schedule.find((s: any) => s.status !== "paid" && s.status !== "prepaid") : null;
+  const displayStatus = isOpening
+    ? loan.status
+    : liveTotals.cleared
+      ? "completed"
+      : loan.status === "completed" || loan.status === "completed_with_fine"
+        ? "active"
+        : loan.status;
 
   const onDeletePayment = async (payment: any) => {
     if (!confirm("Are you sure you want to delete this payment? This action cannot be undone.")) return;
@@ -425,14 +406,11 @@ function LoanLedger() {
           {!isOpening && <Stat label="Payment Frequency" value={loan.payment_frequency} />}
           {!isOpening && <Stat label="Term" value={`${loan.loan_term_months} months`} />}
           <Stat label={isOpening ? "Opening Date" : "Loan Date"} value={fmtLedgerDate(loan.loan_date)} />
-          {!isOpening && <Stat label="Total Fines Charged" value={fmtKES(fineHistoryTotals.amount)} />}
-          {!isOpening && <Stat label="Total Fines Paid" value={fmtKES(fineHistoryTotals.paid)} />}
-          {!isOpening && <Stat label="Outstanding Fines" value={fmtKES(liveTotals.outstandingFines)} highlight={liveTotals.outstandingFines > 0} />}
           {!isOpening && <Stat label="Insurance Paid" value={fmtKES(insuranceTotals.amount)} />}
           {!isOpening && <Stat label="Next Payment Due" value={nextDue ? fmtLedgerDate(nextDue.due_date) : "—"} />}
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Status</div>
-            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[loan.status] ?? "bg-gray-100 text-gray-700"}`}>{(loan.status ?? (isOpening ? "active" : "")).replace(/_/g, " ")}</span>
+            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-700"}`}>{(displayStatus ?? (isOpening ? "active" : "")).replace(/_/g, " ")}</span>
             {liveTotals.cleared && <div className="mt-1 text-xs text-emerald-700 font-semibold">{isOpening ? "LOAN FULLY CLEARED" : "LOAN CLEARED"}</div>}
           </div>
         </div>
@@ -472,16 +450,13 @@ function LoanLedger() {
         )}
         <div className="p-4 border-b border-border font-serif text-lg">Running Ledger</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="px-3 py-2">#</th>
                 <th className="px-3 py-2">Date</th>
                 {!isOpening && <th className="px-3 py-2 text-right">Expected</th>}
                 <th className="px-3 py-2 text-right">Paid</th>
-                {!isOpening && <th className="px-3 py-2 text-right">Fine Charged</th>}
-                {!isOpening && <th className="px-3 py-2 text-right">Fine Paid</th>}
-                {!isOpening && <th className="px-3 py-2 text-right">Outstanding Fine</th>}
                 <th className="px-3 py-2 text-right">Balance</th>
                 {!isOpening && <th className="px-3 py-2">Status</th>}
                 <th className="px-3 py-2">Remarks</th>
@@ -489,7 +464,7 @@ function LoanLedger() {
               </tr>
             </thead>
             <tbody>
-              {ledgerRows.length === 0 && <tr><td colSpan={canEditPayments && !isOpening ? 11 : (isOpening ? 6 : 10)} className="p-6 text-center text-muted-foreground">No payments yet</td></tr>}
+              {ledgerRows.length === 0 && <tr><td colSpan={canEditPayments && !isOpening ? 8 : (isOpening ? 5 : 7)} className="p-6 text-center text-muted-foreground">No payments yet</td></tr>}
               {ledgerRows.map((s: any) => {
                 const outstandingRow = !isOpening ? Math.max(0, Number(s.expected_amount ?? 0) - Number(s.amount_paid ?? 0)) : 0;
                 const rowDone = !isOpening && (s.status === "paid" || s.status === "prepaid" || outstandingRow <= 0);
@@ -499,9 +474,6 @@ function LoanLedger() {
                   <td className="px-3 py-2">{fmtLedgerDate(s.due_date)}</td>
                   {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(s.expected_amount)}</td>}
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.amount_paid)}</td>
-                  {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_amount ?? 0)}</td>}
-                  {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(s.fine_paid ?? 0)}</td>}
-                  {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(Number(s.fine_amount ?? 0) - Number(s.fine_paid ?? 0))}</td>}
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(s.balance_remaining)}</td>
                   {!isOpening && <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status] ?? "bg-gray-100"}`}>{s.status}</span></td>}
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.prepaid ? "Prepaid" : s.remarks ?? ""}</td>
@@ -532,9 +504,6 @@ function LoanLedger() {
                   <td className="px-3 py-2" colSpan={2}>TOTALS</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.expected)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.paid)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.fineCharged)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.finePaid)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(ledgerTotals.outstandingFine)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(liveTotals.outstanding)}</td>
                   <td className="px-3 py-2" colSpan={canEditPayments ? 3 : 2} />
                 </tr>
@@ -547,11 +516,16 @@ function LoanLedger() {
       {!isOpening && (
         <Card className="mb-4">
           <div className="p-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
-            <span className="font-serif text-lg">Fine History</span>
+            <span className="font-serif text-lg">Fine Ledger</span>
             <div className="flex items-center gap-2">
               {canEditPayments && (
                 <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setAddFineOpen(true)}>
                   <Plus className="w-4 h-4 mr-1" /> Add Fine
+                </Button>
+              )}
+              {canEditPayments && (
+                <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setRecordFineOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> Record Fine Payment
                 </Button>
               )}
               {canDelete && fines.length > 0 && (
@@ -573,22 +547,32 @@ function LoanLedger() {
               )}
             </div>
           </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <Stat label="Fines Charged" value={fmtKES(fineHistoryTotals.amount)} />
+            <Stat label="Paid So Far" value={fmtKES(fineHistoryTotals.paid)} />
+            <Stat label="Outstanding" value={fmtKES(fineHistoryTotals.outstanding)} highlight={fineHistoryTotals.outstanding > 0} />
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-3 py-2">Date</th><th className="px-3 py-2">Reason</th>
-                <th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-right">Paid</th><th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Reason / Week</th>
+                <th className="px-3 py-2 text-right">Amount Charged</th>
+                <th className="px-3 py-2 text-right">Amount Paid</th>
+                <th className="px-3 py-2 text-right">Outstanding</th>
+                <th className="px-3 py-2">Status</th>
                 {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {fines.length === 0 && <tr><td colSpan={canEditPayments ? 6 : 5} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
+              {fines.length === 0 && <tr><td colSpan={canEditPayments ? 7 : 6} className="p-4 text-center text-muted-foreground">No fines</td></tr>}
               {fines.map((f: any) => (
                 <tr key={f.id} className="border-b last:border-0">
                   <td className="px-3 py-2">{fmtLedgerDate(f.fine_date)}</td>
-                  <td className="px-3 py-2">{f.reason}</td>
+                  <td className="px-3 py-2">{finePeriodLabel(f, schedule)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(f.status === "waived" ? 0 : Math.max(0, Number(f.amount ?? 0) - Number(f.amount_paid ?? 0)))}</td>
                   <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[f.status] ?? "bg-gray-100"}`}>{f.status}</span></td>
                   {canEditPayments && (
                     <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -603,54 +587,7 @@ function LoanLedger() {
                   <td className="px-3 py-2" colSpan={2}>TOTALS</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(fineHistoryTotals.amount)}</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(fineHistoryTotals.paid)}</td>
-                  <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
-      )}
-
-      {!isOpening && (
-        <Card className="mb-4">
-          <div className="p-4 border-b border-border flex items-center justify-between gap-2">
-            <span className="font-serif text-lg">Fine Repayments</span>
-            {canEditPayments && (
-              <Button size="sm" className="bg-navy text-white hover:bg-navy-2" onClick={() => setRecordFineOpen(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Record Fine Payment
-              </Button>
-            )}
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Fine Period</th>
-                <th className="px-3 py-2 text-right">Amount Paid</th>
-                <th className="px-3 py-2">Notes</th>
-                {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {fineRepayments.length === 0 && <tr><td colSpan={canEditPayments ? 5 : 4} className="p-4 text-center text-muted-foreground">No fine repayments recorded</td></tr>}
-              {fineRepayments.map((f: any) => (
-                <tr key={f.id} className="border-b last:border-0">
-                  <td className="px-3 py-2">{fineRepaymentDate(f)}</td>
-                  <td className="px-3 py-2">{finePeriodLabel(f, schedule)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(f.amount_paid)}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{f.reason?.replace(/\s*\[Paid.*$/, "") ?? ""}</td>
-                  {canEditPayments && (
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <button onClick={() => setEditFineState(f)} className="text-blue-600 hover:text-blue-800 mr-2" title="Edit"><Pencil className="w-4 h-4 inline" /></button>
-                      {canDelete && <button onClick={() => onDeleteFine(f)} className="text-red-600 hover:text-red-800" title="Delete"><Trash2 className="w-4 h-4 inline" /></button>}
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {fineRepayments.length > 0 && (
-                <tr className="bg-muted/40 font-semibold border-t-2 border-border">
-                  <td className="px-3 py-2" colSpan={2}>TOTALS</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmtKES(fineRepaymentTotals.paid)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{fmtKES(fineHistoryTotals.outstanding)}</td>
                   <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
                 </tr>
               )}
@@ -724,14 +661,13 @@ function LoanLedger() {
                 <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Method</th>
                 <th className="px-3 py-2 text-right">Amount</th>
-                {!isOpening && <th className="px-3 py-2 text-right">Fine Paid</th>}
                 <th className="px-3 py-2 text-right">Principal Paid</th>
                 <th className="px-3 py-2">Notes</th>
                 {canEditPayments && <th className="px-3 py-2 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {repayments.length === 0 && <tr><td colSpan={canEditPayments ? 8 : 7} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
+              {repayments.length === 0 && <tr><td colSpan={canEditPayments ? 7 : 6} className="p-4 text-center text-muted-foreground">No payments yet</td></tr>}
               {repayments.map((r: any) => (
                 <tr key={r.id} className="border-b last:border-0">
                   <td className="px-3 py-2">{fmtLedgerDate(repayDate(r))}</td>
@@ -742,7 +678,6 @@ function LoanLedger() {
                   </td>
                   <td className="px-3 py-2 text-xs capitalize">{(r.payment_method ?? "").replace(/_/g, " ") || "—"}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{fmtKES(r.amount)}</td>
-                  {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(r.fine_paid ?? 0)}</td>}
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(r.principal_paid ?? 0)}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? ""}</td>
                   {canEditPayments && (
@@ -757,7 +692,6 @@ function LoanLedger() {
                 <tr className="bg-muted/40 font-semibold border-t-2 border-border">
                   <td className="px-3 py-2" colSpan={3}>TOTALS</td>
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.amount)}</td>
-                  {!isOpening && <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.finePaid)}</td>}
                   <td className="px-3 py-2 text-right font-mono">{fmtKES(paymentTotals.principalPaid)}</td>
                   <td className="px-3 py-2" colSpan={canEditPayments ? 2 : 1} />
                 </tr>
@@ -1378,4 +1312,3 @@ function EditLoanDetailsDialog({ loan, onClose, onSaved }: any) {
     </>
   );
 }
-
