@@ -112,12 +112,14 @@ export function withBroughtForward(entries: any[], ob: OpeningBalance | null): a
       (source.includes("loan") && source.includes("issued") && (loanPayment > 0 || loanDebit > 0));
 
     if (isOpeningBF) {
-      // Opening loan already reflected in bf.loan_balance — skip any opening duplicate value
+      if (loanPayment > 0) {
+        loanBalance = Math.max(0, loanBalance - loanPayment);
+      }
     } else if (isLoanIssued) {
-      // New loan issued: RESET running balance to issued amount.
+      // New loans add to any existing outstanding balance.
       // Prefer loan_payment based on current passbook data shape, fallback to loan_debit.
       const issuedAmount = Math.max(loanPayment, loanDebit);
-      loanBalance = Math.max(0, issuedAmount);
+      loanBalance = Math.max(0, loanBalance + issuedAmount);
     } else if (loanPayment > 0) {
       // Repayment: subtract, never below 0
       loanBalance = Math.max(0, loanBalance - loanPayment);
