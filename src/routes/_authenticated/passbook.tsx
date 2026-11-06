@@ -16,6 +16,7 @@ import { PassbookTable } from "@/components/PassbookTable";
 import { createManualPassbookEntry, updatePassbookEntry, deletePassbookEntry, updateOpeningBalance, deleteOpeningBalance } from "@/lib/passbook.functions";
 import { forceDeletePassbookEntry } from "@/lib/entries.functions";
 import { PageSkeleton } from "@/components/loading-skeletons";
+import { fetchPassbookLoanRepayments } from "@/lib/passbook-loan-display";
 
 export const Route = createFileRoute("/_authenticated/passbook")({
   component: PassbookAdmin,
@@ -83,7 +84,7 @@ function PassbookAdmin() {
     },
   });
 
-  const { data: memberLoans = [] } = useQuery({
+  const { data: loanData = { options: [], displayLoans: [] } } = useQuery({
     queryKey: ["passbook-member-loans", memberId],
     enabled: !!memberId && isStaff,
     queryFn: async () => {
@@ -102,8 +103,7 @@ function PassbookAdmin() {
       if (loansRes.error) throw loansRes.error;
       if (openingRes.error) throw openingRes.error;
 
-      const regularLoans = (loansRes.data ?? [])
-        .filter((loan: any) => !["completed", "completed_with_fine", "rejected"].includes(String(loan.status ?? "")))
+      const allRegularLoans = (loansRes.data ?? [])
         .map((loan: any) => ({
           id: loan.id,
           type: "loan" as const,
@@ -113,8 +113,7 @@ function PassbookAdmin() {
           sort_date: loan.loan_date ?? null,
         }));
 
-      const openingLoans = ((openingRes.data ?? []) as any[])
-        .filter((loan) => Number(loan.balance ?? 0) > 0)
+      const allOpeningLoans = ((openingRes.data ?? []) as any[])
         .map((loan) => ({
           id: loan.id,
           type: "opening" as const,
@@ -124,9 +123,37 @@ function PassbookAdmin() {
           sort_date: loan.loan_date ?? null,
         }));
 
-      return [...openingLoans, ...regularLoans].sort((a, b) => String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")));
+      const regularLoansById = new Map((loansRes.data ?? []).map((loan: any) => [loan.id, loan]));
+      const openingLoansById = new Map(((openingRes.data ?? []) as any[]).map((loan) => [loan.id, loan]));
+      const displayRegularLoans = allRegularLoans.filter((loan: any) =>
+        !["pending", "rejected"].includes(String(regularLoansById.get(loan.id)?.status ?? "").toLowerCase()),
+      );
+      const optionsRegularLoans = allRegularLoans.filter((loan: any) =>
+        !["completed", "completed_with_fine", "rejected"].includes(String(regularLoansById.get(loan.id)?.status ?? "")),
+      );
+      const optionsOpeningLoans = allOpeningLoans.filter((loan: any) =>
+        Number(openingLoansById.get(loan.id)?.balance ?? 0) > 0,
+      );
+      const repayments = await fetchPassbookLoanRepayments(
+        displayRegularLoans.map((loan) => loan.id),
+        allOpeningLoans.map((loan) => loan.id),
+      );
+      const displayLoans = [...allOpeningLoans, ...displayRegularLoans].sort((a, b) =>
+        String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")),
+      ).map((loan) => ({
+        ...loan,
+        repayments: repayments.filter((repayment) =>
+          loan.type === "loan" ? repayment.loan_id === loan.id : repayment.opening_loan_id === loan.id,
+        ),
+      }));
+      const options = [...optionsOpeningLoans, ...optionsRegularLoans].sort((a, b) =>
+        String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")),
+      );
+      return { options, displayLoans };
     },
   });
+  const memberLoans = loanData.options;
+  const displayLoans = loanData.displayLoans;
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["passbook", memberId],
@@ -201,6 +228,7 @@ function PassbookAdmin() {
       }
       toast.success("Entry deleted and balances recalculated");
       qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+      qc.invalidateQueries({ queryKey: ["passbook-member-loans", memberId] });
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to delete");
     }
@@ -224,17 +252,26 @@ function PassbookAdmin() {
       </Card>
 
       {memberId && (
-        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} canEdit={canEdit} canDelete={canDelete} onEdit={handleEditEntry} onDelete={onDeleteEntry} />
+        <PassbookTable entries={entries} loading={isLoading} memberName={selectedMember?.full_name} membershipNo={selectedMember?.membership_no ?? undefined} memberLoans={memberLoans} displayLoans={displayLoans} canEdit={canEdit} canDelete={canDelete} onEdit={handleEditEntry} onDelete={onDeleteEntry} />
       )}
 
-      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
-      <EditEntryDialog entry={editEntry} memberLoans={memberLoans} onClose={() => setEditEntry(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })} />
+      <NewEntryDialog open={open} onOpenChange={setOpen} memberId={memberId} latestDate={entries.at(-1)?.entry_date} memberLoans={memberLoans} onCreated={() => {
+        qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+        qc.invalidateQueries({ queryKey: ["passbook-member-loans", memberId] });
+      }} />
+      <EditEntryDialog entry={editEntry} memberLoans={memberLoans} onClose={() => setEditEntry(null)} onSaved={() => {
+        qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+        qc.invalidateQueries({ queryKey: ["passbook-member-loans", memberId] });
+      }} />
       <EditOpeningBalanceDialog
         open={editOpening}
         onClose={() => setEditOpening(false)}
         memberId={memberId}
         entries={entries}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["passbook", memberId] })}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["passbook", memberId] });
+          qc.invalidateQueries({ queryKey: ["passbook-member-loans", memberId] });
+        }}
       />
     </div>
   );

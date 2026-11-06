@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/PageHeader";
 import { PassbookTable } from "@/components/PassbookTable";
 import { fetchOpeningBalance, withBroughtForward } from "@/lib/opening-balances";
+import { fetchPassbookLoanRepayments, type PassbookLoanRepayment } from "@/lib/passbook-loan-display";
 
 type MemberLoanOption = {
   id: string;
@@ -15,6 +16,7 @@ type MemberLoanOption = {
   total_repayable: number;
   passbook_opening_balance?: number | null;
   sort_date?: string | null;
+  repayments?: PassbookLoanRepayment[];
 };
 
 export const Route = createFileRoute("/_authenticated/my-passbook")({
@@ -46,7 +48,7 @@ function MyPassbook() {
       if (openingRes.error) throw openingRes.error;
 
       const regularLoans = (loansRes.data ?? [])
-        .filter((loan: any) => !["completed", "completed_with_fine", "rejected"].includes(String(loan.status ?? "")))
+        .filter((loan: any) => !["pending", "rejected"].includes(String(loan.status ?? "").toLowerCase()))
         .map((loan: any) => ({
           id: loan.id,
           type: "loan" as const,
@@ -57,7 +59,6 @@ function MyPassbook() {
         }));
 
       const openingLoans = ((openingRes.data ?? []) as any[])
-        .filter((loan) => Number(loan.balance ?? 0) > 0)
         .map((loan) => ({
           id: loan.id,
           type: "opening" as const,
@@ -67,7 +68,17 @@ function MyPassbook() {
           sort_date: loan.loan_date ?? null,
         }));
 
-      return [...openingLoans, ...regularLoans].sort((a, b) => String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")));
+      const loans = [...openingLoans, ...regularLoans].sort((a, b) => String(a.sort_date ?? "").localeCompare(String(b.sort_date ?? "")));
+      const repayments = await fetchPassbookLoanRepayments(
+        regularLoans.map((loan) => loan.id),
+        openingLoans.map((loan) => loan.id),
+      );
+      return loans.map((loan) => ({
+        ...loan,
+        repayments: repayments.filter((repayment) =>
+          loan.type === "loan" ? repayment.loan_id === loan.id : repayment.opening_loan_id === loan.id,
+        ),
+      }));
     },
   });
 
@@ -125,6 +136,7 @@ function MyPassbook() {
         },
         () => {
           qc.invalidateQueries({ queryKey: ["my-passbook", user.id] });
+          qc.invalidateQueries({ queryKey: ["my-passbook-loans", user.id] });
         }
       )
       .subscribe();

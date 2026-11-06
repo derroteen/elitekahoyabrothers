@@ -1,9 +1,11 @@
+import { Fragment } from "react";
 import { fmtKES, fmtDate } from "@/lib/format";
 import { Card } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { exportPassbookExcel, exportPassbookPdf } from "@/lib/passbook-export";
 import { TableRowsSkeleton } from "@/components/loading-skeletons";
+import { buildPassbookLoanDisplay, type PassbookLoanRepayment } from "@/lib/passbook-loan-display";
 
 type MemberLoanColumn = {
   id: string;
@@ -12,6 +14,7 @@ type MemberLoanColumn = {
   total_repayable: number;
   passbook_opening_balance?: number | null;
   sort_date?: string | null;
+  repayments?: PassbookLoanRepayment[];
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -38,106 +41,19 @@ function descriptionFor(e: any): string {
   return "Entry";
 }
 
-function isLoanIssuedEntry(entry: any): boolean {
-  const category = String(entry.category ?? "").toLowerCase();
-  const description = String(entry.description ?? "");
-  const source = String(entry.source ?? "").toLowerCase();
-  const loanDebit = Number(entry.loan_debit ?? 0);
-  const loanPayment = Number(entry.loan_payment ?? 0);
-  return (
-    /loan issued/i.test(description) ||
-    category === "loan_issued" ||
-    (category === "loan" && (loanDebit > 0 || loanPayment > 0) && !/repay/i.test(description)) ||
-    (source.includes("loan") && source.includes("issued") && (loanDebit > 0 || loanPayment > 0))
-  );
-}
-
-function entryMatchesLoan(entry: any, loan: MemberLoanColumn): boolean {
-  const directMatch =
-    (loan.type === "loan" && entry.loan_id === loan.id) ||
-    (loan.type === "opening" && entry.opening_loan_id === loan.id);
-  if (directMatch) return true;
-
-  // Historical loan-issued passbook rows may not have the loan_id populated.
-  // In that case, match the issue row back to the regular loan by its issue date.
-  return Boolean(
-    loan.type === "loan" &&
-      isLoanIssuedEntry(entry) &&
-      loan.sort_date &&
-      entry.entry_date === loan.sort_date
-  );
-}
-
-function loanPaymentForRow(entry: any, loan: MemberLoanColumn): number {
-  const junctionPayment = entry.passbook_entry_loan_payments?.find(
-    (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
-  );
-  if (junctionPayment) return Number(junctionPayment.amount ?? 0);
-  const repayment = entry.loan_repayments?.find(
-    (p: any) => (loan.type === "loan" && p.loan_id === loan.id) || (loan.type === "opening" && p.opening_loan_id === loan.id)
-  );
-  if (repayment) return Number(repayment.amount ?? 0);
-  return entryMatchesLoan(entry, loan) ? Number(entry.loan_payment ?? 0) : 0;
-}
-
-export function PassbookTable({ entries, loading, memberName, membershipNo, memberLoans, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; memberLoans?: MemberLoanColumn[]; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
+export function PassbookTable({ entries, loading, memberName, membershipNo, memberLoans, displayLoans, canEdit, canDelete, onEdit, onDelete }: { entries: any[]; loading?: boolean; memberName?: string; membershipNo?: string; memberLoans?: MemberLoanColumn[]; displayLoans?: MemberLoanColumn[]; canEdit?: boolean; canDelete?: boolean; onEdit?: (entry: any) => void; onDelete?: (entry: any) => void }) {
   const totalSavings = entries.reduce((s, e) => s + Number(e.total ?? 0), 0);
   const totalWithdrawn = entries.reduce((s, e) => s + Number(e.withdrawal ?? 0), 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
   const loanBal = entries.at(-1)?.loan_balance ?? 0;
-  const perLoanColumns = (memberLoans?.length ?? 0) >= 2 ? (memberLoans ?? []) : [];
-  const showCombinedLoanColumns = perLoanColumns.length === 0;
-  const trailingFooterColSpan = (showCombinedLoanColumns ? 2 : perLoanColumns.length * 2) + 1 + (canEdit ? 1 : 0);
+  const loanDisplay = buildPassbookLoanDisplay(entries, displayLoans ?? memberLoans ?? []);
+  const showSplitLoanColumns = loanDisplay !== null;
+  const trailingFooterColSpan = (showSplitLoanColumns ? 5 : 2) + 1 + (canEdit ? 1 : 0);
   const tableColSpan = 5 + trailingFooterColSpan;
 
-  const perLoanPaymentsByRow = (() => {
-    if (perLoanColumns.length === 0) return [];
-    return entries.map((entry) => {
-      return perLoanColumns.map((loan) => {
-        return isLoanIssuedEntry(entry) ? 0 : loanPaymentForRow(entry, loan);
-      });
-    });
-  })();
-
-  const perLoanBalancesByRow = (() => {
-    if (perLoanColumns.length === 0) return [];
-    const runningBalances = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0));
-    const loanStarted = perLoanColumns.map((loan) => Number(loan.passbook_opening_balance ?? 0) > 0);
-    return entries.map((entry, rowIndex) => {
-      perLoanColumns.forEach((loan, index) => {
-        const matchesLoan = entryMatchesLoan(entry, loan);
-        const isIssue = matchesLoan && isLoanIssuedEntry(entry);
-        if (isIssue) {
-          runningBalances[index] = Math.max(
-            Number(entry.loan_debit ?? 0),
-            Number(entry.loan_payment ?? 0),
-            Number(loanPaymentForRow(entry, loan) ?? 0),
-            Number(loan.total_repayable ?? 0)
-          );
-          loanStarted[index] = true;
-          return;
-        }
-        if (matchesLoan && entry.loan_debit && Number(entry.loan_debit) > 0) {
-          runningBalances[index] = runningBalances[index] + Number(entry.loan_debit);
-          loanStarted[index] = true;
-        }
-        // Now subtract the per-loan payment from our perLoanPaymentsByRow
-        const payment = perLoanPaymentsByRow[rowIndex]?.[index] ?? 0;
-        if (payment > 0) {
-          if (!loanStarted[index] && loan.type === "loan" && Number(loan.total_repayable ?? 0) > 0) {
-            runningBalances[index] = Number(loan.total_repayable ?? 0);
-            loanStarted[index] = true;
-          }
-          runningBalances[index] = Math.max(0, runningBalances[index] - payment);
-        }
-      });
-      return [...runningBalances];
-    });
-  })();
-
   const hasEntries = entries.length > 0;
-  const doExcel = () => exportPassbookExcel(entries, { memberName, membershipNo });
-  const doPdf = () => exportPassbookPdf(entries, { memberName, membershipNo });
+  const doExcel = () => exportPassbookExcel(entries, { memberName, membershipNo }, loanDisplay);
+  const doPdf = () => exportPassbookPdf(entries, { memberName, membershipNo }, loanDisplay);
 
   return (
     <Card className="overflow-hidden relative">
@@ -170,18 +86,20 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
               <th className="px-3 py-2 text-right">Credit</th>
               <th className="px-3 py-2 text-right">Debit</th>
               <th className="px-3 py-2 text-right">Balance</th>
-              {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Pmt</th>}
-              {showCombinedLoanColumns && <th className="px-3 py-2 text-right">Loan Bal</th>}
-              {perLoanColumns.map((loan, index) => (
+              {showSplitLoanColumns ? (
                 <>
-                  <th key={`${loan.type}-${loan.id}-pmt`} className="px-3 py-2 text-right" title={loan.label}>
-                    Loan {index + 1} Pmt
-                  </th>
-                  <th key={`${loan.type}-${loan.id}-bal`} className="px-3 py-2 text-right" title={loan.label}>
-                    Loan {index + 1} Bal
-                  </th>
+                  <th className="px-3 py-2 text-right">Loan 1 Pmt</th>
+                  <th className="px-3 py-2 text-right">Loan 1 Bal</th>
+                  <th className="px-3 py-2 text-right">Loan 2 Pmt</th>
+                  <th className="px-3 py-2 text-right">Loan 2 Bal</th>
+                  <th className="px-3 py-2 text-right">Total Loan Bal</th>
                 </>
-              ))}
+              ) : (
+                <>
+                  <th className="px-3 py-2 text-right">Loan Pmt</th>
+                  <th className="px-3 py-2 text-right">Loan Bal</th>
+                </>
+              )}
               <th className="px-3 py-2 text-left">Source</th>
               {canEdit && <th className="px-3 py-2 text-left">Actions</th>}
             </tr>
@@ -206,18 +124,35 @@ export function PassbookTable({ entries, loading, memberName, membershipNo, memb
                   <td className="px-3 py-2 text-right text-emerald-700">{credit > 0 ? credit.toFixed(2) : ""}</td>
                   <td className="px-3 py-2 text-right text-red-700">{debit > 0 ? debit.toFixed(2) : ""}</td>
                   <td className="px-3 py-2 text-right text-navy font-bold">{Number(e.balance).toFixed(2)}</td>
-                  {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>}
-                  {showCombinedLoanColumns && <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>}
-                  {perLoanColumns.map((loan, loanIndex) => (
+                  {showSplitLoanColumns ? (
                     <>
-                      <td key={`${e.id}-${loan.type}-${loan.id}-pmt`} className="px-3 py-2 text-right">
-                        {Number(perLoanPaymentsByRow[rowIndex]?.[loanIndex] ?? 0).toFixed(2)}
-                      </td>
-                      <td key={`${e.id}-${loan.type}-${loan.id}-bal`} className="px-3 py-2 text-right">
-                        {Number(perLoanBalancesByRow[rowIndex]?.[loanIndex] ?? loan.passbook_opening_balance ?? loan.total_repayable ?? 0).toFixed(2)}
-                      </td>
+                      {[0, 1].map((loanIndex) => {
+                        const payment = loanDisplay.rows[rowIndex]?.payments[loanIndex];
+                        const balance = loanDisplay.rows[rowIndex]?.balances[loanIndex];
+                        return (
+                          <Fragment key={loanIndex}>
+                            <td className="px-3 py-2 text-right">
+                              {payment == null ? "" : payment.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {balance == null ? "" : (
+                                <>
+                                  {balance.amount.toFixed(2)}
+                                  {balance.cleared && <span className="ml-1 text-emerald-700 font-sans text-[10px]">CLEARED</span>}
+                                </>
+                              )}
+                            </td>
+                          </Fragment>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>
                     </>
-                  ))}
+                  ) : (
+                    <>
+                      <td className="px-3 py-2 text-right">{Number(e.loan_payment ?? 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right">{Number(e.loan_balance ?? 0).toFixed(2)}</td>
+                    </>
+                  )}
                   <td className="px-3 py-2 text-left text-[10px] uppercase tracking-wider">
                     {bf ? <span className="text-gold-3 font-semibold">Opening</span> : isWeekly ? <span className="text-navy">Weekly Sheet</span> : <span className="text-muted-foreground">Manual</span>}
                   </td>

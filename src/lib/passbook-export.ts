@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fmtKES, fmtDate } from "@/lib/format";
+import type { PassbookLoanDisplay } from "@/lib/passbook-loan-display";
 
 const CATEGORY_LABELS: Record<string, string> = {
   weekly_collection: "Weekly Collection",
@@ -33,26 +34,43 @@ function safeName(s?: string) {
   return (s ?? "passbook").replace(/[^a-z0-9_-]+/gi, "_");
 }
 
-function buildRows(entries: any[]) {
-  return entries.map((e) => {
+function buildRows(entries: any[], loanDisplay?: PassbookLoanDisplay | null) {
+  return entries.map((e, index) => {
     const credit = Number(e.savings ?? 0) + Number(e.bonus ?? 0);
     const debit = Number(e.withdrawal ?? 0);
     const source = e.__brought_forward ? "Opening" : e.source === "weekly" ? "Weekly Sheet" : "Manual";
+    const displayRow = loanDisplay?.rows[index];
+    const loanColumns = loanDisplay
+      ? {
+          "Loan 1 Pmt": displayRow?.payments[0]?.toFixed(2) ?? "",
+          "Loan 1 Bal": formatLoanBalance(displayRow?.balances[0]),
+          "Loan 2 Pmt": displayRow?.payments[1]?.toFixed(2) ?? "",
+          "Loan 2 Bal": formatLoanBalance(displayRow?.balances[1]),
+          "Total Loan Bal": Number(e.loan_balance ?? 0),
+        }
+      : {
+          "Loan Pmt": Number(e.loan_payment ?? 0),
+          "Loan Bal": Number(e.loan_balance ?? 0),
+        };
     return {
       Date: fmtDate(e.entry_date),
       Description: descriptionFor(e),
       Credit: credit,
       Debit: debit,
       Balance: Number(e.balance ?? 0),
-      "Loan Pmt": Number(e.loan_payment ?? 0),
-      "Loan Bal": Number(e.loan_balance ?? 0),
+      ...loanColumns,
       Source: source,
     };
   });
 }
 
-export function exportPassbookExcel(entries: any[], meta: PassbookExportMeta) {
-  const rows = buildRows(entries);
+function formatLoanBalance(balance: { amount: number; cleared: boolean } | null | undefined): string {
+  if (!balance) return "";
+  return `${balance.amount.toFixed(2)}${balance.cleared ? " CLEARED" : ""}`;
+}
+
+export function exportPassbookExcel(entries: any[], meta: PassbookExportMeta, loanDisplay?: PassbookLoanDisplay | null) {
+  const rows = buildRows(entries, loanDisplay);
   const totalCredit = rows.reduce((s, r) => s + r.Credit, 0);
   const totalDebit = rows.reduce((s, r) => s + r.Debit, 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
@@ -73,22 +91,29 @@ export function exportPassbookExcel(entries: any[], meta: PassbookExportMeta) {
     ws,
     [
       [],
-      ["", "Totals", totalCredit, totalDebit, currentBal, "", loanBal, ""],
+      loanDisplay
+        ? ["", "Totals", totalCredit, totalDebit, currentBal, "", "", "", "", loanBal, ""]
+        : ["", "Totals", totalCredit, totalDebit, currentBal, "", loanBal, ""],
     ],
     { origin: `A${lastRow + 1}` },
   );
 
-  ws["!cols"] = [
-    { wch: 12 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
-  ];
+  ws["!cols"] = loanDisplay
+    ? [
+        { wch: 12 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
+        { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 16 }, { wch: 14 },
+      ]
+    : [
+        { wch: 12 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
+      ];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Passbook");
   XLSX.writeFile(wb, `${safeName(meta.membershipNo || meta.memberName)}_passbook.xlsx`);
 }
 
-export function exportPassbookPdf(entries: any[], meta: PassbookExportMeta) {
-  const rows = buildRows(entries);
+export function exportPassbookPdf(entries: any[], meta: PassbookExportMeta, loanDisplay?: PassbookLoanDisplay | null) {
+  const rows = buildRows(entries, loanDisplay);
   const totalCredit = rows.reduce((s, r) => s + r.Credit, 0);
   const totalDebit = rows.reduce((s, r) => s + r.Debit, 0);
   const currentBal = entries.at(-1)?.balance ?? 0;
@@ -105,32 +130,38 @@ export function exportPassbookPdf(entries: any[], meta: PassbookExportMeta) {
   doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 72);
   doc.text(`Current Balance: ${fmtKES(currentBal)}    Loan Balance: ${fmtKES(loanBal)}`, 40, 86);
 
+  const head = loanDisplay
+    ? ["Date", "Description", "Credit", "Debit", "Balance", "Loan 1 Pmt", "Loan 1 Bal", "Loan 2 Pmt", "Loan 2 Bal", "Total Loan Bal", "Source"]
+    : ["Date", "Description", "Credit", "Debit", "Balance", "Loan Pmt", "Loan Bal", "Source"];
+  const body = rows.map((r) =>
+    loanDisplay
+      ? [
+          r.Date, r.Description, r.Credit ? r.Credit.toFixed(2) : "", r.Debit ? r.Debit.toFixed(2) : "",
+          r.Balance.toFixed(2), r["Loan 1 Pmt"] ?? "", r["Loan 1 Bal"] ?? "", r["Loan 2 Pmt"] ?? "",
+          r["Loan 2 Bal"] ?? "", Number(r["Total Loan Bal"] ?? 0).toFixed(2), r.Source,
+        ]
+      : [
+          r.Date, r.Description, r.Credit ? r.Credit.toFixed(2) : "", r.Debit ? r.Debit.toFixed(2) : "",
+          r.Balance.toFixed(2), r["Loan Pmt"] ? r["Loan Pmt"].toFixed(2) : "",
+          r["Loan Bal"] ? r["Loan Bal"].toFixed(2) : "", r.Source,
+        ],
+  );
+  const foot = loanDisplay
+    ? [["", "Totals", totalCredit.toFixed(2), totalDebit.toFixed(2), Number(currentBal).toFixed(2), "", "", "", "", Number(loanBal).toFixed(2), ""]]
+    : [["", "Totals", totalCredit.toFixed(2), totalDebit.toFixed(2), Number(currentBal).toFixed(2), "", Number(loanBal).toFixed(2), ""]];
+
   autoTable(doc, {
     startY: 100,
-    head: [["Date", "Description", "Credit", "Debit", "Balance", "Loan Pmt", "Loan Bal", "Source"]],
-    body: rows.map((r) => [
-      r.Date,
-      r.Description,
-      r.Credit ? r.Credit.toFixed(2) : "",
-      r.Debit ? r.Debit.toFixed(2) : "",
-      r.Balance.toFixed(2),
-      r["Loan Pmt"] ? r["Loan Pmt"].toFixed(2) : "",
-      r["Loan Bal"] ? r["Loan Bal"].toFixed(2) : "",
-      r.Source,
-    ]),
-    foot: [[
-      "", "Totals",
-      totalCredit.toFixed(2),
-      totalDebit.toFixed(2),
-      Number(currentBal).toFixed(2),
-      "", Number(loanBal).toFixed(2), "",
-    ]],
+    head: [head],
+    body,
+    foot,
     styles: { font: "helvetica", fontSize: 9, cellPadding: 4 },
     headStyles: { fillColor: [15, 23, 42], textColor: 255 },
     footStyles: { fillColor: [241, 245, 249], textColor: 15, fontStyle: "bold" },
     columnStyles: {
       2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
-      5: { halign: "right" }, 6: { halign: "right" },
+      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
+      8: { halign: "right" }, 9: { halign: "right" },
     },
   });
 
